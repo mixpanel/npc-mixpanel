@@ -1,5 +1,4 @@
-import { cloudEvent, http } from '@google-cloud/functions-framework';
-import { Storage } from '@google-cloud/storage';
+import {  http } from '@google-cloud/functions-framework';
 import { sLog, uid, timer } from 'ak-tools';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -11,13 +10,12 @@ let TEMP_DIR;
 if (NODE_ENV === 'dev') TEMP_DIR = './tmp';
 else TEMP_DIR = tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
+import headless from './components/headless.js';
 
 
 
 /**
- * @typedef {Object} Params
- * @property {string} [foo] - Description of foo
- * @property {number} [bar] - Description of bar
+ * @typedef {import('./components/headless').PARAMS} Params 
  */
 
 
@@ -33,7 +31,7 @@ http('http-entry', async (req, res) => {
 		/** @type {Params} */
 		const { body = {} } = req;
 		/** @type {Endpoints} */
-		const { path } = req;
+		const { path } = req;		
 
 		const t = timer('job');
 		t.start();
@@ -44,7 +42,7 @@ http('http-entry', async (req, res) => {
 
 		// @ts-ignore
 		const result = await job(body);
-		t.end()
+		t.end();
 		sLog(`FINISH: ${req.path} ... ${t.report(false).human}`, result);
 
 		//finished
@@ -60,13 +58,11 @@ http('http-entry', async (req, res) => {
 	res.send(JSON.stringify(response));
 });
 
-
-async function ping(data) {
-	return Promise.resolve({ status: "ok", message: "service is alive", echo: data });
+async function main(data) {
+	return await headless(data);
 }
 
-
-async function main(data) {
+async function ping(data) {
 	return Promise.resolve({ status: "ok", message: "service is alive", echo: data });
 }
 
@@ -94,30 +90,3 @@ function route(path) {
 			throw new Error(`Invalid path: ${path}`);
 	}
 }
-
-
-
-// cloud event entry point
-// ? https://cloud.google.com/functions/docs/writing/write-event-driven-functions
-// cloudEvent('entry', async (cloudEvent) => {
-// 	const { data } = cloudEvent;
-// 	const runId = uid();
-// 	const reqData = { data, runId };
-// 	let response = {};
-// 	const t = timer('job');
-// 	t.start();
-// 	sLog(`START`, reqData);
-
-// 	try {
-// 		const result = await main(data);
-// 		sLog(`FINISH ${t.end()}`, { ...result, runId });
-// 		response = result;
-
-// 	} catch (e) {
-// 		console.error(`ERROR! ${e.message || "unknown"}`, e);
-// 		response = { error: e };
-// 	}
-
-// 	return response;
-
-// });
