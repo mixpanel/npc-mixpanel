@@ -30,7 +30,7 @@ export default async function main(PARAMS = {}) {
 		users = 10,
 		concurrency = 5,
 		headless = true,
-		inject = false,
+		inject = true,
 		token = ""
 	} = PARAMS;
 	const limit = pLimit(concurrency);
@@ -65,7 +65,7 @@ export default async function main(PARAMS = {}) {
  * @param {boolean} inject - Whether to inject external script.
  */
 async function simulateUser(url, headless = true, inject = false) {
-	const timeoutMs = 3 * 60 * 1000; // 3 minutes in milliseconds
+	const timeoutMs = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 	const browser = await puppeteer.launch({ headless, args: ['--disable-web-security', '--disable-features=IsolateOrigins,site-per-process'] });
 	const page = await browser.newPage();
@@ -73,8 +73,16 @@ async function simulateUser(url, headless = true, inject = false) {
 	await page.goto(url);
 
 	// Define a timeout promise
-	const timeoutPromise = new Promise((resolve, reject) => 
-		setTimeout(() => resolve('timeout'), timeoutMs)
+	const timeoutPromise = new Promise((resolve, reject) =>
+		setTimeout(() => {
+			try {
+				browser.close().then(() => resolve('timeout'));
+			}
+			catch (e) {
+				resolve('timeout');
+			}
+
+		}, timeoutMs)
 	);
 
 	// Define the user session simulation promise
@@ -85,9 +93,9 @@ async function simulateUser(url, headless = true, inject = false) {
 				const injectedFunction = new Function(`return (${injectMixpanelFn})`)();
 				injectedFunction(MIXPANEL_TOKEN);
 			}, MIXPANEL_TOKEN, injectMixpanelString);
+			await u.sleep(100); // Ensure analytics script injection completes
 		}
 
-		await u.sleep(100); // Ensure analytics script injection completes
 		const persona = selectPersona(); // Generate user persona
 		const actions = await simulateUserSession(page, persona); // Simulate actions
 		await browser.close(); // Close browser when done
@@ -124,7 +132,7 @@ async function simulateUserSession(page, persona) {
 				if (coinFlip()) await clickStuff(page);
 				if (coinFlip()) await wait();
 				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await clickStuff(page)
+				if (coinFlip()) await clickStuff(page);
 				if (coinFlip()) await clickStuff(page);
 				if (coinFlip()) await clickStuff(page);
 				if (coinFlip()) await wait();
@@ -274,7 +282,7 @@ async function randomMouseMove(page) {
 async function moveMouse(page, startX, startY, endX, endY) {
 	try {
 		// Increase step distance to reduce total number of steps
-		const stepDistance = u.rand(5, 20); // Increase from 5 to 15 pixels per step
+		const stepDistance = u.rand(10, 20); // Increase from 5 to 15 pixels per step
 		const steps = Math.ceil(Math.max(Math.abs(endX - startX), Math.abs(endY - startY)) / stepDistance);
 		const deltaX = (endX - startX) / steps;
 		const deltaY = (endY - startY) / steps;
@@ -299,7 +307,7 @@ async function moveMouse(page, startX, startY, endX, endY) {
 
 		// Final mouse move to the exact end point
 		await page.mouse.move(endX, endY);
-		await u.sleep(u.rand(50, 100)); // Final hesitation reduced
+		await u.sleep(u.rand(12, 42)); // Final hesitation reduced
 
 		if (NODE_ENV === "dev") console.log('mouse!');
 		return true;
@@ -469,7 +477,7 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 						}, scrollThreshold);
 					});
 
-					console.log('all tracking attached')
+					console.log('all tracking attached');
 
 				},
 				record_sessions_percent: 100,
