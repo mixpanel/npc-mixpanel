@@ -6,6 +6,11 @@ sample-event.json
 scratch.js
 .vscode
 .env
+.git
+tests
+tmps
+scripts
+.cache
 
 
 

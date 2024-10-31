@@ -1,35 +1,36 @@
 {
-  "name": "cloud-function-boilerplate",
-  "version": "1.0.0",
-  "main": "function.js",
-  "scripts": {
-    "local": "./scripts/local.sh",
-    "fire": "./scripts/fire.sh",
-    "deploy": "./scripts/deploy.sh",
-    "perms": "chmod +x ./scripts/*.sh",
-    "prune": "rm -rf tmp/*",
-    "test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js"
-  },
-  "type": "module",
-  "keywords": [
-    "cloud function",
-    "template",
-    "serverless"
-  ],
-  "author": "ak@mixpanel.com",
-  "license": "ISC",
-  "description": "AK's cloud function boilerplate",
-  "dependencies": {
-    "@google-cloud/functions-framework": "^3.4.2",
-    "@google-cloud/storage": "^7.12.0",
-    "ak-fetch": "^1.0.6",
-    "ak-tools": "^1.0.66",
-    "dotenv": "^16.4.5",
-    "p-limit": "^6.1.0",
-    "puppeteer": "^23.6.1"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.1.4"
-  }
+	"name": "cloud-function-boilerplate",
+	"version": "1.0.0",
+	"main": "function.js",
+	"scripts": {
+		"local": "./scripts/local.sh",
+		"fire": "./scripts/fire.sh",
+		"deploy": "./scripts/deploy.sh",
+		"perms": "chmod +x ./scripts/*.sh",
+		"prune": "rm -rf tmp/*",
+		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",
+		"gcp-build": "node node_modules/puppeteer/install.mjs"
+	},
+	"type": "module",
+	"keywords": [
+		"cloud function",
+		"template",
+		"serverless"
+	],
+	"author": "ak@mixpanel.com",
+	"license": "ISC",
+	"description": "AK's cloud function boilerplate",
+	"dependencies": {
+		"@google-cloud/functions-framework": "^3.4.2",
+		"@google-cloud/storage": "^7.12.0",
+		"ak-fetch": "^1.0.6",
+		"ak-tools": "^1.0.66",
+		"dotenv": "^16.4.5",
+		"p-limit": "^6.1.0",
+		"puppeteer": "^23.6.1"
+	},
+	"devDependencies": {
+		"jest": "^29.7.0",
+		"nodemon": "^3.1.4"
+	}
 }

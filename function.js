@@ -22,7 +22,7 @@ import headless from './components/headless.js';
 
 // http entry point
 // ? https://cloud.google.com/functions/docs/writing/write-http-functions
-http('http-entry', async (req, res) => {
+http('entry', async (req, res) => {
 	const runId = uid();
 	const reqData = { url: req.url, method: req.method, headers: req.headers, body: req.body, runId };
 	let response = {};
@@ -32,6 +32,12 @@ http('http-entry', async (req, res) => {
 		const { body = {} } = req;
 		/** @type {Endpoints} */
 		const { path } = req;		
+		
+		//todo: actually do auth
+		if (body.safeWord !== "let me in...") {
+			res.status(401).send("Bro... you're not authorized to be here");
+			return;
+		} 
 
 		const t = timer('job');
 		t.start();
