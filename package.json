@@ -1,6 +1,7 @@
 {
-	"name": "cloud-function-boilerplate",
+	"name": "npc-mixpanel",
 	"version": "1.0.0",
+	"private": true,
 	"main": "function.js",
 	"scripts": {
 		"local": "./scripts/local.sh",
@@ -19,7 +20,7 @@
 	],
 	"author": "ak@mixpanel.com",
 	"license": "ISC",
-	"description": "AK's cloud function boilerplate",
+	"description": "puppeteer in the cloud!",
 	"dependencies": {
 		"@google-cloud/functions-framework": "^3.4.2",
 		"@google-cloud/storage": "^7.12.0",

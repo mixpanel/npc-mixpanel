@@ -1,7 +1,9 @@
 {
-	"url": "https://soundrootswellness.com/",
-	"users": 10,
-	"concurrency": 5,
+	"url": "http://www.youtube.com/",
+	"users": 1,
+	"concurrency": 1,
 	"inject": true,
-	"token": "5d6ca81b005ddbc2dbf8eeca0a058869"
+	"token": "5d6ca81b005ddbc2dbf8eeca0a058869",
+	"safeWord": "let me in...",
+	"headless": false
 }
