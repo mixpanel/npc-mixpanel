@@ -12,6 +12,8 @@
 			--text-color: #f9fafb;
 			--primary-color: #9d5cff;
 			--secondary-color: #4a1e8a;
+			--third-color: #FF7557;
+			--fourth-color: #80E1D9;
 			--input-bg: #2c2c2c;
 			--input-border: #3f3f3f;
 		}
@@ -46,6 +48,18 @@
 			font-size: 1.5rem;
 			font-weight: 600;
 			color: var(--text-color);
+		}
+
+		a {
+			color: var(--third-color);
+		}
+
+		a:hover {
+			color: var(--fourth-color);
+		}
+
+		a:visited {
+			color: var(--secondary-color);
 		}
 
 		.container {
@@ -223,7 +237,6 @@
 				<input type="text"
 					id="url"
 					name="url"
-					value="https://reddit.com"
 					required>
 
 				<label for="token">Mixpanel Token:</label>
@@ -249,7 +262,7 @@
 				<button type="submit">lets go!</button>
 			</form>
 			<div class="loading">Simulating...</div>
-			<div class="success">Your simulation is running! Check out your project!</div>
+			<div class="success"><br/>Your simulation is running!<br/>Check out your project!</div>
 		</div>
 	</div>
 
@@ -259,6 +272,78 @@
 		const success = document.querySelector('.success');
 		const usersSlider = document.getElementById('users');
 		const usersOutput = document.getElementById('usersOutput');
+		const url = document.getElementById('url');
+		const possibleUrls = [
+			"https://reddit.com",
+			"https://youtube.com",
+			"https://soundcloud.com",
+			"https://tumblr.com",
+			"https://bsky.app",
+			"https://threads.net",
+			"https://news.google.com/",
+			"https://news.ycombinator.com/",
+			"https://quora.com",
+			"https://medium.com",
+			"https://dev.to",
+			"https://github.com",
+			"https://stackoverflow.com",
+			"https://nytimes.com",
+			"https://washingtonpost.com",
+			"https://bbc.com",
+			"https://theverge.com",
+			"https://techcrunch.com",
+			"https://producthunt.com",
+			"https://npr.org",
+			"https://coinmarketcap.com",
+			"https://cnn.com",
+			"https://reuters.com",
+			"https://apnews.com",
+			"https://cnbc.com",
+			"https://forbes.com",
+			"https://bloomberg.com",
+			"https://businessinsider.com",
+			"https://arstechnica.com",
+			"https://wired.com",
+			"https://engadget.com",
+			"https://zdnet.com",
+			"https://slashdot.org",
+			"https://huffpost.com",
+			"https://vox.com",
+			"https://vice.com",
+			"https://polygon.com",
+			"https://kotaku.com",
+			"https://ign.com",
+			"https://gamespot.com",
+			"https://howtogeek.com",
+			"https://lifewire.com",
+			"https://digitaltrends.com",
+			"https://tomshardware.com",
+			"https://pcmag.com",
+			"https://gizmodo.com",
+			"https://cnet.com",
+			"https://makeuseof.com",
+			"https://tutorialspoint.com",
+			"https://w3schools.com",
+			"https://codecademy.com",
+			"https://freecodecamp.org",
+			"https://khanacademy.org",
+			"https://nature.com",
+			"https://sciencedaily.com",
+			"https://livescience.com",
+			"https://space.com",
+			"https://nationalgeographic.com",
+			"https://smithsonianmag.com",
+			"https://history.com",
+			"https://biography.com",
+			"https://mentalfloss.com",
+			"https://theatlantic.com",
+			"https://economist.com",
+			"https://marketwatch.com",
+			"https://investopedia.com",
+			"https://cryptoslate.com",
+			"https://coindesk.com"
+		];
+		url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
 		usersSlider.addEventListener('input', (e) => {
 			usersOutput.textContent = e.target.value;
@@ -268,10 +353,10 @@
 			e.preventDefault();
 			const formData = new FormData(form);
 			const data = Object.fromEntries(formData.entries());
-			data.safeWord = "let me in...";
-			data.concurrency = 5;
+			data.safeWord = "let me in...";			
 			data.users = parseInt(data.users);
-			if (data.users > 20) data.concurrency = 7;
+			data.concurrency = data.users;
+			if (data.concurrency > 10) data.concurrency = 10;
 			// data.headless = false;
 
 			form.style.display = 'none';
@@ -285,10 +370,6 @@
 					},
 					body: JSON.stringify(data),
 				});
-
-				// if (!response.ok) {
-				//     throw new Error('Network response was not ok');
-				// }
 
 				await new Promise(resolve => setTimeout(resolve, 15000));
 

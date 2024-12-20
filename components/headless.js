@@ -65,10 +65,8 @@ export default async function main(PARAMS = {}) {
  * Simulates a single user session with random actions, with a timeout to prevent hangs.
  * @param {string} url - The URL to visit.
  * @param {boolean} headless - Whether to run the browser headlessly.
- * @param {string} [userName] - The user name to identify in Mixpanel.
  */
-async function simulateUser(url, headless = true, userName) {
-	if (!userName) userName = u.makeName();
+async function simulateUser(url, headless = true) {
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
 	const timeoutPromise = new Promise((resolve) =>
@@ -99,7 +97,7 @@ async function simulateUser(url, headless = true, userName) {
 		const persona = selectPersona();
 
 		try {
-			const actions = await simulateUserSession(page, persona);
+			const actions = await simulateUserSession(browser, page, persona);
 			await browser.close();
 			return actions;
 		}
@@ -262,40 +260,61 @@ async function relaxCSP(page) {
 
 /**
  * Simulates a user session on the page, following a persona-based action sequence.
+ * @param {import('puppeteer').Browser} browser - Puppeteer browser object.
  * @param {import('puppeteer').Page} page - Puppeteer page object.
  * @param {string} persona - User persona to simulate.
  */
-async function simulateUserSession(page, persona) {
-	const usersHandle = u.makeName();
+async function simulateUserSession(browser, page, persona) {
+	const usersHandle = u.makeName(6, " ");
 
 	// Initial Mixpanel injection
 	await jamMixpanelIntoBrowser(page, usersHandle);
 
-	// Store initial domain
+	// Store initial domain and page target ID
 	let currentDomain = new URL(await page.url()).hostname;
+	const mainPageTarget = await page.target();
+	const mainPageId = mainPageTarget._targetId;
 
-	const actionSequence = generatePersonaActionSequence(persona);
-	const actionResults = [];
+	// Set up tab listener to automatically close new tabs
+	browser.on('targetcreated', async (target) => {
+		if (target._targetId !== mainPageId) {
+			const newPage = await target.page();
+			if (newPage) {
+				if (NODE_ENV === "dev") console.log(`closing new tab @ ${newPage.url()}`);
+				await newPage.close();
+			}
+		}
+	});
 
-	// Set up navigation listener
+	// Set up navigation listener for the main page
 	page.on('domcontentloaded', async () => {
 		try {
-			const newDomain = new URL(await page.url()).hostname;
-			if (newDomain !== currentDomain) {
-				// Domain changed - reinject Mixpanel
-				await relaxCSP(page);
-				await jamMixpanelIntoBrowser(page, usersHandle);
-				currentDomain = newDomain;
+			// Check if we're still on the main page
+			const currentTarget = await page.target();
+			if (currentTarget._targetId === mainPageId) {
+				const newDomain = new URL(await page.url()).hostname;
+				if (newDomain !== currentDomain) {
+					// Domain changed in the same tab - reinject
+					if (NODE_ENV === "dev") console.log(`domain changed from ${currentDomain} to ${newDomain}; reinjecting`);
+					await relaxCSP(page);
+					await jamMixpanelIntoBrowser(page, usersHandle);
+					currentDomain = newDomain;
+				}
 			}
 		} catch (e) {
-			// Handle any URL parsing errors
 			console.error('Error handling navigation:', e);
 		}
 	});
 
-	for (const action of actionSequence) {
-		if (NODE_ENV !== "production") console.log(`Action: ${action}`);
-		const repeats = u.rand(1, 4);
+	const actionSequence = generatePersonaActionSequence(persona);
+	const numActions = actionSequence.length;
+	const actionResults = [];
+
+
+
+	for (const [index, action] of actionSequence.entries()) {
+		if (NODE_ENV !== "production") console.log(`Action ${index} of ${numActions}: ${action}`);
+		let repeats = u.rand(1, 4);
 		let funcToPreform;
 
 		switch (action) {
@@ -304,19 +323,26 @@ async function simulateUserSession(page, persona) {
 				break;
 			case "scroll":
 				funcToPreform = randomScroll;
+				repeats = Math.floor(repeats / 2);
 				break;
 			case "mouseMove":
 				funcToPreform = randomMouseMove;
 				break;
 			default:
 				funcToPreform = wait;
+				repeats = 1;
 				break;
 		}
 
 		if (funcToPreform) {
-			for (let i = 0; i < repeats; i++) {
-				const result = await funcToPreform(page);
-				if (result) actionResults.push(`${action}-${i}`);
+			try {
+				for (let i = 0; i < repeats; i++) {
+					const result = await funcToPreform(page);
+					if (result) actionResults.push(`${action}-${i}`);
+				}
+			}
+			catch (e) {
+				//noop
 			}
 		}
 	}
@@ -371,7 +397,7 @@ function generatePersonaActionSequence(persona) {
  */
 function generateWeightedRandomActionSequence(actionTypes, weights) {
 	const sequence = [];
-	const length = u.rand(187, 420);
+	const length = u.rand(42, 187);
 	for (let i = 0; i < length; i++) {
 		const action = weightedRandom(actionTypes, weights);
 		sequence.push(action);
@@ -405,10 +431,17 @@ async function clickStuff(page) {
 		const href = await page.evaluate(el => el.getAttribute('href'), element);
 
 		// Click with varying speeds
-		const clickOptions = { delay: u.rand(50, 150), count: u.rand(1, 3) };
+		/** @type {import('puppeteer').ClickOptions} */
+		const clickOptions = { 
+			delay: u.rand(50, 150), 
+			count: u.rand(1, 5),
+			button: 'left',
+			//modifiers: ['Meta']
+
+		};
 		if (coinFlip()) clickOptions.count = 1;
 		if (tagName === 'a' && href) {
-			await page.mouse.click(targetX, targetY, { ...clickOptions, modifiers: ['Meta'] });
+			await page.mouse.click(targetX, targetY, { ...clickOptions });
 		} else {
 			await page.mouse.click(targetX, targetY, clickOptions);
 		}
@@ -428,7 +461,7 @@ async function clickStuff(page) {
  */
 async function moveMouse(page, startX, startY, endX, endY) {
 	try {
-		const steps = u.rand(4, 16);
+		const steps = u.rand(4, 32);
 		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
 
 		for (const [x, y] of humanizedPath) {
@@ -479,7 +512,7 @@ async function randomScroll(page) {
 
 		if (!scrollable) return false;
 
-		// Move everything into a single evaluate call
+		// actually scroll
 		await page.evaluate(() => {
 			function smoothScroll(distance) {
 				const steps = 20;
@@ -561,6 +594,6 @@ function coinFlip() {
 
 
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-	const result = await main({ concurrency: 3, users: 10, headless: true, inject: true, url: "https://soundcloud.com" });
+	const result = await main({ concurrency: 1, users: 1, headless: false, url: "https://soundcloud.com" });
 	if (NODE_ENV === 'dev') debugger;
 }
