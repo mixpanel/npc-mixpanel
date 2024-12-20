@@ -325,8 +325,8 @@ async function simulateUserSession(browser, page, persona) {
 				funcToPreform = randomScroll;
 				repeats = Math.floor(repeats / 2);
 				break;
-			case "mouseMove":
-				funcToPreform = randomMouseMove;
+			case "mouse":
+				funcToPreform = randomMouse;
 				break;
 			default:
 				funcToPreform = wait;
@@ -360,16 +360,16 @@ async function simulateUserSession(browser, page, persona) {
 
 // User personas with different action weightings
 const personas = {
-	quickScroller: { scroll: 0.6, mouseMove: 0.2, click: 0.6 },
-	carefulReader: { scroll: 0.3, mouseMove: 0.3, click: 0.3 },
-	frequentClicker: { scroll: 0.2, mouseMove: 0.3, click: 0.6 },
-	noWaiting: { scroll: 0.2, mouseMove: 0.2, click: 0.7 },
-	casualBrowser: { scroll: 0.4, mouseMove: 0.3, click: 0.3 },
-	hoveringObserver: { scroll: 0.2, mouseMove: 0.6, click: 0.6 },
-	intenseReader: { scroll: 0.15, mouseMove: 0.3, click: 0.5 },
-	impulsiveScroller: { scroll: 0.7, mouseMove: 0.2, click: 0.7 },
-	deepDiver: { scroll: 0.25, mouseMove: 0.4, click: 0.9 },
-	explorer: { scroll: 0.5, mouseMove: 0.4, click: 0.7 }
+	quickScroller: { scroll: 0.6, mouse: 0.2, click: 0.6 },
+	carefulReader: { scroll: 0.3, mouse: 0.3, click: 0.3 },
+	frequentClicker: { scroll: 0.2, mouse: 0.3, click: 0.6 },
+	noWaiting: { scroll: 0.2, mouse: 0.2, click: 0.7 },
+	casualBrowser: { scroll: 0.4, mouse: 0.3, click: 0.3 },
+	hoveringObserver: { scroll: 0.2, mouse: 0.6, click: 0.6 },
+	intenseReader: { scroll: 0.15, mouse: 0.3, click: 0.5 },
+	impulsiveScroller: { scroll: 0.7, mouse: 0.2, click: 0.7 },
+	deepDiver: { scroll: 0.25, mouse: 0.4, click: 0.9 },
+	explorer: { scroll: 0.5, mouse: 0.4, click: 0.7 }
 };
 
 /**
@@ -432,9 +432,9 @@ async function clickStuff(page) {
 
 		// Click with varying speeds
 		/** @type {import('puppeteer').ClickOptions} */
-		const clickOptions = { 
-			delay: u.rand(50, 150), 
-			count: u.rand(1, 5),
+		const clickOptions = {
+			delay: u.rand(50, 150),
+			count: u.rand(1, 3),
 			button: 'left',
 			//modifiers: ['Meta']
 
@@ -452,6 +452,15 @@ async function clickStuff(page) {
 	}
 }
 
+
+async function randomMouse(page) {
+	const startX = u.rand(0, page.viewport().width);
+	const startY = u.rand(0, page.viewport().height);
+	const endX = u.rand(0, page.viewport().width);
+	const endY = u.rand(0, page.viewport().height);
+	return await moveMouse(page, startX, startY, endX, endY);
+}
+
 /**
  * @param  {import('puppeteer').Page} page
  * @param  {number} startX
@@ -461,17 +470,38 @@ async function clickStuff(page) {
  */
 async function moveMouse(page, startX, startY, endX, endY) {
 	try {
-		const steps = u.rand(4, 32);
+		// More natural number of steps based on distance
+		const distance = Math.hypot(endX - startX, endY - startY);
+		const baseSteps = Math.floor(distance / 50); // One step per 50 pixels
+		const steps = Math.max(5, Math.min(40, baseSteps + u.rand(-2, 2)));
+
+		// Add slight pause before movement
+		if (coinFlip()) await wait();
+
 		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
 
 		for (const [x, y] of humanizedPath) {
 			await page.mouse.move(x, y);
-			// Variable speed based on distance from target
-			const distanceToTarget = Math.hypot(endX - x, endY - y);
-			const delay = Math.min(10, distanceToTarget / 10);
-			if (delay > 2) await u.sleep(delay);
+
+			// Variable speed that slows down near the target
+			const remainingDistance = Math.hypot(endX - x, endY - y);
+			const progressRatio = remainingDistance / distance;
+
+			// Slow down more dramatically near the target
+			const baseDelay = Math.min(12, remainingDistance / 8);
+			const speedVariation = u.rand(7, 13) / 10; // Add some randomness to speed
+			const delay = baseDelay * speedVariation;
+
+			// Add more delay near the target
+			if (progressRatio < 0.2) {
+				await u.sleep(delay * 2);
+			} else {
+				await u.sleep(delay);
+			}
 		}
-		if (coinFlip() && coinFlip()) await wait();
+
+		// Occasional slight pause after reaching target
+		if (coinFlip()) await wait();
 		return true;
 	} catch (e) {
 		return false;
@@ -480,25 +510,29 @@ async function moveMouse(page, startX, startY, endX, endY) {
 
 function generateHumanizedPath(startX, startY, endX, endY, steps) {
 	const path = [];
-	const controlPoint1X = startX + (endX - startX) * (0.3 + Math.random() * 0.2);
-	const controlPoint1Y = startY + (endY - startY) * (0.3 + Math.random() * 0.2);
-	const controlPoint2X = startX + (endX - startX) * (0.6 + Math.random() * 0.2);
-	const controlPoint2Y = startY + (endY - startY) * (0.6 + Math.random() * 0.2);
+
+	// Add slight initial deviation for more natural movement start
+	const initialDeviation = u.rand(5, 15);
+	const deviationAngle = (Math.random() * Math.PI * 2);
+	const controlPoint1X = startX + (endX - startX) * 0.3 + Math.cos(deviationAngle) * initialDeviation;
+	const controlPoint1Y = startY + (endY - startY) * 0.3 + Math.sin(deviationAngle) * initialDeviation;
+
+	// Second control point closer to target for more precise ending
+	const controlPoint2X = startX + (endX - startX) * 0.7;
+	const controlPoint2Y = startY + (endY - startY) * 0.7;
 
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
 		const x = bezierPoint(startX, controlPoint1X, controlPoint2X, endX, t);
 		const y = bezierPoint(startY, controlPoint1Y, controlPoint2Y, endY, t);
-		path.push([x + u.rand(-2, 2), y + u.rand(-2, 2)]);
+
+		// Add smaller jitter near the target
+		const progressRatio = i / steps;
+		const jitterAmount = progressRatio < 0.8 ? u.rand(-3, 3) : u.rand(-1, 1);
+
+		path.push([x + jitterAmount, y + jitterAmount]);
 	}
 	return path;
-}
-
-function bezierPoint(p0, p1, p2, p3, t) {
-	return Math.pow(1 - t, 3) * p0 +
-		3 * Math.pow(1 - t, 2) * t * p1 +
-		3 * (1 - t) * Math.pow(t, 2) * p2 +
-		Math.pow(t, 3) * p3;
 }
 
 /**
@@ -512,48 +546,57 @@ async function randomScroll(page) {
 
 		if (!scrollable) return false;
 
-		// actually scroll
+		// Enhanced scroll behavior
 		await page.evaluate(() => {
-			function smoothScroll(distance) {
-				const steps = 20;
-				const stepSize = distance / steps;
-				let current = 0;
+			function smoothScroll(distance, duration = 1000) {
+				return new Promise(resolve => {
+					const start = window.pageYOffset;
+					const startTime = performance.now();
 
-				function step() {
-					if (current < steps) {
-						window.scrollBy(0, stepSize * (1 - Math.cos(current / steps * Math.PI)));
-						current++;
-						requestAnimationFrame(step);
+					function easeInOutQuad(t) {
+						return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 					}
-				}
-				requestAnimationFrame(step);
+
+					function scroll(currentTime) {
+						const timeElapsed = currentTime - startTime;
+						const progress = Math.min(timeElapsed / duration, 1);
+
+						const ease = easeInOutQuad(progress);
+						window.scrollTo(0, start + distance * ease);
+
+						if (progress < 1) {
+							requestAnimationFrame(scroll);
+						} else {
+							resolve();
+						}
+					}
+
+					requestAnimationFrame(scroll);
+				});
 			}
 
-			// Define scroll types inside evaluate where window is available
+			// More natural scroll patterns
 			const scrollTypes = [
-				() => smoothScroll(Math.random() * (window.innerHeight / 2 - 100) + 100),
-				() => smoothScroll(-Math.random() * (window.innerHeight / 2 - 100) - 100),
-				() => window.scrollTo({ top: 0, behavior: 'smooth' }),
-				() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+				// Small scroll
+				() => smoothScroll(Math.random() * (window.innerHeight * 0.3) + 100, u.rand(800, 1200)),
+				// Medium scroll
+				() => smoothScroll(Math.random() * (window.innerHeight * 0.6) + 200, u.rand(1200, 1800)),
+				// Full scroll to bottom
+				() => smoothScroll(document.documentElement.scrollHeight - window.innerHeight, u.rand(2000, 3000)),
+				// Scroll back up
+				() => smoothScroll(-(window.pageYOffset * 0.7), u.rand(1500, 2500))
 			];
 
-			// Execute random scroll type
-			scrollTypes[Math.floor(Math.random() * scrollTypes.length)]();
+			return scrollTypes[Math.floor(Math.random() * scrollTypes.length)]();
 		});
 
+		// Add natural pauses between scrolls
 		await wait();
+		if (coinFlip()) await wait();
 		return true;
 	} catch (e) {
 		return false;
 	}
-}
-
-async function randomMouseMove(page) {
-	const startX = u.rand(0, page.viewport().width);
-	const startY = u.rand(0, page.viewport().height);
-	const endX = u.rand(0, page.viewport().width);
-	const endY = u.rand(0, page.viewport().height);
-	return await moveMouse(page, startX, startY, endX, endY);
 }
 
 
@@ -566,6 +609,14 @@ async function wait() {
 		await u.sleep(u.rand(97, 240));
 	}
 
+}
+
+
+function bezierPoint(p0, p1, p2, p3, t) {
+	return Math.pow(1 - t, 3) * p0 +
+		3 * Math.pow(1 - t, 2) * t * p1 +
+		3 * (1 - t) * Math.pow(t, 2) * p2 +
+		Math.pow(t, 3) * p3;
 }
 
 /**
@@ -594,6 +645,10 @@ function coinFlip() {
 
 
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+	const local = u.timer('headless');
+	local.start();
 	const result = await main({ concurrency: 1, users: 1, headless: false, url: "https://soundcloud.com" });
+	local.stop(true);
+
 	if (NODE_ENV === 'dev') debugger;
 }
