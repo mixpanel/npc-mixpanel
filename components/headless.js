@@ -381,21 +381,13 @@ function generateWeightedRandomActionSequence(actionTypes, weights) {
 
 // Core action functions
 
+/**
+ * @param  {import('puppeteer').Page} page
+ */
 async function clickStuff(page) {
 	try {
 		const elements = await page.$$('a, button, input[type="submit"], [role="button"], [onclick], h1, h2, h3');
 		if (elements.length === 0) return false;
-
-		// // Get element in viewport
-		// const visibleElements = await page.evaluate(() => {
-		// 	return Array.from(document.querySelectorAll('a, button, input[type="submit"], [role="button"], [onclick]'))
-		// 		.filter(el => {
-		// 			const rect = el.getBoundingClientRect();
-		// 			return rect.top >= 0 && rect.top <= window.innerHeight;
-		// 		});
-		// });
-
-		// if (!visibleElements.length) return false;
 
 		const element = elements[Math.floor(Math.random() * elements.length)];
 		const boundingBox = await element.boundingBox();
@@ -407,22 +399,16 @@ async function clickStuff(page) {
 
 		// Add hover pause before clicking
 		await moveMouse(page, u.rand(0, page.viewport().width), u.rand(0, page.viewport().height), targetX, targetY);
-		await u.sleep(u.rand(200, 800)); // Hover pause
+		if (coinFlip()) await wait();
 
 		const tagName = await page.evaluate(el => el.tagName.toLowerCase(), element);
 		const href = await page.evaluate(el => el.getAttribute('href'), element);
 
 		// Click with varying speeds
-		const clickOptions = { delay: u.rand(50, 150) };
+		const clickOptions = { delay: u.rand(50, 150), count: u.rand(1, 3) };
+		if (coinFlip()) clickOptions.count = 1;
 		if (tagName === 'a' && href) {
 			await page.mouse.click(targetX, targetY, { ...clickOptions, modifiers: ['Meta'] });
-
-			// Handle navigation
-			page.once('load', async () => {
-				// await relaxCSP(page);
-				// await jamMixpanelIntoBrowser(page);
-
-			});
 		} else {
 			await page.mouse.click(targetX, targetY, clickOptions);
 		}
@@ -433,9 +419,16 @@ async function clickStuff(page) {
 	}
 }
 
+/**
+ * @param  {import('puppeteer').Page} page
+ * @param  {number} startX
+ * @param  {number} startY
+ * @param  {number} endX
+ * @param  {number} endY
+ */
 async function moveMouse(page, startX, startY, endX, endY) {
 	try {
-		const steps = u.rand(30, 42);
+		const steps = u.rand(4, 16);
 		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
 
 		for (const [x, y] of humanizedPath) {
@@ -475,6 +468,9 @@ function bezierPoint(p0, p1, p2, p3, t) {
 		Math.pow(t, 3) * p3;
 }
 
+/**
+ * @param  {import('puppeteer').Page} page
+ */
 async function randomScroll(page) {
 	try {
 		const scrollable = await page.evaluate(() => {
@@ -512,7 +508,7 @@ async function randomScroll(page) {
 			scrollTypes[Math.floor(Math.random() * scrollTypes.length)]();
 		});
 
-		await u.sleep(u.rand(300, 800));
+		await wait();
 		return true;
 	} catch (e) {
 		return false;
@@ -528,9 +524,15 @@ async function randomMouseMove(page) {
 }
 
 
-// Utility wait functions
+// either a short or long wait
 async function wait() {
-	await u.sleep(u.rand(42, 420));
+	if (coinFlip()) {
+		await u.sleep(u.rand(35, 42));
+	}
+	else {
+		await u.sleep(u.rand(97, 240));
+	}
+
 }
 
 /**

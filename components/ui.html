@@ -272,7 +272,7 @@
 			data.concurrency = 5;
 			data.users = parseInt(data.users);
 			if (data.users > 20) data.concurrency = 7;
-			data.headless = false;
+			// data.headless = false;
 
 			form.style.display = 'none';
 			loading.style.display = 'block';
@@ -290,7 +290,7 @@
 				//     throw new Error('Network response was not ok');
 				// }
 
-				await new Promise(resolve => setTimeout(resolve, 5000));
+				await new Promise(resolve => setTimeout(resolve, 15000));
 
 				loading.style.display = 'none';
 				success.style.display = 'block';
