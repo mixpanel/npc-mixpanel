@@ -17,7 +17,6 @@ TEMP_DIR = path.resolve(TEMP_DIR);
  * @property {number} users Number of users to simulate
  * @property {number} concurrency Number of users to simulate concurrently
  * @property {boolean} headless Whether to run headless or not
- * @property {boolean} inject Whether to inject external script
  * @property {token} token Mixpanel token
  */
 
@@ -30,7 +29,6 @@ export default async function main(PARAMS = {}) {
 		users = 10,
 		concurrency = 5,
 		headless = true,
-		inject = true,
 		token = ""
 	} = PARAMS;
 	const limit = pLimit(concurrency);
@@ -41,12 +39,17 @@ export default async function main(PARAMS = {}) {
 	const userPromises = Array.from({ length: users }, (_, i) => {
 
 		return limit(() => {
-			if (NODE_ENV === "dev") console.log(`start user ${i + 1}...`);
-			return simulateUser(url, headless, inject)
-				.then((results) => {
-					if (NODE_ENV === "dev") console.log(`end user ${i + 1}...`);
-					return results;
-				});
+			try {
+				if (NODE_ENV === "dev") console.log(`start user ${i + 1}...`);
+				return simulateUser(url, headless)
+					.then((results) => {
+						if (NODE_ENV === "dev") console.log(`end user ${i + 1}...`);
+						return results;
+					});
+			}
+			catch (e) {
+				//noop;
+			}
 		});
 	});
 
@@ -62,52 +65,48 @@ export default async function main(PARAMS = {}) {
  * Simulates a single user session with random actions, with a timeout to prevent hangs.
  * @param {string} url - The URL to visit.
  * @param {boolean} headless - Whether to run the browser headlessly.
- * @param {boolean} inject - Whether to inject external script.
+ * @param {string} [userName] - The user name to identify in Mixpanel.
  */
-async function simulateUser(url, headless = true, inject = false) {
-	const timeoutMs = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-	const browser = await puppeteer.launch({
-		headless, args: [
-			'--disable-web-security',
-			'--disable-features=IsolateOrigins,site-per-process',
-			'--disable-features=TrustedDOMTypes'
-
-		]
-	});
-	const page = await browser.newPage();
-	await relaxCSP(page);
-	await page.setViewport({ width: 1280, height: 720 });
-	await page.goto(url);
-
-	// Define a timeout promise
-	const timeoutPromise = new Promise((resolve, reject) =>
+async function simulateUser(url, headless = true, userName) {
+	if (!userName) userName = u.makeName();
+	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
+	const pageTimeout = 60 * 1000; // 1 minutes
+	const timeoutPromise = new Promise((resolve) =>
 		setTimeout(() => {
-			try {
-				browser.close().then(() => resolve('timeout'));
-			}
-			catch (e) {
-				resolve('timeout');
-			}
-
-		}, timeoutMs)
+			resolve('timeout');
+		}, totalTimeout)
 	);
+	let browser;
 
 	// Define the user session simulation promise
 	const simulationPromise = (async () => {
-		if (inject) {
-			const injectMixpanelString = injectMixpanel.toString();
-			await page.evaluate((MIXPANEL_TOKEN, injectMixpanelFn) => {
-				const injectedFunction = new Function(`return (${injectMixpanelFn})`)();
-				injectedFunction(MIXPANEL_TOKEN);
-			}, MIXPANEL_TOKEN, injectMixpanelString);
-			await u.sleep(100); // Ensure analytics script injection completes
-		}
+		browser = await puppeteer.launch({
+			headless, args: [
+				'--disable-web-security',
+				'--disable-features=IsolateOrigins,site-per-process,TrustedDOMTypes',
 
-		const persona = selectPersona(); // Generate user persona
-		const actions = await simulateUserSession(page, persona); // Simulate actions
-		await browser.close(); // Close browser when done
-		return actions; // Return actions performed
+			],
+			timeout: pageTimeout, // Browser launch timeout
+			waitForInitialPage: true,
+		});
+		const page = (await browser.pages())[0];
+		await page.setDefaultTimeout(pageTimeout);
+		await page.setDefaultNavigationTimeout(pageTimeout);
+		await relaxCSP(page);
+		await page.setViewport({ width: 2560, height: 1440, deviceScaleFactor: 0 });
+
+		await page.goto(url);
+		const persona = selectPersona();
+
+		try {
+			const actions = await simulateUserSession(page, persona);
+			await browser.close();
+			return actions;
+		}
+		catch (error) {
+			await browser.close();
+			return { error: error.message, timedOut: false };
+		}
 	})();
 
 	// Use Promise.race to terminate if simulation takes too long
@@ -115,308 +114,38 @@ async function simulateUser(url, headless = true, inject = false) {
 		return await Promise.race([simulationPromise, timeoutPromise]);
 	} catch (error) {
 		// Handle timeout error (close browser if not already closed)
-		await browser.close();
+		if (browser) await browser.close();
 		if (NODE_ENV === "dev") console.error("simulateUser Error:", error);
 		return { error: error.message, timedOut: true };
 	}
 }
 
-
-async function relaxCSP(page) {
-	await page.setRequestInterception(true);
-    
-    page.on('request', request => {
-        const headers = request.headers();
-        delete headers['content-security-policy'];
-        delete headers['content-security-policy-report-only'];
-        headers['content-security-policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;";
-        request.continue({ headers });
-    });
-
-    await page.setBypassCSP(true);
-
-    // Fixed MutationObserver setup
-    await page.evaluateOnNewDocument(() => {
-        const removeCSP = () => {
-            const metas = document.getElementsByTagName('meta');
-            for (let i = 0; i < metas.length; i++) {
-                if (metas[i].httpEquiv === 'Content-Security-Policy') {
-                    metas[i].remove();
-                }
-            }
-        };
-
-        // Wait for document to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                removeCSP();
-                if (document.documentElement) {
-                    new MutationObserver(removeCSP).observe(document.documentElement, {
-                        childList: true,
-                        subtree: true
-                    });
-                }
-            });
-        } else {
-            removeCSP();
-            if (document.documentElement) {
-                new MutationObserver(removeCSP).observe(document.documentElement, {
-                    childList: true,
-                    subtree: true
-                });
-            }
-        }
-
-        // Override document.createElement
-        const originalCreateElement = document.createElement;
-        document.createElement = function(...args) {
-            const element = originalCreateElement.apply(document, args);
-            if (element.nodeName === 'SCRIPT') {
-                setTimeout(() => {
-                    element.removeAttribute('nonce');
-                    element.removeAttribute('integrity');
-                }, 0);
-            }
-            return element;
-        };
-    });
-
-}
-
-/**
- * Simulates a user session on the page, following a persona-based action sequence.
- * @param {import('puppeteer').Page} page - Puppeteer page object.
- * @param {string} persona - User persona to simulate.
- */
-async function simulateUserSession(page, persona) {
-	await u.sleep(250); // Wait for page to load
-	const actionSequence = generatePersonaActionSequence(persona);
-	for (const action of actionSequence) {
-		switch (action) {
-			case "click":
-				await clickStuff(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await clickStuff(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await clickStuff(page);
-				break;
-			case "scroll":
-				await randomScroll(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await randomScroll(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await randomScroll(page);
-				break;
-			case "mouseMove":
-				await randomMouseMove(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await randomMouseMove(page);
-				if (coinFlip()) await wait();
-				if (coinFlip()) await randomMouseMove(page);
-				break;
-			case "wait":
-				await wait();
-				break;
+async function retry(operation, maxRetries = 3, delay = 1000) {
+	for (let i = 0; i < maxRetries; i++) {
+		try {
+			return await operation();
+		} catch (error) {
+			if (i === maxRetries - 1) throw error;
+			await u.sleep(delay);
 		}
-
-		await u.sleep(250); // wait for data to flush
-	}
-	return {
-		persona: personas[persona],
-		personaLabel: persona,
-		actionSequence
-	};
-}
-
-// User personas with different action weightings
-const personas = {
-	quickScroller: { scroll: 0.6, mouseMove: 0.2, click: 0.1, wait: 0.1 },
-	carefulReader: { scroll: 0.3, mouseMove: 0.3, click: 0.2, wait: 0.2 },
-	frequentClicker: { scroll: 0.2, mouseMove: 0.3, click: 0.6, wait: 0.1 },
-	noWaiting: { scroll: 0.2, mouseMove: 0.2, click: 0.7, wait: 0.05 },
-	casualBrowser: { scroll: 0.4, mouseMove: 0.3, click: 0.2, wait: 0.15 },
-	hoveringObserver: { scroll: 0.2, mouseMove: 0.6, click: 0.1, wait: 0.3 },
-	intenseReader: { scroll: 0.15, mouseMove: 0.3, click: 0.1, wait: 0.4 },
-	impulsiveScroller: { scroll: 0.7, mouseMove: 0.2, click: 0.1, wait: 0.05 },
-	deepDiver: { scroll: 0.25, mouseMove: 0.4, click: 0.3, wait: 0.25 },
-	explorer: { scroll: 0.5, mouseMove: 0.4, click: 0.3, wait: 0.1 }
-};
-
-/**
- * Selects a random persona.
- */
-function selectPersona() {
-	const personaKeys = Object.keys(personas);
-	return personaKeys[Math.floor(Math.random() * personaKeys.length)];
-}
-
-/**
- * Generates an action sequence based on a persona's weighting.
- * @param {string} persona - The selected persona.
- */
-function generatePersonaActionSequence(persona) {
-	const personaWeights = personas[persona];
-	const actionTypes = Object.keys(personaWeights);
-	return generateWeightedRandomActionSequence(actionTypes, personaWeights);
-}
-
-/**
- * Generates a weighted random action sequence.
- * @param {Array} actionTypes - List of possible actions.
- * @param {Object} weights - Weighting for each action.
- */
-function generateWeightedRandomActionSequence(actionTypes, weights) {
-	const sequence = [];
-	const length = u.rand(42, 100);
-	for (let i = 0; i < length; i++) {
-		const action = weightedRandom(actionTypes, weights);
-		sequence.push(action);
-	}
-	return sequence;
-}
-
-// Core action functions
-
-async function clickStuff(page) {
-	try {
-		const elements = await page.$$('a, button, input[type="submit"], [role="button"], [onclick]');
-		if (elements.length === 0) throw new Error("No clickable elements found.");
-
-		const element = elements[Math.floor(Math.random() * elements.length)];
-		const boundingBox = await element.boundingBox();
-		if (!boundingBox) throw new Error("Bounding box not found.");
-
-		const { x, y, width, height } = boundingBox;
-		const targetX = x + width / 2 + u.rand(-5, 5);
-		const targetY = y + height / 2 + u.rand(-5, 5);
-
-		// Check if element is a link and has an href attribute
-		const tagName = await page.evaluate(el => el.tagName.toLowerCase(), element);
-		const href = await page.evaluate(el => el.getAttribute('href'), element);
-
-		if (tagName === 'a' && href) {
-			// Register the click for analytics by clicking with the `metaKey` (cmd on macOS)
-			await moveMouse(page, u.rand(0, page.viewport().width), u.rand(0, page.viewport().height), targetX, targetY);
-			await page.mouse.click(targetX, targetY, { modifiers: ['Meta'] });
-		} else {
-			// Move the mouse and click as usual for non-link elements
-			await moveMouse(page, u.rand(0, page.viewport().width), u.rand(0, page.viewport().height), targetX, targetY);
-			await page.mouse.click(targetX, targetY);
-		}
-
-		await u.sleep(u.rand(100, 300)); // Simulate response time
-		if (NODE_ENV === "dev") console.log('click!');
-		return true;
-	} catch (error) {
-		// console.error("clickStuff Error:", error);
-		// if (NODE_ENV === "dev") debugger;
-		return false;
 	}
 }
 
-
-async function randomScroll(page) {
-	try {
-		const scrollOptions = [
-			() => page.evaluate(() => window.scrollBy(0, Math.random() * window.innerHeight / 2)),
-			() => page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight * Math.random(), behavior: 'smooth' })),
-			() => page.evaluate(() => window.scrollBy({ top: window.innerHeight * (Math.random() < 0.5 ? 1 : -1), behavior: 'smooth' })),
-			() => page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' })),
-			() => page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }))
-		];
-		await scrollOptions[Math.floor(Math.random() * scrollOptions.length)]();
-		if (NODE_ENV === "dev") console.log('scroll!');
-		return true;
-	}
-	catch (e) {
-		return false;
-	}
+async function jamMixpanelIntoBrowser(page, username) {
+	await retry(async () => {
+		const injectMixpanelString = injectMixpanel.toString();
+		await page.evaluate((MIXPANEL_TOKEN, userId, injectMixpanelFn) => {
+			const injectedFunction = new Function(`return (${injectMixpanelFn})`)();
+			injectedFunction(MIXPANEL_TOKEN, userId);
+		}, MIXPANEL_TOKEN, username, injectMixpanelString);
+	});
+	return true;
 }
 
-async function randomMouseMove(page) {
-	const startX = u.rand(0, page.viewport().width);
-	const startY = u.rand(0, page.viewport().height);
-	const endX = u.rand(0, page.viewport().width);
-	const endY = u.rand(0, page.viewport().height);
-	return await moveMouse(page, startX, startY, endX, endY);
-}
+function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 
-async function moveMouse(page, startX, startY, endX, endY) {
-	try {
-		// Increase step distance to reduce total number of steps
-		const stepDistance = u.rand(10, 20); // Increase from 5 to 15 pixels per step
-		const steps = Math.ceil(Math.max(Math.abs(endX - startX), Math.abs(endY - startY)) / stepDistance);
-		const deltaX = (endX - startX) / steps;
-		const deltaY = (endY - startY) / steps;
-		let currentX = startX;
-		let currentY = startY;
-
-		for (let i = 0; i < steps; i++) {
-			// Reduce sine curve adjustment for smoother movement
-			const curveX = currentX + deltaX + Math.sin((i / steps) * Math.PI) * u.rand(-2, 2); // Reduced from -10, 10
-			const curveY = currentY + deltaY + Math.sin((i / steps) * Math.PI) * u.rand(-2, 2);
-
-			// Move the mouse to the calculated position
-			await page.mouse.move(curveX, curveY);
-
-			// Decrease the sleep frequency and duration to make movement faster
-			if (u.rand(0, 100) < 10) await u.sleep(u.rand(10, 30)); // Reduced frequency and duration
-
-			// Update current position
-			currentX = curveX;
-			currentY = curveY;
-		}
-
-		// Final mouse move to the exact end point
-		await page.mouse.move(endX, endY);
-		await u.sleep(u.rand(12, 42)); // Final hesitation reduced
-
-		if (NODE_ENV === "dev") console.log('mouse!');
-		return true;
-	} catch (e) {
-		return false;
-	}
-}
-
-// Utility wait functions
-async function wait() {
-	await u.sleep(u.rand(42, 420));
-}
-
-/**
- * Helper to pick a random item from a list with weights.
- * @param {Array} items - List of items to pick from.
- * @param {Object} weights - Object with item keys and their weights.
- * @returns {any} Selected item based on weights.
- */
-function weightedRandom(items, weights) {
-	const totalWeight = items.reduce((sum, item) => sum + weights[item], 0);
-	const randomValue = Math.random() * totalWeight;
-	let cumulativeWeight = 0;
-
-	for (const item of items) {
-		cumulativeWeight += weights[item];
-		if (randomValue < cumulativeWeight) return item;
-	}
-}
-
-
-function coinFlip() {
-	return Math.random() < 0.5;
-}
-
-
-function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 	function reset() {
-		console.log('resetting....\n\n');
+		console.log('[NPC] RESET MIXPANEL\n\n');
 		if (mixpanel) {
 			if (mixpanel.headless) {
 				mixpanel.headless.reset();
@@ -424,51 +153,6 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 		}
 	}
 
-	function generateName() {
-		var adjs = [
-			"autumn", "hidden", "bitter", "misty", "silent", "empty", "dry", "dark",
-			"summer", "icy", "delicate", "quiet", "white", "cool", "spring", "winter",
-			"patient", "twilight", "dawn", "crimson", "wispy", "weathered", "blue",
-			"billowing", "broken", "cold", "damp", "falling", "frosty", "green",
-			"long", "late", "lingering", "bold", "little", "morning", "muddy", "old",
-			"red", "rough", "still", "small", "sparkling", "throbbing", "shy",
-			"wandering", "withered", "wild", "black", "young", "holy", "solitary",
-			"fragrant", "aged", "snowy", "proud", "floral", "restless", "divine",
-			"polished", "ancient", "purple", "lively", "nameless", "gentle", "gleaming", "furious", "luminous", "obscure", "poised", "shimmering", "swirling",
-			"sombre", "steamy", "whispering", "jagged", "melodic", "moonlit", "starry", "forgotten",
-			"peaceful", "restive", "rustling", "sacred", "ancient", "haunting", "solitary", "mysterious",
-			"silver", "dusky", "earthy", "golden", "hallowed", "misty", "roaring", "serene", "vibrant",
-			"stalwart", "whimsical", "timid", "tranquil", "vast", "youthful", "zephyr", "raging",
-			"sapphire", "turbulent", "whirling", "sleepy", "ethereal", "tender", "unseen", "wistful"
-		];
-
-		var nouns = [
-			"waterfall", "river", "breeze", "moon", "rain", "wind", "sea", "morning",
-			"snow", "lake", "sunset", "pine", "shadow", "leaf", "dawn", "glitter",
-			"forest", "hill", "cloud", "meadow", "sun", "glade", "bird", "brook",
-			"butterfly", "bush", "dew", "dust", "field", "fire", "flower", "firefly",
-			"feather", "grass", "haze", "mountain", "night", "pond", "darkness",
-			"snowflake", "silence", "sound", "sky", "shape", "surf", "thunder",
-			"violet", "water", "wildflower", "wave", "water", "resonance", "sun",
-			"wood", "dream", "cherry", "tree", "fog", "frost", "voice", "paper",
-			"frog", "smoke", "star", "glow", "wave", "riverbed", "cliff", "deluge", "prairie", "creek", "ocean",
-			"peak", "valley", "starlight", "quartz", "woodland", "marsh", "earth", "canopy",
-			"petal", "stone", "orb", "gale", "bay", "canyon", "watercourse", "vista", "raindrop",
-			"boulder", "grove", "plateau", "sand", "mist", "tide", "blossom", "leaf", "flame",
-			"shade", "coil", "grotto", "pinnacle", "scallop", "serenity", "abyss", "skyline",
-			"drift", "echo", "nebula", "horizon", "crest", "wreath", "twilight", "balm", "glimmer"
-		];
-
-
-		var adj = adjs[Math.floor(Math.random() * adjs.length)]; // http://stackoverflow.com/a/17516862/103058
-		var noun = nouns[Math.floor(Math.random() * nouns.length)];
-		var MIN = 1000;
-		var MAX = 9999;
-		var num = Math.floor(Math.random() * ((MAX + 1) - MIN)) + MIN;
-
-		return adj + '-' + noun + '-' + num;
-
-	}
 
 	const PARAMS = qsToObj(window.location.search);
 	let { user = "", project_token = "", ...restParams } = PARAMS;
@@ -478,14 +162,19 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 
 	// Function that contains the code to run after the script is loaded
 	function EMBED_TRACKING() {
+		if (window?.MIXPANEL_WAS_INJECTED) {
+			console.log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
+			return;
+		}
+		console.log('[NPC] EMBED TRACKING\n\n');
+		window.MIXPANEL_WAS_INJECTED = true;
 		if (window.mixpanel) {
 			mixpanel.init(project_token, {
 				loaded: function (mp) {
+					console.log('[NPC] MIXPANEL LOADED\n\n');
 					mp.register(restParams);
-					const name = generateName();
-					if (!user) user = name;
-					mp.identify(user);
-					mp.people.set({ $name: user, $email: user });
+					if (userId) mp.identify(userId);
+					if (userId) mp.people.set({ $name: userId, $email: userId });
 					window.addEventListener("beforeunload", () => {
 						mp.track("$mp_page_close", {}, { transport: "sendBeacon", send_immediately: true });
 					});
@@ -515,6 +204,7 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 				api_transport: 'XHR',
 				persistence: "localStorage",
 				api_payload_format: 'json',
+				debug: true
 
 			}, "headless");
 		}
@@ -531,14 +221,341 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "") {
 			return {};
 		}
 	}
-	// Load the external script and run myCode when it's done
-	// loadScript(externalScript, EMBED_EZ_TRACK);
 
 	const MIXPANEL_CUSTOM_LIB_URL = 'https://cdn-dev.mxpnl.com/libs/mixpanel-ac-alpha.js';
 	//prettier-ignore
 	(function (f, b) { if (!b.__SV) { var e, g, i, h; window.mixpanel = b; b._i = []; b.init = function (e, f, c) { function g(a, d) { var b = d.split("."); 2 == b.length && ((a = a[b[0]]), (d = b[1])); a[d] = function () { a.push([d].concat(Array.prototype.slice.call(arguments, 0))); }; } var a = b; "undefined" !== typeof c ? (a = b[c] = []) : (c = "mixpanel"); a.people = a.people || []; a.toString = function (a) { var d = "mixpanel"; "mixpanel" !== c && (d += "." + c); a || (d += " (stub)"); return d; }; a.people.toString = function () { return a.toString(1) + ".people (stub)"; }; i = "disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" "); for (h = 0; h < i.length; h++) g(a, i[h]); var j = "set set_once union unset remove delete".split(" "); a.get_group = function () { function b(c) { d[c] = function () { call2_args = arguments; call2 = [c].concat(Array.prototype.slice.call(call2_args, 0)); a.push([e, call2]); }; } for (var d = {}, e = ["get_group"].concat(Array.prototype.slice.call(arguments, 0)), c = 0; c < j.length; c++) b(j[c]); return d; }; b._i.push([e, f, c]); }; b.__SV = 1.2; e = f.createElement("script"); e.type = "text/javascript"; e.async = !0; e.src = "undefined" !== typeof MIXPANEL_CUSTOM_LIB_URL ? MIXPANEL_CUSTOM_LIB_URL : "file:" === f.location.protocol && "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//) ? "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js" : "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"; g = f.getElementsByTagName("script")[0]; g.parentNode.insertBefore(e, g); } })(document, window.mixpanel || []);
 	EMBED_TRACKING();
 }
+
+/**
+ * 
+ * @param  {import('puppeteer').Page} page
+ */
+async function relaxCSP(page) {
+	try {
+		// await page.setRequestInterception(true);
+
+		// page.on('request', request => {
+
+		// 	const headers = request.headers();
+		// 	delete headers['content-security-policy'];
+		// 	delete headers['content-security-policy-report-only'];
+		// 	headers['content-security-policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;";
+		// 	try {
+		// 		request.continue({ headers });
+		// 	}
+		// 	catch (e) {
+		// 		//noop
+		// 		null;
+		// 	}
+		// });
+
+		await page.setBypassCSP(true);
+
+	}
+	catch (e) {
+
+	}
+
+}
+
+/**
+ * Simulates a user session on the page, following a persona-based action sequence.
+ * @param {import('puppeteer').Page} page - Puppeteer page object.
+ * @param {string} persona - User persona to simulate.
+ */
+async function simulateUserSession(page, persona) {
+	const usersHandle = u.makeName();
+
+	// Initial Mixpanel injection
+	await jamMixpanelIntoBrowser(page, usersHandle);
+
+	// Store initial domain
+	let currentDomain = new URL(await page.url()).hostname;
+
+	const actionSequence = generatePersonaActionSequence(persona);
+	const actionResults = [];
+
+	// Set up navigation listener
+	page.on('domcontentloaded', async () => {
+		try {
+			const newDomain = new URL(await page.url()).hostname;
+			if (newDomain !== currentDomain) {
+				// Domain changed - reinject Mixpanel
+				await relaxCSP(page);
+				await jamMixpanelIntoBrowser(page, usersHandle);
+				currentDomain = newDomain;
+			}
+		} catch (e) {
+			// Handle any URL parsing errors
+			console.error('Error handling navigation:', e);
+		}
+	});
+
+	for (const action of actionSequence) {
+		if (NODE_ENV !== "production") console.log(`Action: ${action}`);
+		const repeats = u.rand(1, 4);
+		let funcToPreform;
+
+		switch (action) {
+			case "click":
+				funcToPreform = clickStuff;
+				break;
+			case "scroll":
+				funcToPreform = randomScroll;
+				break;
+			case "mouseMove":
+				funcToPreform = randomMouseMove;
+				break;
+			default:
+				funcToPreform = wait;
+				break;
+		}
+
+		if (funcToPreform) {
+			for (let i = 0; i < repeats; i++) {
+				const result = await funcToPreform(page);
+				if (result) actionResults.push(`${action}-${i}`);
+			}
+		}
+	}
+
+	// Clean up the navigation listener
+	await page.removeAllListeners('domcontentloaded');
+
+	return {
+		persona: personas[persona],
+		personaLabel: persona,
+		actionSequence,
+		actionResults
+	};
+}
+
+// User personas with different action weightings
+const personas = {
+	quickScroller: { scroll: 0.6, mouseMove: 0.2, click: 0.6 },
+	carefulReader: { scroll: 0.3, mouseMove: 0.3, click: 0.3 },
+	frequentClicker: { scroll: 0.2, mouseMove: 0.3, click: 0.6 },
+	noWaiting: { scroll: 0.2, mouseMove: 0.2, click: 0.7 },
+	casualBrowser: { scroll: 0.4, mouseMove: 0.3, click: 0.3 },
+	hoveringObserver: { scroll: 0.2, mouseMove: 0.6, click: 0.6 },
+	intenseReader: { scroll: 0.15, mouseMove: 0.3, click: 0.5 },
+	impulsiveScroller: { scroll: 0.7, mouseMove: 0.2, click: 0.7 },
+	deepDiver: { scroll: 0.25, mouseMove: 0.4, click: 0.9 },
+	explorer: { scroll: 0.5, mouseMove: 0.4, click: 0.7 }
+};
+
+/**
+ * Selects a random persona.
+ */
+function selectPersona() {
+	const personaKeys = Object.keys(personas);
+	return personaKeys[Math.floor(Math.random() * personaKeys.length)];
+}
+
+/**
+ * Generates an action sequence based on a persona's weighting.
+ * @param {string} persona - The selected persona.
+ */
+function generatePersonaActionSequence(persona) {
+	const personaWeights = personas[persona];
+	const actionTypes = Object.keys(personaWeights);
+	return generateWeightedRandomActionSequence(actionTypes, personaWeights);
+}
+
+/**
+ * Generates a weighted random action sequence.
+ * @param {Array} actionTypes - List of possible actions.
+ * @param {Object} weights - Weighting for each action.
+ */
+function generateWeightedRandomActionSequence(actionTypes, weights) {
+	const sequence = [];
+	const length = u.rand(187, 420);
+	for (let i = 0; i < length; i++) {
+		const action = weightedRandom(actionTypes, weights);
+		sequence.push(action);
+	}
+	return sequence;
+}
+
+// Core action functions
+
+async function clickStuff(page) {
+	try {
+		const elements = await page.$$('a, button, input[type="submit"], [role="button"], [onclick], h1, h2, h3');
+		if (elements.length === 0) return false;
+
+		// // Get element in viewport
+		// const visibleElements = await page.evaluate(() => {
+		// 	return Array.from(document.querySelectorAll('a, button, input[type="submit"], [role="button"], [onclick]'))
+		// 		.filter(el => {
+		// 			const rect = el.getBoundingClientRect();
+		// 			return rect.top >= 0 && rect.top <= window.innerHeight;
+		// 		});
+		// });
+
+		// if (!visibleElements.length) return false;
+
+		const element = elements[Math.floor(Math.random() * elements.length)];
+		const boundingBox = await element.boundingBox();
+		if (!boundingBox) throw new Error("Bounding box not found.");
+
+		const { x, y, width, height } = boundingBox;
+		const targetX = x + width / 2 + u.rand(-5, 5);
+		const targetY = y + height / 2 + u.rand(-5, 5);
+
+		// Add hover pause before clicking
+		await moveMouse(page, u.rand(0, page.viewport().width), u.rand(0, page.viewport().height), targetX, targetY);
+		await u.sleep(u.rand(200, 800)); // Hover pause
+
+		const tagName = await page.evaluate(el => el.tagName.toLowerCase(), element);
+		const href = await page.evaluate(el => el.getAttribute('href'), element);
+
+		// Click with varying speeds
+		const clickOptions = { delay: u.rand(50, 150) };
+		if (tagName === 'a' && href) {
+			await page.mouse.click(targetX, targetY, { ...clickOptions, modifiers: ['Meta'] });
+
+			// Handle navigation
+			page.once('load', async () => {
+				// await relaxCSP(page);
+				// await jamMixpanelIntoBrowser(page);
+
+			});
+		} else {
+			await page.mouse.click(targetX, targetY, clickOptions);
+		}
+		if (coinFlip()) await wait();
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+async function moveMouse(page, startX, startY, endX, endY) {
+	try {
+		const steps = u.rand(30, 42);
+		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
+
+		for (const [x, y] of humanizedPath) {
+			await page.mouse.move(x, y);
+			// Variable speed based on distance from target
+			const distanceToTarget = Math.hypot(endX - x, endY - y);
+			const delay = Math.min(10, distanceToTarget / 10);
+			if (delay > 2) await u.sleep(delay);
+		}
+		if (coinFlip() && coinFlip()) await wait();
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+
+function generateHumanizedPath(startX, startY, endX, endY, steps) {
+	const path = [];
+	const controlPoint1X = startX + (endX - startX) * (0.3 + Math.random() * 0.2);
+	const controlPoint1Y = startY + (endY - startY) * (0.3 + Math.random() * 0.2);
+	const controlPoint2X = startX + (endX - startX) * (0.6 + Math.random() * 0.2);
+	const controlPoint2Y = startY + (endY - startY) * (0.6 + Math.random() * 0.2);
+
+	for (let i = 0; i <= steps; i++) {
+		const t = i / steps;
+		const x = bezierPoint(startX, controlPoint1X, controlPoint2X, endX, t);
+		const y = bezierPoint(startY, controlPoint1Y, controlPoint2Y, endY, t);
+		path.push([x + u.rand(-2, 2), y + u.rand(-2, 2)]);
+	}
+	return path;
+}
+
+function bezierPoint(p0, p1, p2, p3, t) {
+	return Math.pow(1 - t, 3) * p0 +
+		3 * Math.pow(1 - t, 2) * t * p1 +
+		3 * (1 - t) * Math.pow(t, 2) * p2 +
+		Math.pow(t, 3) * p3;
+}
+
+async function randomScroll(page) {
+	try {
+		const scrollable = await page.evaluate(() => {
+			return document.documentElement.scrollHeight > window.innerHeight;
+		});
+
+		if (!scrollable) return false;
+
+		// Move everything into a single evaluate call
+		await page.evaluate(() => {
+			function smoothScroll(distance) {
+				const steps = 20;
+				const stepSize = distance / steps;
+				let current = 0;
+
+				function step() {
+					if (current < steps) {
+						window.scrollBy(0, stepSize * (1 - Math.cos(current / steps * Math.PI)));
+						current++;
+						requestAnimationFrame(step);
+					}
+				}
+				requestAnimationFrame(step);
+			}
+
+			// Define scroll types inside evaluate where window is available
+			const scrollTypes = [
+				() => smoothScroll(Math.random() * (window.innerHeight / 2 - 100) + 100),
+				() => smoothScroll(-Math.random() * (window.innerHeight / 2 - 100) - 100),
+				() => window.scrollTo({ top: 0, behavior: 'smooth' }),
+				() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+			];
+
+			// Execute random scroll type
+			scrollTypes[Math.floor(Math.random() * scrollTypes.length)]();
+		});
+
+		await u.sleep(u.rand(300, 800));
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function randomMouseMove(page) {
+	const startX = u.rand(0, page.viewport().width);
+	const startY = u.rand(0, page.viewport().height);
+	const endX = u.rand(0, page.viewport().width);
+	const endY = u.rand(0, page.viewport().height);
+	return await moveMouse(page, startX, startY, endX, endY);
+}
+
+
+// Utility wait functions
+async function wait() {
+	await u.sleep(u.rand(42, 420));
+}
+
+/**
+ * Helper to pick a random item from a list with weights.
+ * @param {Array} items - List of items to pick from.
+ * @param {Object} weights - Object with item keys and their weights.
+ * @returns {any} Selected item based on weights.
+ */
+function weightedRandom(items, weights) {
+	const totalWeight = items.reduce((sum, item) => sum + weights[item], 0);
+	const randomValue = Math.random() * totalWeight;
+	let cumulativeWeight = 0;
+
+	for (const item of items) {
+		cumulativeWeight += weights[item];
+		if (randomValue < cumulativeWeight) return item;
+	}
+}
+
+
+function coinFlip() {
+	return Math.random() < 0.5;
+}
+
+
 
 
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {

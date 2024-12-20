@@ -1,4 +1,4 @@
-import {  http } from '@google-cloud/functions-framework';
+import { http } from '@google-cloud/functions-framework';
 import { sLog, uid, timer } from 'ak-tools';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -31,13 +31,19 @@ http('entry', async (req, res) => {
 		/** @type {Params} */
 		const { body = {} } = req;
 		/** @type {Endpoints} */
-		const { path } = req;		
-		
+		const { path } = req;
+
+		if (path === "/" && req.method === "GET") {
+			res.set('Cache-Control', 'no-cache');
+			res.status(200).sendFile("./components/ui.html", { root: process.cwd() });
+			return;
+		}
+
 		//todo: actually do auth
 		if (body.safeWord !== "let me in...") {
 			res.status(401).send("Bro... you're not authorized to be here");
 			return;
-		} 
+		}
 
 		const t = timer('job');
 		t.start();
@@ -72,6 +78,10 @@ async function ping(data) {
 	return Promise.resolve({ status: "ok", message: "service is alive", echo: data });
 }
 
+async function html() {
+
+}
+
 
 /*
 ----
@@ -92,6 +102,8 @@ function route(path) {
 			return [main];
 		case "/ping":
 			return [ping];
+		case "/simulate":
+			return [main];
 		default:
 			throw new Error(`Invalid path: ${path}`);
 	}
