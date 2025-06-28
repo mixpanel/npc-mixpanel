@@ -187,6 +187,122 @@
 				transform: rotate(360deg);
 			}
 		}
+
+		/* Terminal Styles */
+		#terminal {
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			background-color: #000;
+			color: #0f0;
+			padding: 20px;
+			border-radius: 0;
+			overflow-y: auto;
+			z-index: 1000;
+			box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+			max-height: 70vh;
+			display: flex;
+			flex-direction: column;
+			animation: slideUp 0.3s ease-out;
+		}
+
+		@keyframes slideUp {
+			from {
+				transform: translateY(100%);
+			}
+			to {
+				transform: translateY(0);
+			}
+		}
+
+		#terminal.hidden {
+			display: none !important;
+		}
+
+		#terminal h3 {
+			color: #fff;
+			margin-top: 0;
+			margin-bottom: 15px;
+			flex-shrink: 0;
+			font-family: 'Courier New', monospace;
+			font-size: 16px;
+			text-shadow: 0 0 5px #0f0;
+		}
+
+		#terminal-content {
+			font-family: 'Courier New', monospace;
+			font-size: 14px;
+			line-height: 1.4;
+			white-space: pre-wrap;
+			flex-grow: 1;
+			overflow-y: auto;
+			background-color: #000;
+			padding: 10px;
+			border: 1px solid #333;
+			border-radius: 4px;
+			scrollbar-width: thin;
+			scrollbar-color: #0f0 #000;
+		}
+
+		#terminal-content::-webkit-scrollbar {
+			width: 8px;
+		}
+
+		#terminal-content::-webkit-scrollbar-track {
+			background: #000;
+		}
+
+		#terminal-content::-webkit-scrollbar-thumb {
+			background: #0f0;
+			border-radius: 4px;
+		}
+
+		#terminal-content::-webkit-scrollbar-thumb:hover {
+			background: #00ff00aa;
+		}
+
+		#close-terminal {
+			position: absolute;
+			top: 15px;
+			right: 15px;
+			background-color: #f44336;
+			color: white;
+			border: none;
+			padding: 8px 12px;
+			cursor: pointer;
+			flex-shrink: 0;
+			border-radius: 4px;
+			font-size: 12px;
+			font-weight: bold;
+			transition: background-color 0.2s;
+		}
+
+		#close-terminal:hover {
+			background-color: #d32f2f;
+		}
+
+		h2,
+		h3 {
+			color: var(--primary-color);
+			font-weight: 600;
+		}
+
+		h2 {
+			font-size: 2em;
+		}
+
+		/* Terminal typing effect for new messages */
+		.terminal-line {
+			opacity: 0;
+			animation: fadeIn 0.2s ease-in forwards;
+		}
+
+		@keyframes fadeIn {
+			to {
+				opacity: 1;
+			}
+		}
 	</style>
 </head>
 
@@ -266,6 +382,16 @@
 		</div>
 	</div>
 
+	<!-- TERMINAL -->
+	<div id="terminal" class="hidden">
+		<h3>🛬 Terminal Output</h3>
+		<button id="close-terminal">×</button>
+		<div id="terminal-content"></div>
+	</div>
+
+	<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+		integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+		crossorigin="anonymous"></script>
 	<script>
 		const form = document.getElementById('simulatorForm');
 		const loading = document.querySelector('.loading');
@@ -349,6 +475,20 @@
 			usersOutput.textContent = e.target.value;
 		});
 
+		// Terminal utility functions
+		function addTerminalLine(content, message) {
+			const timestamp = new Date().toLocaleTimeString();
+			const line = document.createElement('div');
+			line.className = 'terminal-line';
+			line.textContent = `[${timestamp}] ${message}`;
+			content.appendChild(line);
+			content.scrollTop = content.scrollHeight;
+		}
+
+		function clearTerminal(content) {
+			content.innerHTML = '';
+		}
+
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const formData = new FormData(form);
@@ -357,31 +497,112 @@
 			data.users = parseInt(data.users);
 			data.concurrency = data.users;
 			if (data.concurrency > 10) data.concurrency = 10;
-			// data.headless = false;
+
+			// Show terminal with animation
+			const terminal = document.getElementById('terminal');
+			const terminalContent = document.getElementById('terminal-content');
+			
+			// Clear previous content
+			clearTerminal(terminalContent);
+			
+			// Show terminal
+			terminal.classList.remove('hidden');
+			addTerminalLine(terminalContent, '🔌 Connecting to server...');
+
+			// Connect to WebSocket (on port 8081 in dev mode)
+			const socket = io('http://localhost:8081');
+
+			socket.on('connect', () => {
+				addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
+				socket.emit('start_job', data);
+				loading.style.display = 'none';
+			});
+
+			socket.on('job_update', (message) => {
+				// Handle multiple lines in a single message
+				const lines = message.split('\n').filter(line => line.trim());
+				lines.forEach(line => {
+					if (line.trim()) {
+						addTerminalLine(terminalContent, line);
+					}
+				});
+			});
+
+			socket.on('job_complete', (result) => {
+				addTerminalLine(terminalContent, '');
+				addTerminalLine(terminalContent, '🎉 Simulation completed successfully!');
+				addTerminalLine(terminalContent, '📊 Check your Mixpanel project for results');
+				
+				// Auto-close terminal after 3 seconds
+				setTimeout(() => {
+					if (!terminal.classList.contains('hidden')) {
+						addTerminalLine(terminalContent, '⏱️  Closing terminal in 3 seconds...');
+					}
+				}, 2000);
+				
+				setTimeout(() => {
+					terminal.classList.add('hidden');
+					form.style.display = 'flex';
+					loading.style.display = 'none';
+				}, 5000);
+				
+				socket.disconnect();
+			});
+
+			socket.on('error', (error) => {
+				addTerminalLine(terminalContent, `❌ Error: ${error}`);
+				socket.disconnect();
+			});
+
+			socket.on('disconnect', () => {
+				addTerminalLine(terminalContent, '🔌 Disconnected from server');
+			});
 
 			form.style.display = 'none';
 			loading.style.display = 'block';
-
-			try {
-				const response = fetch('/simulate', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify(data),
-				});
-
-				await new Promise(resolve => setTimeout(resolve, 15000));
-
-				loading.style.display = 'none';
-				success.style.display = 'block';
-			} catch (error) {
-				console.error('Error:', error);
-				loading.style.display = 'none';
-				form.style.display = 'flex';
-				alert('An error occurred. Please try again.');
-			}
 		});
+
+		// Close terminal with confirmation for running jobs
+		const closeTerminalButton = document.getElementById('close-terminal');
+		closeTerminalButton.addEventListener('click', () => {
+			const terminal = document.getElementById('terminal');
+			const terminalContent = document.getElementById('terminal-content');
+			
+			// Check if there's active content (not just initial messages)
+			const hasActiveContent = terminalContent.children.length > 2;
+			
+			if (hasActiveContent) {
+				const shouldClose = confirm('Are you sure you want to close the terminal? The simulation may still be running.');
+				if (!shouldClose) return;
+			}
+			
+			// Add exit animation
+			terminal.style.animation = 'slideDown 0.3s ease-in forwards';
+			
+			setTimeout(() => {
+				terminal.classList.add('hidden');
+				terminal.style.animation = ''; // Reset animation
+				clearTerminal(terminalContent);
+				form.style.display = 'flex';
+				loading.style.display = 'none';
+				success.style.display = 'none';
+			}, 300);
+		});
+
+		// Add slide down animation for close
+		const slideDownCSS = `
+			@keyframes slideDown {
+				from {
+					transform: translateY(0);
+				}
+				to {
+					transform: translateY(100%);
+				}
+			}
+		`;
+		const style = document.createElement('style');
+		style.textContent = slideDownCSS;
+		document.head.appendChild(style);
 	</script>
 </body>
 

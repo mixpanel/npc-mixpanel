@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import pLimit from 'p-limit';
 import puppeteer from 'puppeteer';
 import u from 'ak-tools';
+import { log } from '../function.js';
 const { NODE_ENV = "" } = process.env;
 let { MIXPANEL_TOKEN = "" } = process.env;
 if (!NODE_ENV) throw new Error("NODE_ENV is required");
@@ -40,15 +41,15 @@ export default async function main(PARAMS = {}) {
 
 		return limit(() => {
 			try {
-				if (NODE_ENV === "dev") console.log(`start user ${i + 1}...`);
+				log(`🚀 Starting user ${i + 1} of ${users}...`);
 				return simulateUser(url, headless)
 					.then((results) => {
-						if (NODE_ENV === "dev") console.log(`end user ${i + 1}...`);
+						log(`✅ Completed user ${i + 1} of ${users}`);
 						return results;
 					});
 			}
 			catch (e) {
-				//noop;
+				log(`❌ Error with user ${i + 1}: ${e.message}`);
 			}
 		});
 	});
@@ -113,7 +114,7 @@ async function simulateUser(url, headless = true) {
 	} catch (error) {
 		// Handle timeout error (close browser if not already closed)
 		if (browser) await browser.close();
-		if (NODE_ENV === "dev") console.error("simulateUser Error:", error);
+		if (NODE_ENV === "dev") log("simulateUser Error:", error);
 		return { error: error.message, timedOut: true };
 	}
 }
@@ -143,7 +144,7 @@ async function jamMixpanelIntoBrowser(page, username) {
 function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 
 	function reset() {
-		console.log('[NPC] RESET MIXPANEL\n\n');
+		log('[NPC] RESET MIXPANEL\n\n');
 		if (mixpanel) {
 			if (mixpanel.headless) {
 				mixpanel.headless.reset();
@@ -161,15 +162,15 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 	// Function that contains the code to run after the script is loaded
 	function EMBED_TRACKING() {
 		if (window?.MIXPANEL_WAS_INJECTED) {
-			console.log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
+			log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
 			return;
 		}
-		console.log('[NPC] EMBED TRACKING\n\n');
+		log('[NPC] EMBED TRACKING\n\n');
 		window.MIXPANEL_WAS_INJECTED = true;
 		if (window.mixpanel) {
 			mixpanel.init(project_token, {
 				loaded: function (mp) {
-					console.log('[NPC] MIXPANEL LOADED\n\n');
+					log('[NPC] MIXPANEL LOADED\n\n');
 					mp.register(restParams);
 					if (userId) mp.identify(userId);
 					if (userId) mp.people.set({ $name: userId, $email: userId });
@@ -280,7 +281,7 @@ async function simulateUserSession(browser, page, persona) {
 		if (target._targetId !== mainPageId) {
 			const newPage = await target.page();
 			if (newPage) {
-				if (NODE_ENV === "dev") console.log(`closing new tab @ ${newPage.url()}`);
+				log(`🚫 Closing new tab: ${newPage.url()}`);
 				await newPage.close();
 			}
 		}
@@ -295,14 +296,15 @@ async function simulateUserSession(browser, page, persona) {
 				const newDomain = new URL(await page.url()).hostname;
 				if (newDomain !== currentDomain) {
 					// Domain changed in the same tab - reinject
-					if (NODE_ENV === "dev") console.log(`domain changed from ${currentDomain} to ${newDomain}; reinjecting`);
+					log(`🔄 Domain changed from ${currentDomain} to ${newDomain}; reinjecting tracker`);
 					await relaxCSP(page);
 					await jamMixpanelIntoBrowser(page, usersHandle);
 					currentDomain = newDomain;
 				}
 			}
 		} catch (e) {
-			console.error('Error handling navigation:', e);
+			
+			log('Error handling navigation:', e);
 		}
 	});
 
@@ -313,7 +315,7 @@ async function simulateUserSession(browser, page, persona) {
 
 
 	for (const [index, action] of actionSequence.entries()) {
-		if (NODE_ENV !== "production") console.log(`Action ${index} of ${numActions}: ${action}`);
+		if (NODE_ENV !== "production") log(`Action ${index} of ${numActions}: ${action}`);
 		let repeats = u.rand(1, 4);
 		let funcToPreform;
 
