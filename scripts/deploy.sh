@@ -30,26 +30,23 @@ fi
 export $(grep "^SERVICE_NAME=" .env | xargs)
 
 # Convert .env to flat YAML format
-echo "Generating .env.yaml..."
+echo "Generating .env.yaml from .env file..."
 grep -v '^#' .env | grep -v '^\s*$' | while IFS='=' read -r key value; do
-  echo "$key: \"${value//\"/\\\"}\""
+  # Remove quotes if present and escape any remaining quotes
+  value=$(echo "$value" | sed 's/^["'\'']//' | sed 's/["'\'']$//' | sed 's/"/\\"/g')
+  echo "$key: \"$value\""
 done > .env.yaml
 
-# Deploy
-echo "Deploying function: $SERVICE_NAME..."
-gcloud alpha functions deploy "$SERVICE_NAME" \
-  --gen2 \
-  --allow-unauthenticated \
-  --env-vars-file .env.yaml \
-  --runtime nodejs20 \
-  --region us-central1 \
-  --trigger-http \
-  --memory 8GB \
-  --entry-point entry \
-  --source . \
-  --timeout=3600 \
-  --max-instances=100 \
-  --min-instances=0 \
-  --concurrency=1
+echo "Generated .env.yaml:"
+cat .env.yaml
 
-echo "✅ Deployment complete."
+# Deploy using Cloud Build to Cloud Run (not Cloud Functions)
+echo "Deploying $SERVICE_NAME to Cloud Run using Cloud Build..."
+gcloud builds submit \
+  --config cloudbuild.yaml \
+  --substitutions _SERVICE_NAME="$SERVICE_NAME" \
+  --region us-central1
+
+echo "✅ Cloud Run deployment complete!"
+echo "🌐 Your service should be available at:"
+echo "https://$SERVICE_NAME-$(gcloud config get-value project).a.run.app"

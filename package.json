@@ -2,7 +2,7 @@
 	"name": "npc-mixpanel",
 	"version": "1.0.0",
 	"private": true,
-	"main": "function.js",
+	"main": "server.js",
 	"scripts": {
 		"local": "./scripts/local.sh",
 		"fire": "./scripts/fire.sh",
@@ -11,20 +11,20 @@
 		"prune": "rm -rf tmp/*",
 		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
 		"test:headless": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
-		"test:watch": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-		"gcp-build": "node node_modules/puppeteer/install.mjs"
+		"test:watch": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
 	},
 	"type": "module",
 	"keywords": [
-		"cloud function",
-		"template",
-		"serverless"
+		"cloud run",
+		"websockets",
+		"puppeteer",
+		"automation",
+		"mixpanel"
 	],
 	"author": "ak@mixpanel.com",
 	"license": "ISC",
 	"description": "puppeteer in the cloud!",
 	"dependencies": {
-		"@google-cloud/functions-framework": "^3.4.2",
 		"@google-cloud/storage": "^7.12.0",
 		"ak-fetch": "^1.0.6",
 		"ak-tools": "^1.0.66",

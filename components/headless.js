@@ -14,7 +14,7 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./agents.json', true);
-import { log } from '../function.js';
+import { log } from '../utils/logger.js';
 
 /**
  * @typedef PARAMS
@@ -44,7 +44,7 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 	} = PARAMS;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
-	if (concurrency > 10) concurrency = 10;
+	if (concurrency > 3) concurrency = 3;
 	if (token) MIXPANEL_TOKEN = token;
 
 	const userPromises = Array.from({ length: users }, (_, i) => {
@@ -276,20 +276,20 @@ async function jamMixpanelIntoBrowser(page, username) {
 	await retry(async () => {
 		// Enhanced injection with multiple fallback strategies
 		const injectMixpanelString = injectMixpanel.toString();
-		
+
 		await page.evaluate((MIXPANEL_TOKEN, userId, injectMixpanelFn) => {
 			try {
 				// Strategy 1: Direct function injection
 				const injectedFunction = new Function(`return (${injectMixpanelFn})`)();
 				injectedFunction(MIXPANEL_TOKEN, userId);
-				
+
 				// Strategy 2: Force override any existing CSP violations
 				if (window.console && window.console.error) {
 					const originalConsoleError = window.console.error;
-					window.console.error = function(...args) {
+					window.console.error = function (...args) {
 						// Suppress CSP violation errors for our injection
 						const message = args.join(' ');
-						if (message.includes('Content Security Policy') || 
+						if (message.includes('Content Security Policy') ||
 							message.includes('CSP') ||
 							message.includes('unsafe-eval') ||
 							message.includes('unsafe-inline')) {
@@ -298,7 +298,7 @@ async function jamMixpanelIntoBrowser(page, username) {
 						return originalConsoleError.apply(this, args);
 					};
 				}
-				
+
 				// Strategy 3: Ensure script execution even if initially blocked
 				setTimeout(() => {
 					if (!window.MIXPANEL_WAS_INJECTED || !window.mixpanel) {
@@ -311,10 +311,10 @@ async function jamMixpanelIntoBrowser(page, username) {
 						}
 					}
 				}, 500);
-				
+
 			} catch (error) {
 				console.error('[NPC] Mixpanel injection error:', error);
-				
+
 				// Strategy 4: Fallback injection using createElement
 				try {
 					const script = document.createElement('script');
@@ -326,7 +326,7 @@ async function jamMixpanelIntoBrowser(page, username) {
 			}
 		}, MIXPANEL_TOKEN, username, injectMixpanelString);
 	}, 3, 1000); // Retry up to 3 times with 1 second delay
-	
+
 	return true;
 }
 
@@ -431,21 +431,21 @@ async function relaxCSP(page) {
 		page.on('request', request => {
 			try {
 				const headers = { ...request.headers() };
-				
+
 				// Remove all CSP-related headers
 				delete headers['content-security-policy'];
 				delete headers['content-security-policy-report-only'];
 				delete headers['x-content-security-policy'];
 				delete headers['x-webkit-csp'];
-				
+
 				// Remove other restrictive headers
 				delete headers['x-frame-options'];
 				delete headers['x-xss-protection'];
 				delete headers['referrer-policy'];
-				
+
 				// Add permissive CSP that allows everything
 				headers['content-security-policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';";
-				
+
 				request.continue({ headers });
 			} catch (e) {
 				// If request modification fails, continue anyway
@@ -465,9 +465,9 @@ async function relaxCSP(page) {
 				const observer = new MutationObserver((mutations) => {
 					mutations.forEach((mutation) => {
 						mutation.addedNodes.forEach((node) => {
-							if (node.tagName === 'META' && 
+							if (node.tagName === 'META' &&
 								(node.getAttribute('http-equiv') === 'Content-Security-Policy' ||
-								 node.getAttribute('http-equiv') === 'content-security-policy')) {
+									node.getAttribute('http-equiv') === 'content-security-policy')) {
 								node.remove();
 							}
 						});
@@ -484,11 +484,11 @@ async function relaxCSP(page) {
 
 			// Override eval restrictions
 			window.originalEval = window.eval;
-			
+
 			// Ensure fetch and XMLHttpRequest work without restrictions
 			if (typeof fetch !== 'undefined') {
 				const originalFetch = window.fetch;
-				window.fetch = function(...args) {
+				window.fetch = function (...args) {
 					return originalFetch.apply(this, args).catch(err => {
 						// Fallback for blocked requests
 						console.warn('Fetch blocked, attempting proxy:', err);
@@ -500,7 +500,7 @@ async function relaxCSP(page) {
 
 		// 4. Disable additional security features that might interfere
 		await page.setJavaScriptEnabled(true);
-		
+
 		// 5. Set permissive permissions for all origins
 		const context = page.browserContext();
 		await context.overridePermissions(page.url(), [
@@ -533,7 +533,7 @@ async function relaxCSP(page) {
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
  */
 async function simulateUserSession(browser, page, persona, inject = true) {
-	const usersHandle = u.makeName(6, " ");
+	const usersHandle = u.makeName(4, "-");
 
 	// Enhanced logging with user context
 	log(`👤 <span style="color: #9d5cff; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
@@ -542,12 +542,12 @@ async function simulateUserSession(browser, page, persona, inject = true) {
 	if (inject) {
 		log(`  └─ 💉 Injecting Mixpanel tracking...`);
 		await jamMixpanelIntoBrowser(page, usersHandle);
-		
+
 		// Verify injection was successful
 		const injectionSuccess = await page.evaluate(() => {
 			return !!(window.mixpanel && window.MIXPANEL_WAS_INJECTED);
 		});
-		
+
 		if (injectionSuccess) {
 			log(`  │  └─ ✅ <span style="color: #00ff88;">Mixpanel loaded successfully</span>`);
 		} else {
@@ -583,10 +583,22 @@ async function simulateUserSession(browser, page, persona, inject = true) {
 				if (newDomain !== currentDomain) {
 					// Domain changed in the same tab - reinject
 					log(`  ├─ 🔄 <span style="color: #ff8800;">Navigation</span> detected: ${currentDomain} → <span style="color: #80E1D9;">${newDomain}</span>`);
-					await relaxCSP(page);
+					log(`  │  └─ Reapplying CSP relaxations and Mixpanel injection...`);
+					try {
+						await relaxCSP(page);
+					}
+					catch (e) {
+						log(`    └─ ⚠️ <span style="color: #ffaa00;">CSP relaxation failed:</span> ${e.message}`);
+					}
 					if (inject) {
-						log(`  │  └─ 💉 Reinjecting Mixpanel tracker...`);
-						await jamMixpanelIntoBrowser(page, usersHandle);
+						try {
+							log(`  │  └─ 💉 Reinjecting Mixpanel tracker...`);
+							await jamMixpanelIntoBrowser(page, usersHandle);
+
+						}
+						catch (e) {
+							log(`    └─ ⚠️ <span style="color: #ffaa00;">Mixpanel reinjection failed:</span> ${e.message}`);
+						}
 					}
 					currentDomain = newDomain;
 				}

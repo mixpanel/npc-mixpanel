@@ -321,6 +321,43 @@
 			background-color: #d32f2f;
 		}
 
+		#scroll-to-bottom {
+			position: absolute;
+			bottom: 20px;
+			right: 20px;
+			background-color: var(--primary-color);
+			color: white;
+			border: none;
+			padding: 8px 16px;
+			border-radius: 20px;
+			font-size: 12px;
+			cursor: pointer;
+			box-shadow: 0 2px 8px rgba(157, 92, 255, 0.3);
+			transition: all 0.3s ease;
+			animation: bounce 1s infinite;
+		}
+
+		#scroll-to-bottom:hover {
+			background-color: var(--secondary-color);
+			transform: translateY(-2px);
+		}
+
+		#scroll-to-bottom.hidden {
+			display: none !important;
+		}
+
+		@keyframes bounce {
+			0%, 20%, 50%, 80%, 100% {
+				transform: translateY(0);
+			}
+			40% {
+				transform: translateY(-5px);
+			}
+			60% {
+				transform: translateY(-3px);
+			}
+		}
+
 		/* Floating terminal open button */
 		#open-terminal {
 			position: fixed;
@@ -492,6 +529,7 @@
 			<h3>🛬 Terminal Output</h3>
 			<button id="close-terminal">−</button>
 			<div id="terminal-content"></div>
+			<button id="scroll-to-bottom" class="hidden">↓ New messages</button>
 		</div>
 	</div>
 
@@ -594,8 +632,23 @@
 			const line = document.createElement('div');
 			line.className = 'terminal-line';
 			line.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
+			
+			// Check if user is already at the bottom (within 50px threshold)
+			const isAtBottom = (content.scrollTop + content.clientHeight) >= (content.scrollHeight - 50);
+			
 			content.appendChild(line);
-			content.scrollTop = content.scrollHeight;
+			
+			// Only auto-scroll if user was already at the bottom
+			if (isAtBottom) {
+				content.scrollTop = content.scrollHeight;
+				// Hide scroll-to-bottom button if it was showing
+				const scrollButton = document.getElementById('scroll-to-bottom');
+				if (scrollButton) scrollButton.classList.add('hidden');
+			} else {
+				// Show scroll-to-bottom button if user is scrolled up
+				const scrollButton = document.getElementById('scroll-to-bottom');
+				if (scrollButton) scrollButton.classList.remove('hidden');
+			}
 		}
 
 		function clearTerminal(content) {
@@ -634,9 +687,8 @@
 			openTerminalButton.classList.add('hidden');
 			addTerminalLine(terminalContent, '🔌 Connecting to server...');
 
-			// Connect to WebSocket
-			const wsUrl = window.location.hostname === 'localhost' ? 'http://localhost:8081' : `${window.location.protocol}//${window.location.hostname}:8081`;
-			const socket = io(wsUrl);
+			// Connect to WebSocket (same server for Cloud Run)
+			const socket = io();
 
 			socket.on('connect', () => {
 				addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
@@ -726,6 +778,24 @@
 			
 			// Show terminal with animation
 			terminal.classList.remove('hidden');
+		});
+
+		// Scroll-to-bottom functionality
+		const scrollToBottomButton = document.getElementById('scroll-to-bottom');
+		const terminalContent = document.getElementById('terminal-content');
+		
+		scrollToBottomButton.addEventListener('click', () => {
+			terminalContent.scrollTop = terminalContent.scrollHeight;
+			scrollToBottomButton.classList.add('hidden');
+		});
+
+		// Listen for manual scrolling to hide/show the scroll-to-bottom button
+		terminalContent.addEventListener('scroll', () => {
+			const isAtBottom = (terminalContent.scrollTop + terminalContent.clientHeight) >= (terminalContent.scrollHeight - 50);
+			if (isAtBottom) {
+				scrollToBottomButton.classList.add('hidden');
+			}
+			// Note: We don't show the button on scroll up here - only when new messages arrive
 		});
 
 		// Terminal resize functionality
