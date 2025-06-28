@@ -9,7 +9,9 @@
 		"deploy": "./scripts/deploy.sh",
 		"perms": "chmod +x ./scripts/*.sh",
 		"prune": "rm -rf tmp/*",
-		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",
+		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
+		"test:headless": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
+		"test:watch": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
 		"gcp-build": "node node_modules/puppeteer/install.mjs"
 	},
 	"type": "module",
@@ -35,6 +37,7 @@
 	},
 	"devDependencies": {
 		"jest": "^29.7.0",
+		"jest-puppeteer": "^11.0.0",
 		"nodemon": "^3.1.4"
 	}
 }

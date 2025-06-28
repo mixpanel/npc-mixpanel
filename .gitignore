@@ -10,3 +10,4 @@ logs/*
 .env.yaml
 env.yaml
 .cache
+.claude
