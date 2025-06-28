@@ -196,23 +196,53 @@
 			right: 0;
 			background-color: #000;
 			color: #0f0;
-			padding: 20px;
+			padding: 0;
 			border-radius: 0;
-			overflow-y: auto;
+			overflow: hidden;
 			z-index: 1000;
 			box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
-			max-height: 70vh;
+			height: 400px;
 			min-height: 200px;
+			max-height: 80vh;
 			display: flex;
 			flex-direction: column;
 			animation: slideUp 0.3s ease-out;
-			resize: vertical;
-			border-top: 3px solid #0f0;
 		}
 
-		#terminal:hover {
-			border-top: 3px solid #00ff00aa;
+		/* Custom resize handle at the top */
+		#terminal-resize-handle {
+			height: 8px;
+			background: linear-gradient(to bottom, #0f0, #008800);
 			cursor: ns-resize;
+			position: relative;
+			flex-shrink: 0;
+		}
+
+		#terminal-resize-handle:hover {
+			background: linear-gradient(to bottom, #00ff00, #00aa00);
+			height: 10px;
+		}
+
+		/* Add visual indicator for drag handle */
+		#terminal-resize-handle::before {
+			content: '⋮⋮⋮';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			color: #000;
+			font-size: 8px;
+			letter-spacing: 2px;
+			opacity: 0.6;
+		}
+
+		/* Terminal content area */
+		#terminal-body {
+			flex: 1;
+			padding: 20px;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
 		}
 
 		@keyframes slideUp {
@@ -236,6 +266,7 @@
 			font-family: 'Courier New', monospace;
 			font-size: 16px;
 			text-shadow: 0 0 5px #0f0;
+			position: relative;
 		}
 
 		#terminal-content {
@@ -272,7 +303,7 @@
 
 		#close-terminal {
 			position: absolute;
-			top: 15px;
+			top: 14px;
 			right: 15px;
 			background-color: #f44336;
 			color: white;
@@ -288,6 +319,47 @@
 
 		#close-terminal:hover {
 			background-color: #d32f2f;
+		}
+
+		/* Floating terminal open button */
+		#open-terminal {
+			position: fixed;
+			bottom: 20px;
+			right: 20px;
+			background-color: var(--primary-color);
+			color: white;
+			border: none;
+			padding: 12px 20px;
+			border-radius: 25px;
+			font-size: 14px;
+			font-weight: bold;
+			cursor: pointer;
+			box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+			transition: all 0.3s ease;
+			z-index: 999;
+			animation: pulse 2s infinite;
+		}
+
+		#open-terminal:hover {
+			background-color: var(--secondary-color);
+			transform: translateY(-2px);
+			box-shadow: 0 6px 16px rgba(157, 92, 255, 0.4);
+		}
+
+		#open-terminal.hidden {
+			display: none !important;
+		}
+
+		@keyframes pulse {
+			0% {
+				box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+			}
+			50% {
+				box-shadow: 0 4px 20px rgba(157, 92, 255, 0.5);
+			}
+			100% {
+				box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+			}
 		}
 
 		h2,
@@ -354,8 +426,8 @@
 	</div>
 	<div class="container">
 		<div class="form-container">
-			<p>give me a URL + project token...</p>
-			<p>...i'll give you replays!</p>
+			<p id="form-description-line1">give me a URL + project token...</p>
+			<p id="form-description-line2">...i'll give you replays!</p>
 			<form id="simulatorForm">
 				<label for="url">URL:</label>
 				<input type="text"
@@ -415,10 +487,18 @@
 
 	<!-- TERMINAL -->
 	<div id="terminal" class="hidden">
-		<h3>🛬 Terminal Output</h3>
-		<button id="close-terminal">×</button>
-		<div id="terminal-content"></div>
+		<div id="terminal-resize-handle"></div>
+		<div id="terminal-body">
+			<h3>🛬 Terminal Output</h3>
+			<button id="close-terminal">−</button>
+			<div id="terminal-content"></div>
+		</div>
 	</div>
+
+	<!-- FLOATING TERMINAL OPEN BUTTON -->
+	<button id="open-terminal" class="hidden">
+		📟 Show Terminal
+	</button>
 
 	<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
 		integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
@@ -430,6 +510,8 @@
 		const usersSlider = document.getElementById('users');
 		const usersOutput = document.getElementById('usersOutput');
 		const url = document.getElementById('url');
+		const formLine1 = document.getElementById('form-description-line1');
+		const formLine2 = document.getElementById('form-description-line2');
 		const possibleUrls = [
 			"https://reddit.com",
 			"https://youtube.com",
@@ -511,7 +593,7 @@
 			const timestamp = new Date().toLocaleTimeString();
 			const line = document.createElement('div');
 			line.className = 'terminal-line';
-			line.textContent = `[${timestamp}] ${message}`;
+			line.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
 			content.appendChild(line);
 			content.scrollTop = content.scrollHeight;
 		}
@@ -547,12 +629,14 @@
 				addTerminalLine(terminalContent, '');
 			}
 			
-			// Show terminal
+			// Show terminal and hide open button
 			terminal.classList.remove('hidden');
+			openTerminalButton.classList.add('hidden');
 			addTerminalLine(terminalContent, '🔌 Connecting to server...');
 
-			// Connect to WebSocket (on port 8081 in dev mode)
-			const socket = io('http://localhost:8081');
+			// Connect to WebSocket
+			const wsUrl = window.location.hostname === 'localhost' ? 'http://localhost:8081' : `${window.location.protocol}//${window.location.hostname}:8081`;
+			const socket = io(wsUrl);
 
 			socket.on('connect', () => {
 				addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
@@ -578,12 +662,18 @@
 				// Auto-close terminal after 3 seconds
 				setTimeout(() => {
 					if (!terminal.classList.contains('hidden')) {
-						addTerminalLine(terminalContent, '⏱️  Closing terminal in 3 seconds...');
+						addTerminalLine(terminalContent, '⏱️  Closing terminal in 10 seconds...');
 					}
-				}, 2000);
+				}, 10_000);
 				
 				setTimeout(() => {
 					terminal.classList.add('hidden');
+					openTerminalButton.classList.remove('hidden');
+					
+					// Restore original form text
+					formLine1.textContent = 'give me a URL + project token...';
+					formLine2.textContent = '...i\'ll give you replays!';
+					
 					form.style.display = 'flex';
 					loading.style.display = 'none';
 				}, 5000);
@@ -600,23 +690,21 @@
 				addTerminalLine(terminalContent, '🔌 Disconnected from server');
 			});
 
+			// Update form text to show in progress
+			formLine1.textContent = 'replays in progress...';
+			formLine2.textContent = 'check the terminal below!';
+			
+			// Hide form inputs but keep the description visible
 			form.style.display = 'none';
 			loading.style.display = 'block';
 		});
 
-		// Close terminal with confirmation for running jobs
+		// Minimize terminal (close button)
 		const closeTerminalButton = document.getElementById('close-terminal');
+		const openTerminalButton = document.getElementById('open-terminal');
+		
 		closeTerminalButton.addEventListener('click', () => {
 			const terminal = document.getElementById('terminal');
-			const terminalContent = document.getElementById('terminal-content');
-			
-			// Check if there's active content (not just initial messages)
-			const hasActiveContent = terminalContent.children.length > 2;
-			
-			if (hasActiveContent) {
-				const shouldClose = confirm('this should never happen.');
-				if (!shouldClose) return;
-			}
 			
 			// Add exit animation
 			terminal.style.animation = 'slideDown 0.3s ease-in forwards';
@@ -624,11 +712,57 @@
 			setTimeout(() => {
 				terminal.classList.add('hidden');
 				terminal.style.animation = ''; // Reset animation
-				// Don't clear terminal content - keep history
-				form.style.display = 'flex';
-				loading.style.display = 'none';
-				success.style.display = 'none';
+				// Show the floating open button
+				openTerminalButton.classList.remove('hidden');
 			}, 300);
+		});
+
+		// Open/expand terminal
+		openTerminalButton.addEventListener('click', () => {
+			const terminal = document.getElementById('terminal');
+			
+			// Hide the floating button
+			openTerminalButton.classList.add('hidden');
+			
+			// Show terminal with animation
+			terminal.classList.remove('hidden');
+		});
+
+		// Terminal resize functionality
+		const resizeHandle = document.getElementById('terminal-resize-handle');
+		const terminal = document.getElementById('terminal');
+		
+		let isResizing = false;
+		let startY = 0;
+		let startHeight = 0;
+
+		resizeHandle.addEventListener('mousedown', (e) => {
+			isResizing = true;
+			startY = e.clientY;
+			startHeight = parseInt(document.defaultView.getComputedStyle(terminal).height, 10);
+			document.body.style.userSelect = 'none'; // Prevent text selection while dragging
+			e.preventDefault();
+		});
+
+		document.addEventListener('mousemove', (e) => {
+			if (!isResizing) return;
+
+			const dy = startY - e.clientY; // Inverted because we're dragging from top
+			let newHeight = startHeight + dy;
+			
+			// Apply constraints
+			const minHeight = 200;
+			const maxHeight = window.innerHeight * 0.8;
+			newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+			
+			terminal.style.height = newHeight + 'px';
+		});
+
+		document.addEventListener('mouseup', () => {
+			if (isResizing) {
+				isResizing = false;
+				document.body.style.userSelect = ''; // Re-enable text selection
+			}
 		});
 
 		// Add slide down animation for close

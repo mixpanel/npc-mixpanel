@@ -54,8 +54,8 @@ function coerceTypes(params, method) {
 }
 
 
-// Initialize Socket.IO on a different port in dev mode
-if (NODE_ENV === 'dev') {
+// Initialize Socket.IO server
+if (true) {
 	const app = express();
 	const httpServer = createServer(app);
 	
@@ -127,7 +127,7 @@ if (NODE_ENV === 'dev') {
 // Logger function that emits to websockets
 export function log(message) {
 	console.log(message);
-	if (activeSocket && NODE_ENV === 'dev') {
+	if (activeSocket) {
 		activeSocket.emit('job_update', message);
 	}
 }
