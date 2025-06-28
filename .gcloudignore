@@ -11,7 +11,7 @@ tests
 tmps
 scripts
 .cache
-
+.claude
 
 
 # Ignore node_modules (generated during npm install)
