@@ -368,6 +368,8 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 					});
 
 				},
+
+				//autocapture
 				autocapture: {
 					pageview: "full-url",
 					click: true,
@@ -381,10 +383,14 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 				record_sessions_percent: 100,
 				record_inline_images: true,
 				record_collect_fonts: true,
-				record_mask_text_selector: 'nothing',
-				record_block_selector: "nothing",
-				record_block_class: "nothing",
+				record_mask_text_selector: "nope",
+				record_block_selector: "nope",
+				record_block_class: "nope",
+				record_canvas: true,
+				record_heatmap_data: true,
 
+
+				
 				//normal mixpanel
 				ignore_dnt: true,
 				batch_flush_interval_ms: 0,
