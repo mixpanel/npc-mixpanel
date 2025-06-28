@@ -5,12 +5,16 @@ import { tmpdir } from 'os';
 import pLimit from 'p-limit';
 import puppeteer from 'puppeteer';
 import u from 'ak-tools';
-import { log } from '../function.js';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+dayjs.extend(utc);
 const { NODE_ENV = "" } = process.env;
 let { MIXPANEL_TOKEN = "" } = process.env;
 if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
+const agents = await u.load('./agents.json', true);
+import { log } from '../function.js';
 
 /**
  * @typedef PARAMS
@@ -18,18 +22,24 @@ TEMP_DIR = path.resolve(TEMP_DIR);
  * @property {number} users Number of users to simulate
  * @property {number} concurrency Number of users to simulate concurrently
  * @property {boolean} headless Whether to run headless or not
- * @property {token} token Mixpanel token
+ * @property {boolean} inject Whether to inject mixpanel or not
+ * @property {boolean} past Whether to simulate time in past
+ * @property {string} token Mixpanel token
  */
 
 /**
  * Main function to simulate user behavior.
  * @param {PARAMS} PARAMS 
+ * @param {Function} logFunction - Optional logging function for real-time updates
  */
-export default async function main(PARAMS = {}) {
+export default async function main(PARAMS = {}, logFunction = console.log) {
+	const log = logFunction;
 	let { url = "https://aktunes.neocities.org/fixpanel/",
 		users = 10,
 		concurrency = 5,
 		headless = true,
+		inject = true,
+		past = false,
 		token = ""
 	} = PARAMS;
 	const limit = pLimit(concurrency);
@@ -42,7 +52,7 @@ export default async function main(PARAMS = {}) {
 		return limit(() => {
 			try {
 				log(`🚀 Starting user ${i + 1} of ${users}...`);
-				return simulateUser(url, headless)
+				return simulateUser(url, headless, inject, past)
 					.then((results) => {
 						log(`✅ Completed user ${i + 1} of ${users}`);
 						return results;
@@ -66,8 +76,10 @@ export default async function main(PARAMS = {}) {
  * Simulates a single user session with random actions, with a timeout to prevent hangs.
  * @param {string} url - The URL to visit.
  * @param {boolean} headless - Whether to run the browser headlessly.
+ * @param {boolean} inject - Whether to inject Mixpanel into the page.
+ * @param {boolean} past - Whether to simulate time in past.
  */
-async function simulateUser(url, headless = true) {
+async function simulateUser(url, headless = true, inject = true, past = false) {
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
 	const timeoutPromise = new Promise((resolve) =>
@@ -92,13 +104,21 @@ async function simulateUser(url, headless = true) {
 		await page.setDefaultTimeout(pageTimeout);
 		await page.setDefaultNavigationTimeout(pageTimeout);
 		await relaxCSP(page);
-		await page.setViewport({ width: 2560, height: 1440, deviceScaleFactor: 0 });
+		await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false, hasTouch: false, isLandscape: true });
+		
+		// Spoof user agent for realistic browser fingerprinting
+		await spoofAgent(page);
+		
+		// Spoof time if requested
+		if (past) await forceSpoofTimeInBrowser(page);
 
+		log(`📍 Navigating to ${url}...`);
 		await page.goto(url);
 		const persona = selectPersona();
+		log(`🎭 Selected persona: ${persona}`);
 
 		try {
-			const actions = await simulateUserSession(browser, page, persona);
+			const actions = await simulateUserSession(browser, page, persona, inject);
 			await browser.close();
 			return actions;
 		}
@@ -130,6 +150,100 @@ async function retry(operation, maxRetries = 3, delay = 1000) {
 	}
 }
 
+// USER AGENT SPOOFING
+/**
+ * @param  {import('puppeteer').Page} page
+ */
+export async function spoofAgent(page) {
+	const agent = u.shuffle(agents).slice().pop();
+	const { userAgent, ...headers } = agent;
+	const set = await setUserAgent(page, userAgent, headers);
+	return set;
+}
+
+/**
+ * Set the user agent and additional headers for the page.
+ * @param  {import('puppeteer').Page} page
+ * @param  {string} userAgent
+ * @param  {Object} additionalHeaders
+ */
+export async function setUserAgent(page, userAgent, additionalHeaders = {}) {
+	if (!page) throw new Error("Browser not initialized");
+
+	await page.setUserAgent(userAgent);
+
+	if (Object.keys(additionalHeaders).length > 0) {
+		await page.setExtraHTTPHeaders(additionalHeaders);
+	}
+
+	return { userAgent, additionalHeaders };
+}
+
+// TIME SPOOFING
+function getRandomTimestampWithinLast5Days() {
+	const now = Date.now();
+	const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000); // 5 days ago in milliseconds
+	const timeChosen = Math.floor(Math.random() * (now - fiveDaysAgo)) + fiveDaysAgo;
+	log(`🕰️ Spoofed time: ${dayjs(timeChosen).toISOString()}`);
+	return timeChosen;
+}
+
+// Function to inject and execute time spoofing
+async function forceSpoofTimeInBrowser(page) {
+	const spoofedTimestamp = getRandomTimestampWithinLast5Days();
+	const spoofTimeFunctionString = spoofTime.toString();
+
+	await retry(async () => {
+		await page.evaluateOnNewDocument((timestamp, spoofTimeFn) => {
+			const injectedFunction = new Function(`return (${spoofTimeFn})`)();
+			injectedFunction(timestamp);
+		}, spoofedTimestamp, spoofTimeFunctionString);
+	});
+}
+
+// The time spoofing function that will be serialized and injected
+function spoofTime(startTimestamp) {
+	function DO_TIME_SPOOF() {
+		const actualDate = Date;
+		const actualNow = Date.now;
+		const actualPerformanceNow = performance.now;
+
+		// Calculate the offset
+		const offset = actualNow() - startTimestamp;
+
+		// Override Date constructor
+		function FakeDate(...args) {
+			if (args.length === 0) {
+				return new actualDate(actualNow() - offset);
+			}
+			return new actualDate(...args);
+		}
+
+		// Copy static methods
+		FakeDate.now = () => actualNow() - offset;
+		FakeDate.parse = actualDate.parse;
+		FakeDate.UTC = actualDate.UTC;
+
+		// Override instance methods
+		FakeDate.prototype = actualDate.prototype;
+
+		// Override Date.now
+		Date.now = () => actualNow() - offset;
+
+		// Override performance.now
+		performance.now = function () {
+			const timeSincePageLoad = actualPerformanceNow.call(performance);
+			return (actualNow() - offset) - (Date.now() - timeSincePageLoad);
+		};
+
+		// Replace window Date
+		window.Date = FakeDate;
+
+		return { spoof: true };
+	}
+	return DO_TIME_SPOOF();
+}
+
 async function jamMixpanelIntoBrowser(page, username) {
 	await retry(async () => {
 		const injectMixpanelString = injectMixpanel.toString();
@@ -144,7 +258,7 @@ async function jamMixpanelIntoBrowser(page, username) {
 function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 
 	function reset() {
-		log('[NPC] RESET MIXPANEL\n\n');
+		console.log('[NPC] RESET MIXPANEL\n\n');
 		if (mixpanel) {
 			if (mixpanel.headless) {
 				mixpanel.headless.reset();
@@ -162,10 +276,10 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 	// Function that contains the code to run after the script is loaded
 	function EMBED_TRACKING() {
 		if (window?.MIXPANEL_WAS_INJECTED) {
-			log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
+			console.log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
 			return;
 		}
-		log('[NPC] EMBED TRACKING\n\n');
+		console.log('[NPC] EMBED TRACKING\n\n');
 		window.MIXPANEL_WAS_INJECTED = true;
 		if (window.mixpanel) {
 			mixpanel.init(project_token, {
@@ -264,12 +378,18 @@ async function relaxCSP(page) {
  * @param {import('puppeteer').Browser} browser - Puppeteer browser object.
  * @param {import('puppeteer').Page} page - Puppeteer page object.
  * @param {string} persona - User persona to simulate.
+ * @param {boolean} inject - Whether to inject Mixpanel into the page.
  */
-async function simulateUserSession(browser, page, persona) {
+async function simulateUserSession(browser, page, persona, inject = true) {
 	const usersHandle = u.makeName(6, " ");
 
-	// Initial Mixpanel injection
-	await jamMixpanelIntoBrowser(page, usersHandle);
+	// Conditional Mixpanel injection
+	if (inject) {
+		log(`💉 Injecting Mixpanel tracking for user: ${usersHandle}`);
+		await jamMixpanelIntoBrowser(page, usersHandle);
+	} else {
+		log(`⏭️ Skipping Mixpanel injection for user: ${usersHandle}`);
+	}
 
 	// Store initial domain and page target ID
 	let currentDomain = new URL(await page.url()).hostname;
@@ -296,14 +416,17 @@ async function simulateUserSession(browser, page, persona) {
 				const newDomain = new URL(await page.url()).hostname;
 				if (newDomain !== currentDomain) {
 					// Domain changed in the same tab - reinject
-					log(`🔄 Domain changed from ${currentDomain} to ${newDomain}; reinjecting tracker`);
+					log(`🔄 Domain changed from ${currentDomain} to ${newDomain}`);
 					await relaxCSP(page);
-					await jamMixpanelIntoBrowser(page, usersHandle);
+					if (inject) {
+						log(`💉 Reinjecting Mixpanel tracker for new domain`);
+						await jamMixpanelIntoBrowser(page, usersHandle);
+					}
 					currentDomain = newDomain;
 				}
 			}
 		} catch (e) {
-			
+
 			log('Error handling navigation:', e);
 		}
 	});
@@ -314,9 +437,18 @@ async function simulateUserSession(browser, page, persona) {
 
 
 
+	// Action emoji mapping
+	const actionEmojis = {
+		click: '👆',
+		scroll: '📜', 
+		mouse: '🖱️',
+		wait: '⏸️'
+	};
+
 	for (const [index, action] of actionSequence.entries()) {
-		if (NODE_ENV !== "production") log(`Action ${index} of ${numActions}: ${action}`);
-		let repeats = u.rand(1, 4);
+		const emoji = actionEmojis[action] || '🎯';
+		log(`${emoji} Action ${index + 1}/${numActions}: ${action} (${u.rand(1, 4)} repeats)`);
+		let repeats = u.rand(1, 3); // Reduced from 1-4 to 1-3 for speed
 		let funcToPreform;
 
 		switch (action) {
@@ -325,7 +457,7 @@ async function simulateUserSession(browser, page, persona) {
 				break;
 			case "scroll":
 				funcToPreform = randomScroll;
-				repeats = Math.floor(repeats / 2);
+				repeats = Math.max(1, Math.floor(repeats / 2)); // Ensure at least 1
 				break;
 			case "mouse":
 				funcToPreform = randomMouse;
@@ -399,7 +531,7 @@ function generatePersonaActionSequence(persona) {
  */
 function generateWeightedRandomActionSequence(actionTypes, weights) {
 	const sequence = [];
-	const length = u.rand(42, 187);
+	const length = u.rand(25, 80); // Reduced from 42-187 to 25-80 for faster sessions
 	for (let i = 0; i < length; i++) {
 		const action = weightedRandom(actionTypes, weights);
 		sequence.push(action);
@@ -427,19 +559,17 @@ async function clickStuff(page) {
 
 		// Add hover pause before clicking
 		await moveMouse(page, u.rand(0, page.viewport().width), u.rand(0, page.viewport().height), targetX, targetY);
-		if (coinFlip()) await wait();
+		if (Math.random() < 0.3) await wait(); // Reduced from 50% to 30% chance
 
 		const tagName = await page.evaluate(el => el.tagName.toLowerCase(), element);
 		const href = await page.evaluate(el => el.getAttribute('href'), element);
 
-		// Click with varying speeds
+		// Click with faster, more varied speeds
 		/** @type {import('puppeteer').ClickOptions} */
 		const clickOptions = {
-			delay: u.rand(50, 150),
-			count: u.rand(1, 3),
+			delay: u.rand(20, 80), // Faster clicks (was 50-150)
+			count: Math.random() < 0.8 ? 1 : u.rand(1, 2), // Usually single clicks
 			button: 'left',
-			//modifiers: ['Meta']
-
 		};
 		if (coinFlip()) clickOptions.count = 1;
 		if (tagName === 'a' && href) {
@@ -472,33 +602,33 @@ async function randomMouse(page) {
  */
 async function moveMouse(page, startX, startY, endX, endY) {
 	try {
-		// More natural number of steps based on distance
+		// More natural number of steps based on distance - faster movement
 		const distance = Math.hypot(endX - startX, endY - startY);
-		const baseSteps = Math.floor(distance / 50); // One step per 50 pixels
-		const steps = Math.max(5, Math.min(40, baseSteps + u.rand(-2, 2)));
+		const baseSteps = Math.floor(distance / 70); // Fewer steps (was 50, now 70)
+		const steps = Math.max(3, Math.min(25, baseSteps + u.rand(-1, 1))); // Fewer steps overall
 
-		// Add slight pause before movement
-		if (coinFlip()) await wait();
+		// Less frequent pause before movement
+		if (Math.random() < 0.2) await wait();
 
 		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
 
 		for (const [x, y] of humanizedPath) {
 			await page.mouse.move(x, y);
 
-			// Variable speed that slows down near the target
+			// Faster variable speed that slows down near the target
 			const remainingDistance = Math.hypot(endX - x, endY - y);
 			const progressRatio = remainingDistance / distance;
 
-			// Slow down more dramatically near the target
-			const baseDelay = Math.min(12, remainingDistance / 8);
-			const speedVariation = u.rand(7, 13) / 10; // Add some randomness to speed
+			// Faster movement with less variation
+			const baseDelay = Math.min(6, remainingDistance / 12); // Faster (was 12/8, now 6/12)
+			const speedVariation = u.rand(8, 12) / 10; // Less variation
 			const delay = baseDelay * speedVariation;
 
-			// Add more delay near the target
-			if (progressRatio < 0.2) {
-				await u.sleep(delay * 2);
+			// Less dramatic slowdown near target
+			if (progressRatio < 0.1) {
+				await u.sleep(delay * 1.5); // Was 2x, now 1.5x
 			} else {
-				await u.sleep(delay);
+				await u.sleep(delay * 0.7); // Faster base movement
 			}
 		}
 
@@ -592,9 +722,8 @@ async function randomScroll(page) {
 			return scrollTypes[Math.floor(Math.random() * scrollTypes.length)]();
 		});
 
-		// Add natural pauses between scrolls
-		await wait();
-		if (coinFlip()) await wait();
+		// Faster, less frequent pauses between scrolls
+		if (Math.random() < 0.4) await wait(); // Only 40% chance of pause
 		return true;
 	} catch (e) {
 		return false;
@@ -602,15 +731,19 @@ async function randomScroll(page) {
 }
 
 
-// either a short or long wait
+// More realistic wait patterns - faster and more varied
 async function wait() {
-	if (coinFlip()) {
-		await u.sleep(u.rand(35, 42));
+	const waitType = Math.random();
+	if (waitType < 0.4) {
+		// Quick pause (40% chance)
+		await u.sleep(u.rand(15, 35));
+	} else if (waitType < 0.8) {
+		// Medium pause (40% chance) 
+		await u.sleep(u.rand(50, 120));
+	} else {
+		// Longer thinking pause (20% chance)
+		await u.sleep(u.rand(200, 400));
 	}
-	else {
-		await u.sleep(u.rand(97, 240));
-	}
-
 }
 
 

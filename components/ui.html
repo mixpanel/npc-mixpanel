@@ -202,9 +202,17 @@
 			z-index: 1000;
 			box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
 			max-height: 70vh;
+			min-height: 200px;
 			display: flex;
 			flex-direction: column;
 			animation: slideUp 0.3s ease-out;
+			resize: vertical;
+			border-top: 3px solid #0f0;
+		}
+
+		#terminal:hover {
+			border-top: 3px solid #00ff00aa;
+			cursor: ns-resize;
 		}
 
 		@keyframes slideUp {
@@ -375,6 +383,29 @@
 				<output for="users"
 					id="usersOutput">1</output>
 
+				<!-- New Checkbox for Inject -->
+				<label>
+					<input type="checkbox"
+						id="inject"
+						name="inject"
+						checked> Inject Mixpanel
+				</label>
+
+				<!-- New Checkbox for Headless -->
+				<label>
+					<input type="checkbox"
+						id="headless"
+						name="headless"
+						checked> Run in Headless Mode
+				</label>
+
+				<!-- New Checkbox for Past -->
+				<label>
+					<input type="checkbox"
+						id="past"
+						name="past"> Simulate time in past
+				</label>
+
 				<button type="submit">lets go!</button>
 			</form>
 			<div class="loading">Simulating...</div>
@@ -498,12 +529,23 @@
 			data.concurrency = data.users;
 			if (data.concurrency > 10) data.concurrency = 10;
 
+			// Ensure checkbox values are included in the data
+			data.inject = form.querySelector('#inject').checked;
+			data.headless = form.querySelector('#headless').checked;
+			data.past = form.querySelector('#past').checked;
+
 			// Show terminal with animation
 			const terminal = document.getElementById('terminal');
 			const terminalContent = document.getElementById('terminal-content');
 			
-			// Clear previous content
-			clearTerminal(terminalContent);
+			// Add session separator if there's existing content
+			if (terminalContent.children.length > 0) {
+				addTerminalLine(terminalContent, '');
+				addTerminalLine(terminalContent, '═══════════════════════════════════════');
+				addTerminalLine(terminalContent, '🔄 NEW SIMULATION SESSION');
+				addTerminalLine(terminalContent, '═══════════════════════════════════════');
+				addTerminalLine(terminalContent, '');
+			}
 			
 			// Show terminal
 			terminal.classList.remove('hidden');
@@ -572,7 +614,7 @@
 			const hasActiveContent = terminalContent.children.length > 2;
 			
 			if (hasActiveContent) {
-				const shouldClose = confirm('Are you sure you want to close the terminal? The simulation may still be running.');
+				const shouldClose = confirm('this should never happen.');
 				if (!shouldClose) return;
 			}
 			
@@ -582,7 +624,7 @@
 			setTimeout(() => {
 				terminal.classList.add('hidden');
 				terminal.style.animation = ''; // Reset animation
-				clearTerminal(terminalContent);
+				// Don't clear terminal content - keep history
 				form.style.display = 'flex';
 				loading.style.display = 'none';
 				success.style.display = 'none';
