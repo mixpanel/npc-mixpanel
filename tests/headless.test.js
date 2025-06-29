@@ -28,9 +28,9 @@ import {
   weightedRandom,
   coinFlip,
   extractTopLevelDomain
-} from '../components/headless.js';
+} from '../headless.js';
 
-import mainFunction from '../components/headless.js';
+import mainFunction from '../headless.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';

@@ -14,7 +14,7 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./agents.json', true);
-import { log } from '../utils/logger.js';
+import { log } from './logger.js';
 
 /**
  * @typedef PARAMS
