@@ -35,43 +35,72 @@ import { log } from '../utils/logger.js';
  */
 export default async function main(PARAMS = {}, logFunction = console.log) {
 	const log = logFunction;
-	let { url = "https://aktunes.neocities.org/fixpanel/",
+	let { url = "https://ak--47.github.io/fixpanel/",
 		users = 10,
-		concurrency = 2,
+		concurrency = 5,
 		headless = true,
 		inject = true,
 		past = false,
 		token = "",
 		maxActions = null
 	} = PARAMS;
+	if (url === "fixpanel") url = `https://ak--47.github.io/fixpanel/`;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
-	if (concurrency > 3) concurrency = 3;
+	if (concurrency > 10) concurrency = 10;
 	if (token) MIXPANEL_TOKEN = token;
+	if (NODE_ENV === 'production') headless = true; // Always headless in production
 
 	const userPromises = Array.from({ length: users }, (_, i) => {
 
 		return limit(() => {
-			try {
-				log(`🚀 <span style="color: #9d5cff; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
-				return simulateUser(url, headless, inject, past, maxActions)
-					.then((results) => {
+			return new Promise(async (resolve) => {
+				try {
+					log(`🚀 <span style="color: #9d5cff; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
+
+					const result = await simulateUser(url, headless, inject, past, maxActions);
+
+					if (result && !result.error && !result.timedOut) {
 						log(`✅ <span style="color: #00ff88;">User ${i + 1}/${users} completed!</span> Session data captured.`);
-						return results;
-					});
-			}
-			catch (e) {
-				log(`❌ <span style="color: #ff4444;">User ${i + 1} failed:</span> ${e.message}`);
-			}
+					} else if (result && result.timedOut) {
+						log(`⏰ <span style="color: #ffaa00;">User ${i + 1}/${users} timed out</span> - but simulation continues`);
+					} else {
+						log(`⚠️ <span style="color: #ffaa00;">User ${i + 1}/${users} completed with issues</span> - but simulation continues`);
+					}
+
+					resolve(result || { error: 'Unknown error', user: i + 1 });
+				}
+				catch (e) {
+					const errorMsg = e.message || 'Unknown error';
+					log(`❌ <span style="color: #ff4444;">User ${i + 1}/${users} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`);
+					resolve({ error: errorMsg, user: i + 1, crashed: true });
+				}
+			});
 		});
 	});
 
-	const results = await Promise.all(userPromises).catch((error) => {
-		if (NODE_ENV === "dev") debugger;
-		throw error;
-	});
+	// Use Promise.allSettled instead of Promise.all to prevent one failure from stopping everything
+	const results = await Promise.allSettled(userPromises);
 
-	return results;
+	// Process results and provide summary
+	const successful = results.filter(r => r.status === 'fulfilled' && r.value && !r.value.error && !r.value.crashed).length;
+	const timedOut = results.filter(r => r.status === 'fulfilled' && r.value && r.value.timedOut).length;
+	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
+	const failed = results.filter(r => r.status === 'rejected').length;
+
+	log(`📊 <span style="color: #9d5cff;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
+
+	// Return the actual results, filtering out any undefined values
+	const finalResults = results.map(r => {
+		if (r.status === 'fulfilled') {
+			return r.value;
+		} else {
+			log(`⚠️ <span style="color: #ff4444;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
+			return { error: r.reason?.message || 'Promise rejected', crashed: true };
+		}
+	}).filter(Boolean);
+
+	return finalResults;
 }
 
 /**
@@ -145,6 +174,8 @@ async function simulateUser(url, headless = true, inject = true, past = false, m
 
 		log(`📍 <span style="color: #ff8800;">Navigating</span> to <span style="color: #80E1D9;">${url}</span>...`);
 		await page.goto(url);
+		log(`  └─ <span style="color: #00ff88;">Page loaded successfully</span>`);
+		await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
 		const persona = selectPersona();
 		log(`🎭 <span style="color: #9d5cff;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
 
@@ -164,9 +195,19 @@ async function simulateUser(url, headless = true, inject = true, past = false, m
 		return await Promise.race([simulationPromise, timeoutPromise]);
 	} catch (error) {
 		// Handle timeout error (close browser if not already closed)
-		if (browser) await browser.close();
+		const errorMsg = error.message || 'Unknown error';
+		log(`🚨 <span style="color: #ff4444;">User simulation error:</span> ${errorMsg}`);
+
+		try {
+			if (browser) {
+				await browser.close();
+			}
+		} catch (closeError) {
+			log(`⚠️ <span style="color: #ffaa00;">Browser close error:</span> ${closeError.message}`);
+		}
+
 		if (NODE_ENV === "dev") log("simulateUser Error:", error);
-		return { error: error.message, timedOut: true };
+		return { error: errorMsg, timedOut: error.message?.includes('timeout') || false };
 	}
 }
 
@@ -423,7 +464,6 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 		const config = {
 			heartbeatInterval: 30000, // 30 seconds
 			visibilityDelay: 100, // 100ms delay for visibility changes
-			includeHeartbeat: true,
 			includeAdvancedFeatures: true,
 			logToConsole: false,
 			...options
@@ -607,25 +647,11 @@ function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
 			}
 		}
 
-		// Heartbeat functionality
-		function setupHeartbeat() {
-			if (!config.includeHeartbeat) return;
-
-			heartbeatInterval = setInterval(() => {
-				if (!hasTracked && document.visibilityState === "visible") {
-					mp.track("$mp_page_heartbeat", {
-						session_duration: Date.now() - sessionStartTime,
-						last_activity: Date.now() - lastActivityTime,
-						url: window.location.href
-					}, { transport: "sendBeacon" });
-				}
-			}, config.heartbeatInterval);
-		}
 
 		// Initialize everything
 		setupListeners();
 		setupAdvancedFeatures();
-		setupHeartbeat();
+
 
 		// Return utility functions for SPA support
 		return {
@@ -682,7 +708,6 @@ async function relaxCSP(page) {
 
 		// 2. Set up request interception to modify security headers
 		await page.setRequestInterception(true);
-
 		page.on('request', request => {
 			try {
 				const headers = { ...request.headers() };
@@ -701,7 +726,7 @@ async function relaxCSP(page) {
 				// Add permissive CSP that allows everything
 				headers['content-security-policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';";
 
-				request.continue({ headers });
+				if (!request.isInterceptResolutionHandled()) request.continue({ headers });
 			} catch (e) {
 				// If request modification fails, continue without headers modification
 				// Only continue if request hasn't been handled yet
@@ -837,7 +862,7 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 			} catch (e) {
 				// Ignore errors during polling - page might be navigating
 			}
-		}, 30000); // Every 30 seconds
+		}, 15000); // Every 15 seconds
 	}
 
 	// Set up tab listener to automatically close new tabs
@@ -854,10 +879,14 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 	// Set up navigation listener for the main page
 	page.on('domcontentloaded', async () => {
 		try {
+			// Check if page is still responsive
+			await page.evaluate(() => document.readyState);
+
 			// Check if we're still on the main page
 			const currentTarget = await page.target();
 			if (currentTarget._targetId === mainPageId) {
-				const newDomain = new URL(await page.url()).hostname;
+				const currentUrl = await page.url();
+				const newDomain = new URL(currentUrl).hostname;
 				if (newDomain !== currentDomain) {
 					// Domain changed in the same tab - reinject
 					log(`  ├─ 🔄 <span style="color: #ff8800;">Navigation</span> detected: ${currentDomain} → <span style="color: #80E1D9;">${newDomain}</span>`);
@@ -866,7 +895,7 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 						await relaxCSP(page);
 					}
 					catch (e) {
-						log(`    └─ ⚠️ <span style="color: #ffaa00;">CSP relaxation failed:</span> ${e.message}`);
+						log(`    └─ ⚠️ <span style="color: #ffaa00;">CSP relaxation failed:</span> ${e.message || 'Unknown error'}`);
 					}
 					if (inject) {
 						try {
@@ -875,21 +904,40 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 
 						}
 						catch (e) {
-							log(`    └─ ⚠️ <span style="color: #ffaa00;">Mixpanel reinjection failed:</span> ${e.message}`);
+							log(`    └─ ⚠️ <span style="color: #ffaa00;">Mixpanel reinjection failed:</span> ${e.message || 'Unknown error'}`);
 						}
 					}
 					currentDomain = newDomain;
 				}
 			}
 		} catch (e) {
-
-			log('Error handling navigation:', e);
+			// Page might be closed or unresponsive - don't crash
+			const errorMsg = e.message || 'Unknown navigation error';
+			if (!errorMsg.includes('Target closed') && !errorMsg.includes('Session closed')) {
+				log(`⚠️ <span style="color: #ffaa00;">Navigation error:</span> ${errorMsg}`);
+			}
 		}
 	});
 
 	const actionSequence = generatePersonaActionSequence(persona, maxActions);
 	const numActions = actionSequence.length;
 	const actionResults = [];
+
+	// Track action history for context-aware decisions
+	const actionHistory = [];
+
+	// Circuit breaker to stop user if too many consecutive failures
+	let consecutiveFailures = 0;
+	const maxConsecutiveFailures = 5;
+
+	// Identify hot zones for coordinated user behavior (always enabled for better heatmap data)
+	let hotZones = [];
+	try {
+		hotZones = await identifyHotZones(page);
+		log(`  ├─ 🎯 <span style="color: #ff8800;">Hot zones detected:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
+	} catch (e) {
+		log(`  ├─ ⚠️ <span style="color: #ffaa00;">Hot zone detection failed:</span> ${e.message} - using fallback targeting`);
+	}
 
 
 
@@ -898,42 +946,93 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 		click: '👆',
 		scroll: '📜',
 		mouse: '🖱️',
-		wait: '⏸️'
+		wait: '⏸️',
+		hover: '🎯',
+		form: '📝',
+		back: '⬅️'
 	};
 
-	for (const [index, action] of actionSequence.entries()) {
+	for (const [index, originalAction] of actionSequence.entries()) {
+		// Apply context-aware action selection
+		const action = getContextAwareAction(actionHistory, originalAction);
+
 		const emoji = actionEmojis[action] || '🎯';
-		log(`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${numActions}</span>: ${action}`);
+		const contextNote = action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
+		log(`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${numActions}</span>: ${action}${contextNote}`);
 
 		let funcToPerform;
 		switch (action) {
 			case "click":
-				funcToPerform = clickStuff;
+				funcToPerform = () => clickStuff(page, hotZones);
 				break;
 			case "scroll":
-				funcToPerform = intelligentScroll;
+				funcToPerform = () => intelligentScroll(page, hotZones);
 				break;
 			case "mouse":
-				funcToPerform = naturalMouseMovement;
+				funcToPerform = () => naturalMouseMovement(page, hotZones);
+				break;
+			case "hover":
+				funcToPerform = () => hoverOverElements(page, hotZones);
+				break;
+			case "form":
+				funcToPerform = () => interactWithForms(page);
+				break;
+			case "back":
+				funcToPerform = () => navigateBack(page);
 				break;
 			default:
-				funcToPerform = shortPause;
+				funcToPerform = () => shortPause(page);
 				break;
 		}
 
 		if (funcToPerform) {
 			try {
-				const result = await funcToPerform(page);
-				if (result) actionResults.push(action);
+				// Add timeout for individual actions to prevent hanging
+				const actionTimeout = new Promise((_, reject) =>
+					setTimeout(() => reject(new Error('Action timeout')), 30000) // 30 second timeout per action
+				);
+
+				const result = await Promise.race([
+					funcToPerform(page),
+					actionTimeout
+				]);
+
+				if (result) {
+					actionResults.push(action);
+					actionHistory.push(action);
+					consecutiveFailures = 0; // Reset failure counter on success
+				} else {
+					// Action failed, still add to history for context
+					actionHistory.push(`${action}_failed`);
+					consecutiveFailures++;
+					log(`    └─ ⚠️ <span style="color: #ffaa00;">Action ${action} failed:</span> <span style="color: #888;">no result returned (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
+				}
 			}
 			catch (e) {
-				// Log error but continue
-				log(`    └─ ⚠️ <span style="color: #ffaa00;">Action ${action} failed:</span> <span style="color: #888;">${e.message}</span>`);
+				// Log error but continue with simulation
+				const errorMsg = e.message || 'unknown error';
+				consecutiveFailures++;
+				log(`    └─ ⚠️ <span style="color: #ffaa00;">Action ${action} failed:</span> <span style="color: #888;">${errorMsg} (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
+				actionHistory.push(`${action}_error`);
+
+				// Check if page is still responsive after error
+				try {
+					await page.evaluate(() => document.readyState);
+				} catch (pageError) {
+					log(`    └─ 🚨 <span style="color: #ff4444;">Page unresponsive after ${action}</span> - stopping this user`);
+					break; // Exit this user's action loop, but don't crash the whole simulation
+				}
 			}
 		}
 
-		// Very short natural pause between actions
-		await u.sleep(u.rand(25, 100));
+		// Circuit breaker: stop user if too many consecutive failures
+		if (consecutiveFailures >= maxConsecutiveFailures) {
+			log(`    └─ 🛑 <span style="color: #ff4444;">Too many consecutive failures</span> - stopping this user early`);
+			break;
+		}
+
+		// More realistic pause between actions (humans need time to think/process)
+		await u.sleep(u.rand(500, 2000));
 	}
 
 	// Clean up the navigation listener and intervals
@@ -956,35 +1055,35 @@ async function simulateUserSession(browser, page, persona, inject = true, maxAct
 // Realistic user personas optimized for comprehensive engagement
 const personas = {
 	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.9, wait: 0.1 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.8, wait: 0.2 },
+	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1 },
+	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.8, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2 },
 
 	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.7, wait: 0.3 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.4 },
+	shopper: { scroll: 0.4, mouse: 0.2, click: 0.7, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3 },
+	comparison: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4 },
 
 	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.4, wait: 0.5 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.3, wait: 0.2 },
+	reader: { scroll: 0.6, mouse: 0.2, click: 0.4, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2 },
+	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.3, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3 },
 
 	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.6, wait: 0.3 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.7, wait: 0.2 },
+	explorer: { scroll: 0.4, mouse: 0.3, click: 0.6, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2 },
+	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.7, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1 },
 
 	// Mobile-like behavior (even on desktop)
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.6, wait: 0.2 },
+	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.6, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2 },
 
 	// Efficient users
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.9, wait: 0.1 },
+	decisive: { scroll: 0.2, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1 },
 
 	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.5, wait: 0.6 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.5 },
+	researcher: { scroll: 0.7, mouse: 0.4, click: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1 },
+	methodical: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2 },
 
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.8, wait: 0.2 }, // Optimize every action
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.4, wait: 0.6 }, // Immersive experience
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, wait: 0.01 }, // Click all the things!
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.5, wait: 0.7 }, // Read everything twice
+	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.8, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1 }, // Optimize every action
+	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.4, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2 }, // Immersive experience
+	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1 }, // Click all the things!
+	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.5, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3 }, // Read everything twice
 
 };
 
@@ -994,6 +1093,60 @@ const personas = {
 function selectPersona() {
 	const personaKeys = Object.keys(personas);
 	return personaKeys[Math.floor(Math.random() * personaKeys.length)];
+}
+
+/**
+ * Context-aware action selection based on recent actions
+ * @param {Array} actionHistory - Recent actions performed
+ * @param {string} suggestedAction - Action suggested by persona weighting
+ * @returns {string} - The action to perform (may override suggestion)
+ */
+function getContextAwareAction(actionHistory, suggestedAction) {
+	if (actionHistory.length === 0) return suggestedAction;
+
+	const lastAction = actionHistory[actionHistory.length - 1];
+	const recent5Actions = actionHistory.slice(-5);
+
+	// After clicking, users often wait or scroll to see results
+	if (lastAction === 'click') {
+		if (Math.random() < 0.4) return 'wait';
+		if (Math.random() < 0.3) return 'scroll';
+	}
+
+	// After form interaction, usually wait to see results or navigate
+	if (lastAction === 'form') {
+		if (Math.random() < 0.5) return 'wait';
+		if (Math.random() < 0.2) return 'back';
+	}
+
+	// After scrolling a lot, users often click something they found
+	const recentScrolls = recent5Actions.filter(a => a === 'scroll').length;
+	if (recentScrolls >= 3 && Math.random() < 0.6) {
+		return 'click';
+	}
+
+	// After hovering, users often click what they were examining
+	if (lastAction === 'hover' && Math.random() < 0.4) {
+		return 'click';
+	}
+
+	// After going back, users often scroll or wait to orient themselves
+	if (lastAction === 'back') {
+		if (Math.random() < 0.4) return 'wait';
+		if (Math.random() < 0.3) return 'scroll';
+	}
+
+	// Prevent too much repetition of the same action
+	const recentSameActions = recent5Actions.filter(a => a === suggestedAction).length;
+	if (recentSameActions >= 3) {
+		// Switch to a different action
+		const alternatives = ['click', 'scroll', 'wait', 'hover'];
+		const different = alternatives.filter(a => a !== suggestedAction);
+		return different[Math.floor(Math.random() * different.length)];
+	}
+
+	// Default: use the persona-suggested action
+	return suggestedAction;
 }
 
 /**
@@ -1099,9 +1252,50 @@ function generateWeightedRandomActionSequence(actionTypes, weights, maxActions =
  * Smart click targeting - prioritizes elements users actually click
  * @param  {import('puppeteer').Page} page
  */
-async function clickStuff(page) {
+async function clickStuff(page, hotZones = []) {
 	try {
-		// Get all potentially clickable elements with priority scoring
+		// If we have hot zones, prefer them (80% chance to use hot zone)
+		if (hotZones.length > 0 && Math.random() < 0.8) {
+			// Select from hot zones with weighted probability based on priority
+			const weightedHotZones = [];
+			hotZones.forEach(zone => {
+				for (let i = 0; i < zone.priority; i++) {
+					weightedHotZones.push(zone);
+				}
+			});
+
+			const selectedZone = weightedHotZones[Math.floor(Math.random() * weightedHotZones.length)];
+
+			// More natural click positioning within the hot zone
+			const targetX = selectedZone.x + u.rand(-selectedZone.width * 0.3, selectedZone.width * 0.3);
+			const targetY = selectedZone.y + u.rand(-selectedZone.height * 0.3, selectedZone.height * 0.3);
+
+			// Slower, more realistic mouse movement to target
+			await moveMouse(page,
+				u.rand(0, page.viewport().width),
+				u.rand(0, page.viewport().height),
+				targetX,
+				targetY
+			);
+
+			// More realistic pause before clicking (humans don't click immediately)
+			await u.sleep(u.rand(200, 800));
+
+			// Natural click with slight delay
+			await page.mouse.click(targetX, targetY, {
+				delay: u.rand(50, 150),
+				count: 1,
+				button: 'left'
+			});
+
+			log(`    └─ 👆 <span style="color: #00ff00;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #ffff88;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
+
+			// Pause after click to see results
+			await u.sleep(u.rand(300, 1000));
+			return true;
+		}
+
+		// Fallback: Get all potentially clickable elements with priority scoring
 		const targetInfo = await page.evaluate(() => {
 			const elements = [];
 
@@ -1231,20 +1425,20 @@ async function clickStuff(page) {
 			targetY
 		);
 
-		// Brief realistic pause before clicking
-		if (Math.random() < 0.2) await u.sleep(u.rand(50, 200));
+		// More realistic pause before clicking (humans take time to aim)
+		await u.sleep(u.rand(200, 800));
 
-		// Quick, confident click
+		// Natural click with more realistic timing
 		await page.mouse.click(targetX, targetY, {
-			delay: u.rand(30, 80),
+			delay: u.rand(50, 150),
 			count: 1,
 			button: 'left'
 		});
 
 		log(`    └─ 👆 <span style="color: #00ff00;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #ffff88;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
 
-		// Very brief pause after click
-		if (Math.random() < 0.3) await u.sleep(u.rand(100, 300));
+		// Pause after click to see results (more realistic)
+		await u.sleep(u.rand(300, 1000));
 
 		return true;
 	} catch (error) {
@@ -1255,7 +1449,7 @@ async function clickStuff(page) {
 /**
  * Intelligent scrolling that feels natural and content-aware
  */
-async function intelligentScroll(page) {
+async function intelligentScroll(page, hotZones = []) {
 	try {
 		const scrollInfo = await page.evaluate(() => {
 			const scrollHeight = document.documentElement.scrollHeight;
@@ -1292,7 +1486,35 @@ async function intelligentScroll(page) {
 		if (!scrollInfo) return false;
 
 		let targetScroll;
-		if (scrollInfo.targets.length > 0 && Math.random() < 0.7) {
+
+		// If we have hot zones, prefer scrolling towards them (70% chance)
+		if (hotZones.length > 0 && Math.random() < 0.7) {
+			// Find hot zones that are not currently visible
+			const currentViewportTop = scrollInfo.currentScroll;
+			const currentViewportBottom = scrollInfo.currentScroll + scrollInfo.viewportHeight;
+
+			const targetZones = hotZones.filter(zone => {
+				return zone.y < currentViewportTop - 100 || zone.y > currentViewportBottom + 100;
+			});
+
+			if (targetZones.length > 0) {
+				// Scroll towards a high-priority hot zone
+				const sortedZones = targetZones.sort((a, b) => b.priority - a.priority);
+				const targetZone = sortedZones[Math.floor(Math.random() * Math.min(3, sortedZones.length))]; // Pick from top 3
+				targetScroll = targetZone.y - (scrollInfo.viewportHeight * 0.3); // Center zone in viewport
+				log(`    └─ 📜 <span style="color: #ff8800;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`);
+			} else {
+				// All hot zones visible, do regular content scroll
+				if (scrollInfo.targets.length > 0) {
+					const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
+					targetScroll = target.top - (scrollInfo.viewportHeight * 0.1);
+				} else {
+					const scrollDirection = Math.random() < 0.8 ? 1 : -1;
+					const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7);
+					targetScroll = scrollInfo.currentScroll + (scrollDistance * scrollDirection);
+				}
+			}
+		} else if (scrollInfo.targets.length > 0 && Math.random() < 0.7) {
 			// 70% chance to scroll to content section
 			const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
 			targetScroll = target.top - (scrollInfo.viewportHeight * 0.1); // Leave some margin
@@ -1314,8 +1536,8 @@ async function intelligentScroll(page) {
 			});
 		}, targetScroll);
 
-		// Wait for scroll to complete
-		await u.sleep(u.rand(400, 800));
+		// Wait for scroll to complete (more realistic timing)
+		await u.sleep(u.rand(800, 1500));
 
 		log(`    └─ 📜 <span style="color: #00aaff;">Scrolled</span> to position <span style="color: #ffff88;">${Math.round(targetScroll)}</span>`);
 		return true;
@@ -1327,47 +1549,65 @@ async function intelligentScroll(page) {
 /**
  * Natural mouse movement without clicking - simulates reading/hovering behavior
  */
-async function naturalMouseMovement(page) {
+async function naturalMouseMovement(page, hotZones = []) {
 	try {
-		// Move to readable content areas
-		const contentInfo = await page.evaluate(() => {
-			const elements = document.querySelectorAll('p, h1, h2, h3, article, [class*="content"], [class*="text"]');
-			const targets = [];
+		let target;
 
-			elements.forEach(el => {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 100 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
-					targets.push({
-						x: rect.x + rect.width * 0.5,
-						y: rect.y + rect.height * 0.5,
-						width: rect.width,
-						height: rect.height
-					});
-				}
+		// 60% chance to move near hot zones for more realistic mouse tracking
+		if (hotZones.length > 0 && Math.random() < 0.6) {
+			// Select a hot zone but don't actually interact with it - just move near it
+			const zone = hotZones[Math.floor(Math.random() * hotZones.length)];
+			target = {
+				x: zone.x + u.rand(-80, 80), // Move near but not exactly on the hot zone
+				y: zone.y + u.rand(-60, 60),
+				source: 'near hot zone'
+			};
+		} else {
+			// Move to readable content areas
+			const contentInfo = await page.evaluate(() => {
+				const elements = document.querySelectorAll('p, h1, h2, h3, article, [class*="content"], [class*="text"]');
+				const targets = [];
+
+				elements.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 100 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+						targets.push({
+							x: rect.x + rect.width * 0.5,
+							y: rect.y + rect.height * 0.5,
+							width: rect.width,
+							height: rect.height
+						});
+					}
+				});
+
+				return targets.slice(0, 10); // Limit to first 10 elements
 			});
 
-			return targets.slice(0, 10); // Limit to first 10 elements
-		});
+			if (contentInfo.length === 0) return false;
 
-		if (contentInfo.length === 0) return false;
+			const contentTarget = contentInfo[Math.floor(Math.random() * contentInfo.length)];
+			target = {
+				x: contentTarget.x + u.rand(-contentTarget.width * 0.3, contentTarget.width * 0.3),
+				y: contentTarget.y + u.rand(-contentTarget.height * 0.3, contentTarget.height * 0.3),
+				source: 'content area'
+			};
+		}
 
-		const target = contentInfo[Math.floor(Math.random() * contentInfo.length)];
-
-		// Add some randomness to the target position
-		const targetX = target.x + u.rand(-target.width * 0.3, target.width * 0.3);
-		const targetY = target.y + u.rand(-target.height * 0.3, target.height * 0.3);
+		// Ensure target is within viewport
+		target.x = Math.max(50, Math.min(page.viewport().width - 50, target.x));
+		target.y = Math.max(50, Math.min(page.viewport().height - 50, target.y));
 
 		await moveMouse(page,
 			u.rand(0, page.viewport().width),
 			u.rand(0, page.viewport().height),
-			targetX,
-			targetY
+			target.x,
+			target.y
 		);
 
-		// Brief pause as if reading
-		await u.sleep(u.rand(200, 500));
+		// Longer, more realistic pause (users move mouse then pause to read/think)
+		await u.sleep(u.rand(800, 2000));
 
-		log(`    └─ 🖱️ <span style="color: #88aaff;">Mouse moved</span> to content area <span style="color: #888;">(reading behavior)</span>`);
+		log(`    └─ 🖱️ <span style="color: #88aaff;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span>`);
 		return true;
 	} catch (error) {
 		return false;
@@ -1375,12 +1615,348 @@ async function naturalMouseMovement(page) {
 }
 
 /**
- * Very short pause to simulate natural user rhythm
+ * Natural pause to simulate realistic user rhythm
  */
 async function shortPause(page) {
-	await u.sleep(u.rand(50, 200));
-	log(`    └─ ⏸️ <span style="color: #888;">Brief pause</span> (${u.rand(50, 200)}ms)`);
+	const pauseDuration = u.rand(300, 1500);
+	await u.sleep(pauseDuration);
+	log(`    └─ ⏸️ <span style="color: #888;">Natural pause</span> (${pauseDuration}ms)`);
 	return true;
+}
+
+/**
+ * Interact with forms - search boxes, email inputs, etc.
+ */
+async function interactWithForms(page) {
+	try {
+		// Check if page is still responsive
+		await page.evaluate(() => document.readyState);
+
+		const formElements = await page.evaluate(() => {
+			const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'));
+			return inputs.filter(el => {
+				const rect = el.getBoundingClientRect();
+				return rect.width > 0 && rect.height > 0 && !el.disabled && !el.readOnly && rect.top < window.innerHeight;
+			}).map(el => {
+				const rect = el.getBoundingClientRect();
+				return {
+					selector: el.tagName.toLowerCase() + (el.type ? `[type="${el.type}"]` : ''),
+					type: el.type || 'textarea',
+					placeholder: el.placeholder || '',
+					name: el.name || '',
+					id: el.id || '',
+					rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+				};
+			});
+		});
+
+		if (formElements.length === 0) return false;
+
+		const target = formElements[Math.floor(Math.random() * formElements.length)];
+
+		// Click into the field
+		const targetX = target.rect.x + (target.rect.width * 0.5) + u.rand(-target.rect.width * 0.2, target.rect.width * 0.2);
+		const targetY = target.rect.y + (target.rect.height * 0.5) + u.rand(-target.rect.height * 0.2, target.rect.height * 0.2);
+
+		await page.mouse.click(targetX, targetY);
+		await u.sleep(u.rand(100, 300));
+
+		// Choose realistic search terms based on input type
+		const searchTerms = {
+			search: ['best products', 'how to', 'reviews', 'price', 'compare', 'tutorial', 'guide', 'tips'],
+			email: ['user@example.com', 'test@gmail.com', 'hello@test.com'],
+			text: ['John Doe', 'test user', 'sample text', 'hello world']
+		};
+
+		const termType = target.type === 'email' ? 'email' : (target.type === 'search' ? 'search' : 'text');
+		const availableTerms = searchTerms[termType];
+		const term = availableTerms[Math.floor(Math.random() * availableTerms.length)];
+
+		// Type with realistic speed and occasional typos
+		for (const char of term) {
+			// Occasionally make a typo and correct it (5% chance)
+			if (Math.random() < 0.05) {
+				const wrongChar = String.fromCharCode(97 + Math.floor(Math.random() * 26)); // random letter
+				await page.keyboard.type(wrongChar);
+				await u.sleep(u.rand(100, 200));
+				await page.keyboard.press('Backspace');
+				await u.sleep(u.rand(50, 150));
+			}
+
+			await page.keyboard.type(char);
+			await u.sleep(u.rand(50, 150)); // Realistic typing speed
+		}
+
+		// Sometimes submit (30%), sometimes just leave it
+		const action = Math.random();
+		if (action < 0.3) {
+			await page.keyboard.press('Enter');
+			log(`    └─ 📝 <span style="color: #00aa00;">Form submitted</span> "${term}" in ${target.type} field`);
+		} else {
+			log(`    └─ 📝 <span style="color: #88aa00;">Form filled</span> "${term}" in ${target.type} field <span style="color: #888;">(abandoned)</span>`);
+		}
+
+		return true;
+	} catch (error) {
+		// Log specific error but don't crash
+		if (error.message && !error.message.includes('Target closed')) {
+			log(`    └─ ⚠️ <span style="color: #ffaa00;">Form interaction failed:</span> ${error.message}`);
+		}
+		return false;
+	}
+}
+
+/**
+ * Hover over elements to trigger dropdowns, tooltips, etc.
+ */
+async function hoverOverElements(page, hotZones = []) {
+	try {
+		let target;
+
+		// If we have hot zones, prefer them (75% chance to use hot zone)
+		if (hotZones.length > 0 && Math.random() < 0.75) {
+			// Filter to currently visible hot zones
+			const visibleZones = hotZones.filter(zone => {
+				return zone.y > 0 && zone.y < page.viewport().height;
+			});
+
+			if (visibleZones.length > 0) {
+				// Weight by priority for selection
+				const weightedZones = [];
+				visibleZones.forEach(zone => {
+					for (let i = 0; i < zone.priority; i++) {
+						weightedZones.push(zone);
+					}
+				});
+
+				target = weightedZones[Math.floor(Math.random() * weightedZones.length)];
+				log(`    └─ 🎯 <span style="color: #ff8800;">Hovering hot zone</span> ${target.tag}: "<span style="color: #ffff88;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`);
+			}
+		}
+
+		// Fallback: find regular hover targets
+		if (!target) {
+			const hoverTargets = await page.evaluate(() => {
+				const elements = document.querySelectorAll('a, button, [class*="card"], [class*="item"], img, [role="button"], [class*="menu"], nav a');
+				const targets = [];
+
+				elements.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+						targets.push({
+							x: rect.x + rect.width / 2,
+							y: rect.y + rect.height / 2,
+							width: rect.width,
+							height: rect.height,
+							text: el.textContent?.trim().substring(0, 30) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
+
+				return targets.slice(0, 20); // Limit to first 20 for performance
+			});
+
+			if (hoverTargets.length === 0) return false;
+			target = hoverTargets[Math.floor(Math.random() * hoverTargets.length)];
+		}
+
+		// Move to element
+		await moveMouse(page,
+			u.rand(0, page.viewport().width),
+			u.rand(0, page.viewport().height),
+			target.x + u.rand(-10, 10),
+			target.y + u.rand(-10, 10)
+		);
+
+		// More realistic hover duration - users take time to read/examine
+		const hoverDuration = u.rand(1000, 3000);
+		await u.sleep(hoverDuration);
+
+		// Often move slightly while hovering (reading tooltip/dropdown/examining element)
+		if (Math.random() < 0.6) {
+			await page.mouse.move(
+				target.x + u.rand(-30, 30),
+				target.y + u.rand(-30, 30)
+			);
+			await u.sleep(u.rand(500, 1200));
+		}
+
+		if (!target.priority) {
+			log(`    └─ 🎯 <span style="color: #aa88ff;">Hovered</span> ${target.tag}: "<span style="color: #ffff88;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
+		}
+
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Navigate back using browser back button
+ */
+async function navigateBack(page) {
+	try {
+		const canGoBack = await page.evaluate(() => window.history.length > 1);
+		if (canGoBack && Math.random() < 0.7) { // 70% chance to actually go back if possible
+			await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
+			log(`    └─ ⬅️ <span style="color: #88aaff;">Navigated back</span> in browser history`);
+			return true;
+		}
+		return false;
+	} catch (error) {
+		// Back navigation might fail for various reasons (no history, navigation restrictions, etc.)
+		return false;
+	}
+}
+
+/**
+ * Identify hot zones on the page for heatmap generation
+ * These are prominent, interactive elements that users should cluster around
+ */
+async function identifyHotZones(page) {
+	try {
+		return await page.evaluate(() => {
+			const hotZones = [];
+
+			// Priority 1: High-impact conversion elements (most important for heatmaps)
+			const highPrioritySelectors = [
+				'button[type="submit"]',
+				'[class*="cta"]:not([class*="secondary"])', '[class*="CTA"]:not([class*="secondary"])',
+				'[class*="btn-primary"]', '[class*="primary-btn"]',
+				'[class*="buy-now"]', '[class*="purchase"]', '[class*="order"]',
+				'[class*="signup"]', '[class*="sign-up"]', '[class*="register"]',
+				'[class*="get-started"]', '[class*="start-trial"]',
+				'[class*="download-now"]', '[class*="subscribe"]',
+				'[role="button"][class*="primary"]'
+			];
+
+			// Priority 2: Navigation and key interactive areas  
+			const mediumPrioritySelectors = [
+				'nav > ul > li > a', 'header nav a', '[class*="nav-main"] a',
+				'[class*="hero"] button', '[class*="hero"] a[class*="btn"]',
+				'[class*="card"] button', '[class*="card"] a[class*="btn"]',
+				'[class*="product"] button', '[class*="service"] button',
+				'[class*="pricing"] button', '[class*="plan"] button',
+				'form button', 'form input[type="submit"]',
+				'[class*="search"] button', '[class*="search"] input[type="submit"]'
+			];
+
+			// Priority 3: Secondary interactive elements (be selective)
+			const lowPrioritySelectors = [
+				'button:not([class*="close"]):not([class*="dismiss"])',
+				'a[href]:not([href="#"]):not([href=""]):not([href^="mailto"]):not([href^="tel"])',
+				'[role="button"]:not([aria-hidden="true"])'
+			];
+
+			function analyzeElements(selectors, basePriority) {
+				selectors.forEach(selector => {
+					try {
+						const elements = document.querySelectorAll(selector);
+						elements.forEach(el => {
+							const rect = el.getBoundingClientRect();
+
+							// Element must be visible and appropriately sized for interaction
+							if (rect.width > 30 && rect.height > 20 &&
+								rect.top >= 0 && rect.top < window.innerHeight &&
+								rect.left >= 0 && rect.left < window.innerWidth &&
+								rect.bottom > 0 && rect.right > 0) {
+
+								// Check if element is actually visible
+								const style = window.getComputedStyle(el);
+								if (style.display === 'none' || style.visibility === 'hidden' ||
+									style.opacity === '0' || el.disabled || el.hidden) {
+									return; // Skip hidden/disabled elements
+								}
+
+								// Calculate priority based on size, position, and content
+								let priority = basePriority;
+
+								// Boost priority for appropriately sized interactive elements
+								const area = rect.width * rect.height;
+								if (area > 15000) priority += 3; // Large, prominent elements
+								else if (area > 8000) priority += 2; // Medium prominent elements
+								else if (area > 3000) priority += 1; // Reasonably sized elements
+								else if (area < 800) priority -= 2; // Too small, probably not main interaction
+
+								// Boost priority for elements in key positions
+								if (rect.top < window.innerHeight * 0.4) priority += 2; // Above the fold
+								else if (rect.top < window.innerHeight * 0.8) priority += 1; // Still visible
+
+								// Boost priority for elements with action-oriented text
+								const text = el.textContent?.trim().toLowerCase() || '';
+								const actionWords = ['buy', 'shop', 'get', 'start', 'learn', 'try', 'demo', 'download', 'signup', 'subscribe', 'register', 'join', 'contact', 'book', 'order'];
+								const wordMatches = actionWords.filter(word => text.includes(word)).length;
+								priority += wordMatches * 2; // Each action word adds priority
+
+								// Reduce priority for likely non-interactive content
+								if (text.length > 100) priority -= 1; // Probably text content, not button
+								if (el.tagName === 'A' && !el.getAttribute('href')) priority -= 2; // Non-functional links
+
+								hotZones.push({
+									element: el,
+									rect: {
+										x: rect.x + rect.width / 2,
+										y: rect.y + rect.height / 2,
+										width: rect.width,
+										height: rect.height,
+										top: rect.top,
+										left: rect.left
+									},
+									priority,
+									selector: selector,
+									text: text.substring(0, 50),
+									tag: el.tagName.toLowerCase(),
+									area: area
+								});
+							}
+						});
+					} catch (e) {
+						// Ignore selector errors
+					}
+				});
+			}
+
+			// Analyze elements by priority (more focused scoring)
+			analyzeElements(highPrioritySelectors, 12);  // High-impact conversion elements
+			analyzeElements(mediumPrioritySelectors, 7);  // Navigation and key areas
+			analyzeElements(lowPrioritySelectors, 4);     // Secondary elements
+
+			// Sort by priority and limit to top candidates
+			hotZones.sort((a, b) => b.priority - a.priority);
+
+			// Remove overlapping zones and apply quality filters
+			const filteredZones = [];
+			hotZones.forEach(zone => {
+				// Only include zones with meaningful priority (above baseline)
+				if (zone.priority < 8) return;
+
+				const isOverlapping = filteredZones.some(existing => {
+					const dx = Math.abs(zone.rect.x - existing.rect.x);
+					const dy = Math.abs(zone.rect.y - existing.rect.y);
+					return dx < 40 && dy < 40; // Tighter overlap detection
+				});
+
+				if (!isOverlapping && filteredZones.length < 10) { // Limit to 10 highest quality hot zones
+					filteredZones.push(zone);
+				}
+			});
+
+			return filteredZones.map(zone => ({
+				x: zone.rect.x,
+				y: zone.rect.y,
+				width: zone.rect.width,
+				height: zone.rect.height,
+				priority: zone.priority,
+				text: zone.text,
+				tag: zone.tag,
+				selector: zone.selector
+			}));
+		});
+	} catch (error) {
+		console.error('Hot zone detection failed:', error);
+		return [];
+	}
 }
 
 async function randomMouse(page) {

@@ -4,6 +4,8 @@
 	"jest.jestCommandLine": "npm run test --",
 	"cSpell.words": [
 		"autocapture",
-		"EZTRACK"
+		"EZTRACK",
+		"Meeple",
+		"meeples"
 	]
 }

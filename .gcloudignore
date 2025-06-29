@@ -12,6 +12,7 @@ tmps
 scripts
 .cache
 .claude
+.prettierrc
 
 
 # Ignore node_modules (generated during npm install)

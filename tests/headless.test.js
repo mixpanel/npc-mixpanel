@@ -29,22 +29,84 @@ describe('Headless.js Functional Tests', () => {
 	});
 
 	describe('Sanity Check', () => {
-		test('should handle default parameters', async () => {
+		test('should run fast sanity check - 1 user, 10 actions', async () => {
 			const mockLog = function (msg) {
 				mockLog.calls = mockLog.calls || [];
 				mockLog.calls.push(msg);
 			};
 
 			try {
-				const result = await main({ maxActions: 3, users: 3 }, mockLog);
+				const result = await main({ 
+					users: 1, 
+					maxActions: 10, 
+					inject: false, // Disable injection for faster test
+					headless: true,
+					url: 'https://example.com' // Simple, fast-loading page
+				}, mockLog);
+				
+				// Should return an array
 				expect(Array.isArray(result)).toBe(true);
+				expect(result.length).toBe(1);
+				
+				// Should have some log calls
+				expect(mockLog.calls.length).toBeGreaterThan(0);
+				
+				// Should have spawning message
+				const hasSpawningMessage = mockLog.calls.some(msg => 
+					msg.includes('🚀') && msg.includes('Spawning')
+				);
+				expect(hasSpawningMessage).toBe(true);
+				
+				// Should have completion message or summary
+				const hasCompletionMessage = mockLog.calls.some(msg => 
+					msg.includes('✅') || msg.includes('📊') || msg.includes('Summary')
+				);
+				expect(hasCompletionMessage).toBe(true);
+				
 			} catch (error) {
-				// Expected to fail without proper browser setup
-				// expect(error).toBeDefined();
+				// Test should not throw unhandled errors - our safeguards should catch them
+				console.log('Sanity check error (should be handled gracefully):', error.message);
+				expect(error).not.toBeInstanceOf(Error);
 			}
-		});
+		}, 10000); // 10 second timeout for sanity check
 
+		test('should generate heatmap-optimized behavior - 1 user, 5 actions', async () => {
+			const mockLog = function (msg) {
+				mockLog.calls = mockLog.calls || [];
+				mockLog.calls.push(msg);
+			};
 
+			try {
+				const result = await main({ 
+					users: 1, 
+					maxActions: 5, // Shorter test for speed
+					inject: false, // Disable injection for faster test
+					headless: true,
+					url: 'https://example.com' // Simple, fast-loading page
+				}, mockLog);
+				
+				// Should return an array
+				expect(Array.isArray(result)).toBe(true);
+				expect(result.length).toBe(1);
+				
+				// Should have detected hot zones
+				const hasHotZoneMessage = mockLog.calls.some(msg => 
+					msg.includes('🎯') && msg.includes('Hot zones detected')
+				);
+				expect(hasHotZoneMessage).toBe(true);
+				
+				// Should have completion message or summary
+				const hasCompletionMessage = mockLog.calls.some(msg => 
+					msg.includes('✅') || msg.includes('📊') || msg.includes('Summary')
+				);
+				expect(hasCompletionMessage).toBe(true);
+				
+			} catch (error) {
+				// Test should not throw unhandled errors - our safeguards should catch them
+				console.log('Heatmap test error (should be handled gracefully):', error.message);
+				expect(error).not.toBeInstanceOf(Error);
+			}
+		}, 15000); // 15 second timeout for more realistic timing
 	});
 
 	describe('User agent spoofing', () => {
