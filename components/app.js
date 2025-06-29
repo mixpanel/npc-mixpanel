@@ -305,3 +305,65 @@ const slideDownCSS = `
 const style = document.createElement('style');
 style.textContent = slideDownCSS;
 document.head.appendChild(style);
+
+
+function qsToObj(queryString) {
+	try {
+		const parsedQs = new URLSearchParams(queryString);
+		const params = Object.fromEntries(parsedQs);
+		return params;
+	}
+
+	catch (e) {
+		return {};
+	}
+}
+
+
+// analytics
+const PROJECT_TOKEN = `6c3bc01ddc1f16d01e4fda11d3a4d166`;
+if (window.mixpanel) {
+	mixpanel.init(PROJECT_TOKEN, {
+		loaded: function (mp) {
+			console.log('\n\nMIXPANEL LOADED\n\n');
+			const PARAMS = qsToObj(window.location.search);
+			let { user = "", ...restParams } = PARAMS;
+			if (!restParams) restParams = {};
+			mp.register(restParams);
+			if (userId) mp.identify(userId);
+			if (userId) mp.people.set({ $name: userId, $email: userId });
+
+		},
+
+		//autocapture
+		autocapture: {
+			pageview: "full-url",
+			click: true,
+			input: true,
+			scroll: true,
+			submit: true,
+			capture_text_content: true
+		},
+
+		//session replay
+		record_sessions_percent: 100,
+		record_inline_images: true,
+		record_collect_fonts: true,
+		record_mask_text_selector: "nope",
+		record_block_selector: "nope",
+		record_block_class: "nope",
+		record_canvas: true,
+		record_heatmap_data: true,
+
+
+
+		//normal mixpanel
+		ignore_dnt: true,
+		batch_flush_interval_ms: 0,
+		api_host: "https://express-proxy-lmozz6xkha-uc.a.run.app",
+		api_transport: 'XHR',
+		persistence: "localStorage",
+		api_payload_format: 'json'		
+
+	});
+}

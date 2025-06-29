@@ -169,11 +169,11 @@ app.post('/simulate', async (req, res) => {
 			runId
 		};
 		const startTime = Date.now();
-		sLog(`/simulate start`, mergedParams, 'info');
+		sLog(`/SIMULATE START`, mergedParams, 'info');
 		const result = await main(mergedParams, log);
 		const endTime = Date.now();
 		const duration = endTime - startTime / 1000;
-		sLog(`/simulate completed in ${duration} seconds`, mergedParams, 'info');
+		sLog(`/SIMULATE END in ${duration} seconds`, mergedParams, 'info');
 		res.status(200).json(result);
 
 	} catch (error) {
