@@ -25,6 +25,7 @@ import { log } from '../utils/logger.js';
  * @property {boolean} inject Whether to inject mixpanel or not
  * @property {boolean} past Whether to simulate time in past
  * @property {string} token Mixpanel token
+ * @property {number} maxActions Maximum number of actions per user session
  */
 
 /**
@@ -40,7 +41,8 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 		headless = true,
 		inject = true,
 		past = false,
-		token = ""
+		token = "",
+		maxActions = null
 	} = PARAMS;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
@@ -52,7 +54,7 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 		return limit(() => {
 			try {
 				log(`🚀 <span style="color: #9d5cff; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
-				return simulateUser(url, headless, inject, past)
+				return simulateUser(url, headless, inject, past, maxActions)
 					.then((results) => {
 						log(`✅ <span style="color: #00ff88;">User ${i + 1}/${users} completed!</span> Session data captured.`);
 						return results;
@@ -78,8 +80,9 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
  * @param {boolean} headless - Whether to run the browser headlessly.
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
  * @param {boolean} past - Whether to simulate time in past.
+ * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-async function simulateUser(url, headless = true, inject = true, past = false) {
+async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null) {
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
 	const timeoutPromise = new Promise((resolve) =>
@@ -146,7 +149,7 @@ async function simulateUser(url, headless = true, inject = true, past = false) {
 		log(`🎭 <span style="color: #9d5cff;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
 
 		try {
-			const actions = await simulateUserSession(browser, page, persona, inject);
+			const actions = await simulateUserSession(browser, page, persona, inject, maxActions);
 			await browser.close();
 			return actions;
 		}
@@ -786,8 +789,9 @@ async function relaxCSP(page) {
  * @param {import('puppeteer').Page} page - Puppeteer page object.
  * @param {string} persona - User persona to simulate.
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
+ * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-async function simulateUserSession(browser, page, persona, inject = true) {
+async function simulateUserSession(browser, page, persona, inject = true, maxActions = null) {
 	const usersHandle = u.makeName(4, "-");
 
 	// Enhanced logging with user context
@@ -883,7 +887,7 @@ async function simulateUserSession(browser, page, persona, inject = true) {
 		}
 	});
 
-	const actionSequence = generatePersonaActionSequence(persona);
+	const actionSequence = generatePersonaActionSequence(persona, maxActions);
 	const numActions = actionSequence.length;
 	const actionResults = [];
 
@@ -995,22 +999,25 @@ function selectPersona() {
 /**
  * Generates an action sequence based on a persona's weighting.
  * @param {string} persona - The selected persona.
+ * @param {number} maxActions - Maximum number of actions (optional).
  */
-function generatePersonaActionSequence(persona) {
+function generatePersonaActionSequence(persona, maxActions = null) {
 	const personaWeights = personas[persona];
 	const actionTypes = Object.keys(personaWeights);
-	return generateWeightedRandomActionSequence(actionTypes, personaWeights);
+	return generateWeightedRandomActionSequence(actionTypes, personaWeights, maxActions);
 }
 
 /**
  * Generates a weighted random action sequence.
  * @param {Array} actionTypes - List of possible actions.
  * @param {Object} weights - Weighting for each action.
+ * @param {number} maxActions - Maximum number of actions (optional).
  */
-function generateWeightedRandomActionSequence(actionTypes, weights) {
+function generateWeightedRandomActionSequence(actionTypes, weights, maxActions = null) {
 	const sequence = [];
 	// More comprehensive sessions - users engage deeply with content
-	const length = u.rand(25, 100);
+	// Use maxActions if provided, otherwise use default range
+	const length = maxActions ? Math.min(maxActions, u.rand(25, 100)) : u.rand(25, 100);
 
 	// Create a more natural flow with better variety for longer sessions
 	let lastAction = '';
