@@ -9,9 +9,8 @@
 		"deploy": "./scripts/deploy.sh",
 		"perms": "chmod +x ./scripts/*.sh",
 		"prune": "rm -rf tmp/*",
-		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
-		"test:headless": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.functional.test.js",
-		"test:watch": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
+		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.test.js",
+		"test:headless": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.test.js"
 	},
 	"type": "module",
 	"keywords": [
