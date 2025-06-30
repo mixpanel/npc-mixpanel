@@ -684,7 +684,7 @@ describe('Headless.js - Comprehensive Test Suite', () => {
   describe('Domain Navigation Logic', () => {
     test('extractTopLevelDomain should handle edge cases', () => {
       // Test various domain formats
-      expect(extractTopLevelDomain('')).toBe('');
+      expect(extractTopLevelDomain('')).toBe('[empty-hostname]');
       expect(extractTopLevelDomain('example')).toBe('example');
       expect(extractTopLevelDomain('example.com')).toBe('example.com');
       expect(extractTopLevelDomain('www.example.com')).toBe('example.com');

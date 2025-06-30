@@ -873,18 +873,61 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	// Set up comprehensive polling for CSP, Mixpanel, and domain monitoring
 	let monitoringInterval;
 	let hasNavigatedBack = false;
+	let consecutiveNavigationAttempts = 0;
+	const MAX_NAVIGATION_ATTEMPTS = 5;
 	
 	if (inject) {
 		monitoringInterval = setInterval(async () => {
 			try {
 				// Check if page is still responsive
 				const currentUrl = await page.url();
-				const newDomain = new URL(currentUrl).hostname;
-				const newTopLevelDomain = extractTopLevelDomain(newDomain);
+				
+				// Handle special URLs that don't have normal domains
+				if (!currentUrl || currentUrl.startsWith('about:') || currentUrl.startsWith('chrome://') || currentUrl.startsWith('data:')) {
+					log(`  ├─ ⚠️ <span style="color: #ffaa00;">Special URL detected, skipping domain monitoring:</span> ${currentUrl}`);
+					return;
+				}
+				
+				let newDomain, newTopLevelDomain;
+				try {
+					newDomain = new URL(currentUrl).hostname;
+					newTopLevelDomain = extractTopLevelDomain(newDomain);
+					
+					// Add defensive check for empty domains
+					if (!newDomain) {
+						log(`  ├─ ⚠️ <span style="color: #ffaa00;">Empty hostname detected from URL:</span> ${currentUrl}`);
+						return;
+					}
+					if (!newTopLevelDomain) {
+						log(`  ├─ ⚠️ <span style="color: #ffaa00;">Could not extract top-level domain from:</span> ${newDomain}`);
+						return;
+					}
+				} catch (urlError) {
+					log(`  ├─ ⚠️ <span style="color: #ffaa00;">URL parsing error:</span> ${urlError.message} (URL: ${currentUrl})`);
+					return;
+				}
 
 				// Check for top-level domain changes (should navigate back)
 				if (newTopLevelDomain !== initialTopLevelDomain && !hasNavigatedBack) {
-					log(`  ├─ 🚨 <span style="color: #ff4444;">Top-level domain change detected:</span> ${initialTopLevelDomain} → ${newTopLevelDomain}`);
+					consecutiveNavigationAttempts++;
+					log(`  ├─ 🚨 <span style="color: #ff4444;">Top-level domain change detected:</span> ${initialTopLevelDomain} → ${newTopLevelDomain} (attempt ${consecutiveNavigationAttempts}/${MAX_NAVIGATION_ATTEMPTS})`);
+					
+					// If too many consecutive navigation attempts, return to original URL
+					if (consecutiveNavigationAttempts >= MAX_NAVIGATION_ATTEMPTS) {
+						log(`  │  └─ 🚨 <span style="color: #ff4444;">Too many navigation attempts, returning to origin:</span> ${initialUrl}`);
+						try {
+							await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+							await u.sleep(2000);
+							currentDomain = initialDomain;
+							consecutiveNavigationAttempts = 0; // Reset counter
+							log(`  │  └─ ✅ <span style="color: #00ff88;">Successfully returned to origin:</span> ${initialDomain}`);
+						} catch (originError) {
+							log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Could not return to origin:</span> ${originError.message}`);
+						}
+						hasNavigatedBack = false;
+						return;
+					}
+					
 					log(`  │  └─ 🔙 <span style="color: #ff8800;">Navigating back to original domain...</span>`);
 					
 					hasNavigatedBack = true;
@@ -896,11 +939,17 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 						const backUrl = await page.url();
 						currentDomain = new URL(backUrl).hostname;
 						log(`  │  └─ ✅ <span style="color: #00ff88;">Successfully navigated back to:</span> ${currentDomain}`);
+						
+						// Reset navigation attempts on successful back navigation
+						consecutiveNavigationAttempts = 0;
 					} catch (backError) {
 						log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Could not navigate back:</span> ${backError.message}`);
 					}
 					hasNavigatedBack = false; // Reset for future navigations
 					return;
+				} else if (newTopLevelDomain === initialTopLevelDomain && consecutiveNavigationAttempts > 0) {
+					// Reset counter when back on original domain
+					consecutiveNavigationAttempts = 0;
 				}
 
 				// Check for domain changes (subdomain navigation is OK)
@@ -1687,26 +1736,49 @@ export async function interactWithForms(page) {
 		await page.evaluate(() => document.readyState);
 
 		const formElements = await page.evaluate(() => {
-			const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="search"], textarea'));
+			// Expanded selector to include more input types and inputs without explicit type
+			const inputs = Array.from(document.querySelectorAll('input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="image"]):not([type="hidden"]), textarea, select'));
 			return inputs.filter(el => {
 				const rect = el.getBoundingClientRect();
-				return rect.width > 0 && rect.height > 0 && !el.disabled && !el.readOnly && rect.top < window.innerHeight;
+				const style = window.getComputedStyle(el);
+				// Better visibility check: element must be visible and either in viewport or scrollable into view
+				return rect.width > 0 && rect.height > 0 && 
+					   !el.disabled && !el.readOnly && 
+					   style.visibility !== 'hidden' && style.display !== 'none' &&
+					   (rect.bottom > 0 && rect.top < document.documentElement.scrollHeight);
 			}).map(el => {
 				const rect = el.getBoundingClientRect();
 				return {
 					selector: el.tagName.toLowerCase() + (el.type ? `[type="${el.type}"]` : ''),
-					type: el.type || 'textarea',
+					type: el.type || el.tagName.toLowerCase(),
 					placeholder: el.placeholder || '',
 					name: el.name || '',
 					id: el.id || '',
-					rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+					rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+					isInViewport: rect.top >= 0 && rect.top < window.innerHeight
 				};
 			});
 		});
 
-		if (formElements.length === 0) return false;
+		if (formElements.length === 0) {
+			log(`    └─ 📝 <span style="color: #888;">No interactive form elements found</span>`);
+			return false;
+		}
+
+		log(`    └─ 📝 Found ${formElements.length} form element(s) to interact with`);
 
 		const target = formElements[Math.floor(Math.random() * formElements.length)];
+
+		// Scroll element into view if it's not currently visible
+		if (!target.isInViewport) {
+			await page.evaluate((selector) => {
+				const element = document.querySelector(selector);
+				if (element) {
+					element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}, `${target.selector}${target.id ? '#' + target.id : ''}${target.name ? '[name="' + target.name + '"]' : ''}`);
+			await u.sleep(u.rand(500, 1000)); // Wait for scroll
+		}
 
 		// Click into the field
 		const targetX = target.rect.x + (target.rect.width * 0.5) + u.rand(-target.rect.width * 0.2, target.rect.width * 0.2);
@@ -1718,11 +1790,30 @@ export async function interactWithForms(page) {
 		// Choose realistic search terms based on input type
 		const searchTerms = {
 			search: ['best products', 'how to', 'reviews', 'price', 'compare', 'tutorial', 'guide', 'tips'],
-			email: ['user@example.com', 'test@gmail.com', 'hello@test.com'],
-			text: ['John Doe', 'test user', 'sample text', 'hello world']
+			email: ['user@example.com', 'test@gmail.com', 'hello@test.com', 'demo@website.com'],
+			text: ['John Doe', 'test user', 'sample text', 'hello world'],
+			password: ['password123', 'secret456', 'test1234'],
+			url: ['https://example.com', 'https://test.com', 'https://sample.org'],
+			tel: ['555-123-4567', '(555) 987-6543', '555.456.7890'],
+			number: ['42', '100', '2024', '3.14'],
+			select: null // Will be handled differently
 		};
 
-		const termType = target.type === 'email' ? 'email' : (target.type === 'search' ? 'search' : 'text');
+		// Handle select elements differently
+		if (target.type === 'select') {
+			await page.evaluate((selector) => {
+				const selectEl = document.querySelector(selector);
+				if (selectEl && selectEl.options.length > 1) {
+					const randomIndex = Math.floor(Math.random() * selectEl.options.length);
+					selectEl.selectedIndex = randomIndex;
+					selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+				}
+			}, `${target.selector}${target.id ? '#' + target.id : ''}${target.name ? '[name="' + target.name + '"]' : ''}`);
+			log(`    └─ 📝 <span style="color: #00aa00;">Select option chosen</span> in dropdown field`);
+			return true;
+		}
+
+		const termType = ['email', 'search', 'password', 'url', 'tel', 'number'].includes(target.type) ? target.type : 'text';
 		const availableTerms = searchTerms[termType];
 		const term = availableTerms[Math.floor(Math.random() * availableTerms.length)];
 
@@ -2219,10 +2310,23 @@ export function coinFlip() {
  * @returns {string} - The top-level domain (e.g., "example.com" from "sub.example.com")
  */
 export function extractTopLevelDomain(hostname) {
-	if (!hostname) return '';
+	if (!hostname || typeof hostname !== 'string') {
+		return '[empty-hostname]';
+	}
 	
-	// Handle IP addresses
+	// Trim whitespace and handle empty after trim
+	hostname = hostname.trim();
+	if (!hostname) {
+		return '[empty-hostname]';
+	}
+	
+	// Handle IP addresses (IPv4)
 	if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+		return hostname;
+	}
+	
+	// Handle IPv6 addresses (basic check)
+	if (hostname.includes(':') && hostname.includes('[')) {
 		return hostname;
 	}
 	
@@ -2231,11 +2335,19 @@ export function extractTopLevelDomain(hostname) {
 		return hostname;
 	}
 	
+	// Handle invalid hostname characters
+	if (!/^[a-zA-Z0-9.-]+$/.test(hostname)) {
+		return '[invalid-hostname]';
+	}
+	
 	// Split hostname into parts
 	const parts = hostname.split('.');
 	
-	// If less than 2 parts, return as-is
-	if (parts.length < 2) {
+	// Filter out empty parts
+	const validParts = parts.filter(part => part.length > 0);
+	
+	// If less than 2 valid parts, return as-is (could be localhost-style)
+	if (validParts.length < 2) {
 		return hostname;
 	}
 	
@@ -2244,15 +2356,15 @@ export function extractTopLevelDomain(hostname) {
 	// For ccTLD + gTLD (like .co.uk), take last 3 parts if middle part is common
 	const commonSecondLevelDomains = ['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'blogspot', 'github'];
 	
-	if (parts.length >= 3) {
-		const secondLevel = parts[parts.length - 2];
+	if (validParts.length >= 3) {
+		const secondLevel = validParts[validParts.length - 2];
 		if (commonSecondLevelDomains.includes(secondLevel)) {
-			return parts.slice(-3).join('.');
+			return validParts.slice(-3).join('.');
 		}
 	}
 	
 	// Default: return last 2 parts
-	return parts.slice(-2).join('.');
+	return validParts.slice(-2).join('.');
 }
 
 
