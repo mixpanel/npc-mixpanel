@@ -2,8 +2,8 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { uid } from 'ak-tools';
-import main from './components/headless.js';
-import { log, setActiveSocket } from './utils/logger.js';
+import main from './headless.js';
+import { log, setActiveSocket } from './logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sLog } from 'ak-tools';
@@ -112,10 +112,9 @@ io.on('connection', (socket) => {
 	});
 });
 
-// WebSocket logging is now handled by utils/logger.js
 
 // Serve static files (UI)
-app.use(express.static('components'));
+app.use(express.static('ui'));
 
 // API routes
 app.get('/ping', async (req, res) => {
@@ -129,7 +128,7 @@ app.get('/ping', async (req, res) => {
 
 // Main UI route
 app.get('/', (req, res) => {
-	res.sendFile(path.join(__dirname, 'components', 'ui.html'));
+	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
 
 // HTTP endpoint for direct API calls (backwards compatibility)
@@ -169,11 +168,11 @@ app.post('/simulate', async (req, res) => {
 			runId
 		};
 		const startTime = Date.now();
-		sLog(`/simulate start`, mergedParams, 'info');
+		sLog(`/SIMULATE START`, mergedParams, 'NOTICE');
 		const result = await main(mergedParams, log);
 		const endTime = Date.now();
 		const duration = endTime - startTime / 1000;
-		sLog(`/simulate completed in ${duration} seconds`, mergedParams, 'info');
+		sLog(`/SIMULATE END in ${duration} seconds`, mergedParams, 'NOTICE');
 		res.status(200).json(result);
 
 	} catch (error) {
@@ -184,7 +183,7 @@ app.post('/simulate', async (req, res) => {
 
 // Catch-all for SPA routing
 app.get('*', (req, res) => {
-	res.sendFile(path.join(__dirname, 'components', 'ui.html'));
+	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
 
 // Only start the server if this file is run directly (not imported)

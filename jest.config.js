@@ -5,8 +5,7 @@ export default {
     '**/tests/**/*.test.js'
   ],
   collectCoverageFrom: [
-    'components/**/*.js',
-    'function.js',
+    './**/*.js',    
     '!**/node_modules/**',
     '!**/tmp/**'
   ],

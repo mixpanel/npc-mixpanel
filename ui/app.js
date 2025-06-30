@@ -1,3 +1,4 @@
+let startTime = null;
 const form = document.getElementById('simulatorForm');
 const loading = document.querySelector('.loading');
 const success = document.querySelector('.success');
@@ -79,7 +80,7 @@ const possibleUrls = [
 url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
 usersSlider.addEventListener('input', (e) => {
-	usersOutput.textContent = e.target.value;
+	usersOutput.textContent = `${e.target.value} meeples`;
 });
 
 // Terminal utility functions
@@ -147,6 +148,7 @@ form.addEventListener('submit', async (e) => {
 	const socket = io({ reconnection: false });
 
 	socket.on('connect', () => {
+		startTime = Date.now();
 		addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
 		socket.emit('start_job', data);
 		loading.style.display = 'none';
@@ -163,9 +165,10 @@ form.addEventListener('submit', async (e) => {
 	});
 
 	socket.on('job_complete', (result) => {
+		const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 		addTerminalLine(terminalContent, '');
-		addTerminalLine(terminalContent, '🎉 Simulation completed successfully!');
-		addTerminalLine(terminalContent, '📊 Check your Mixpanel project for results');
+		addTerminalLine(terminalContent, `🎉 Simulation completed successfully! in ${duration} seconds`);
+		addTerminalLine(terminalContent, '');
 
 		// Auto-close terminal after 3 seconds
 		setTimeout(() => {
@@ -174,13 +177,14 @@ form.addEventListener('submit', async (e) => {
 			}
 		}, 10_000);
 
+		//? todo: restore UI
 		setTimeout(() => {
 			terminal.classList.add('hidden');
 			openTerminalButton.classList.remove('hidden');
 
 			// Restore original form text
-			formLine1.textContent = 'give me a URL + project token...';
-			formLine2.textContent = '...i\'ll give you replays!';
+			formLine1.innerHTML = 'meeples want <em>URL</em>';
+			formLine2.innerHTML = 'meeples need <em>project token</em>';
 
 			form.style.display = 'flex';
 			loading.style.display = 'none';
@@ -198,6 +202,7 @@ form.addEventListener('submit', async (e) => {
 		addTerminalLine(terminalContent, '🔌 Disconnected from server');
 	});
 
+	//todo: this should be normal too
 	// Update form text to show in progress
 	formLine1.textContent = 'replays in progress...';
 	formLine2.textContent = 'check the terminal below!';
@@ -305,3 +310,65 @@ const slideDownCSS = `
 const style = document.createElement('style');
 style.textContent = slideDownCSS;
 document.head.appendChild(style);
+
+
+function qsToObj(queryString) {
+	try {
+		const parsedQs = new URLSearchParams(queryString);
+		const params = Object.fromEntries(parsedQs);
+		return params;
+	}
+
+	catch (e) {
+		return {};
+	}
+}
+
+
+// analytics
+const PROJECT_TOKEN = `6c3bc01ddc1f16d01e4fda11d3a4d166`;
+if (window.mixpanel) {
+	mixpanel.init(PROJECT_TOKEN, {
+		loaded: function (mp) {
+			console.log('\n\nMIXPANEL LOADED\n\n');
+			const PARAMS = qsToObj(window.location.search);
+			let { user = "", ...restParams } = PARAMS;
+			if (!restParams) restParams = {};
+			mp.register(restParams);
+			if (user) mp.identify(user);
+			if (user) mp.people.set({ $name: user, $email: user });
+
+		},
+
+		//autocapture
+		autocapture: {
+			pageview: "full-url",
+			click: true,
+			input: true,
+			scroll: true,
+			submit: true,
+			capture_text_content: true
+		},
+
+		//session replay
+		record_sessions_percent: 100,
+		record_inline_images: true,
+		record_collect_fonts: true,
+		record_mask_text_selector: "nope",
+		record_block_selector: "nope",
+		record_block_class: "nope",
+		record_canvas: true,
+		record_heatmap_data: true,
+
+
+
+		//normal mixpanel
+		ignore_dnt: true,
+		batch_flush_interval_ms: 0,
+		api_host: "https://express-proxy-lmozz6xkha-uc.a.run.app",
+		api_transport: 'XHR',
+		persistence: "localStorage",
+		api_payload_format: 'json'
+
+	});
+}
