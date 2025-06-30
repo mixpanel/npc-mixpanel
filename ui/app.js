@@ -186,6 +186,10 @@ form.addEventListener('submit', async (e) => {
 			formLine1.innerHTML = 'meeples want <em>URL</em>';
 			formLine2.innerHTML = 'meeples need <em>project token</em>';
 
+			// Show all form inputs again
+			const formInputs = form.querySelectorAll('input, button, label, output, a');
+			formInputs.forEach(input => input.style.display = '');
+			
 			form.style.display = 'flex';
 			loading.style.display = 'none';
 		}, 5000);
@@ -202,13 +206,15 @@ form.addEventListener('submit', async (e) => {
 		addTerminalLine(terminalContent, '🔌 Disconnected from server');
 	});
 
-	//todo: this should be normal too
 	// Update form text to show in progress
 	formLine1.textContent = 'replays in progress...';
 	formLine2.textContent = 'check the terminal below!';
 
-	// Hide form inputs but keep the description visible
-	form.style.display = 'none';
+	// Hide form inputs but keep the description text visible
+	const formInputs = form.querySelectorAll('input, button, label, output, a');
+	formInputs.forEach(input => input.style.display = 'none');
+	
+	// Show loading indicator as backup
 	loading.style.display = 'block';
 });
 

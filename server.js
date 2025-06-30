@@ -6,7 +6,7 @@ import main from './headless.js';
 import { log, setActiveSocket } from './logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { sLog } from 'ak-tools';
+import { cloudLog, logger } from './utils/cloudLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,9 +53,11 @@ io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-	sLog(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id }, 'info');
+	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id });
 	activeSocket = socket;
 	setActiveSocket(socket);
+	var startTime = Date.now();
+
 
 	// If there's an active job, associate the reconnected client with it
 	if (activeJob) {
@@ -87,9 +89,11 @@ io.on('connection', (socket) => {
 			};
 
 			socket.emit('job_update', `🚀 Starting simulation job: ${jobId}`);
-
+			logger.notice(`/SIMULATE START`, coercedData);
 			const result = await main(coercedData, log);
-
+			const endTime = Date.now();
+			const duration = (endTime - startTime) / 1000;
+			logger.notice(`/SIMULATE END in ${duration} seconds`, { ...coercedData, duration });
 			socket.emit('job_update', `✅ Job completed: ${jobId}`);
 			socket.emit('job_complete', result);
 
@@ -105,7 +109,7 @@ io.on('connection', (socket) => {
 	});
 
 	socket.on('disconnect', () => {
-		sLog(`SOCKET DISCONNECTED: ${socket.id}`, { socketId: socket.id }, 'info');
+		logger.info(`SOCKET DISCONNECTED: ${socket.id}`, { socketId: socket.id });
 		activeSocket = null;
 		setActiveSocket(null);
 		// Don't clear activeJob here - job may still be running
@@ -131,31 +135,6 @@ app.get('/', (req, res) => {
 	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
 
-// HTTP endpoint for direct API calls (backwards compatibility)
-app.post('/entry', async (req, res) => {
-	const runId = uid();
-
-	try {
-		// Merge query params and body params
-		const mergedParams = {
-			...coerceTypes(req.query || {}),
-			...req.body,
-			runId
-		};
-
-		// Auth check
-		if (mergedParams.safeWord !== "let me in...") {
-			return res.status(401).send("Bro... you're not authorized to be here");
-		}
-
-		const result = await main(mergedParams, log);
-		res.status(200).json(result);
-
-	} catch (error) {
-		console.error(`ERROR: ${req.path}`, error);
-		res.status(500).json({ error: error.message });
-	}
-});
 
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
@@ -168,15 +147,20 @@ app.post('/simulate', async (req, res) => {
 			runId
 		};
 		const startTime = Date.now();
-		sLog(`/SIMULATE START`, mergedParams, 'NOTICE');
+		logger.notice(`/SIMULATE START`, mergedParams);
 		const result = await main(mergedParams, log);
 		const endTime = Date.now();
-		const duration = endTime - startTime / 1000;
-		sLog(`/SIMULATE END in ${duration} seconds`, mergedParams, 'NOTICE');
+		const duration = (endTime - startTime) / 1000;
+		logger.notice(`/SIMULATE END in ${duration} seconds`, { ...mergedParams, duration });
 		res.status(200).json(result);
 
 	} catch (error) {
-		console.error(`ERROR: ${req.path}`, error);
+		logger.error(`ERROR: ${req.path}`, {
+			path: req.path,
+			error: error.message,
+			stack: error.stack,
+			runId
+		});
 		res.status(500).json({ error: error.message });
 	}
 });

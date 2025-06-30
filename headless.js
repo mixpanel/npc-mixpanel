@@ -56,23 +56,23 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 		return limit(() => {
 			return new Promise(async (resolve) => {
 				try {
-					log(`🚀 <span style="color: #9d5cff; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
+					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
 
 					const result = await simulateUser(url, headless, inject, past, maxActions);
 
 					if (result && !result.error && !result.timedOut) {
-						log(`✅ <span style="color: #00ff88;">User ${i + 1}/${users} completed!</span> Session data captured.`);
+						log(`✅ <span style="color: #07B096;">User ${i + 1}/${users} completed!</span> Session data captured.`);
 					} else if (result && result.timedOut) {
-						log(`⏰ <span style="color: #ffaa00;">User ${i + 1}/${users} timed out</span> - but simulation continues`);
+						log(`⏰ <span style="color: #F8BC3B;">User ${i + 1}/${users} timed out</span> - but simulation continues`);
 					} else {
-						log(`⚠️ <span style="color: #ffaa00;">User ${i + 1}/${users} completed with issues</span> - but simulation continues`);
+						log(`⚠️ <span style="color: #F8BC3B;">User ${i + 1}/${users} completed with issues</span> - but simulation continues`);
 					}
 
 					resolve(result || { error: 'Unknown error', user: i + 1 });
 				}
 				catch (e) {
 					const errorMsg = e.message || 'Unknown error';
-					log(`❌ <span style="color: #ff4444;">User ${i + 1}/${users} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`);
+					log(`❌ <span style="color: #CC332B;">User ${i + 1}/${users} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`);
 					resolve({ error: errorMsg, user: i + 1, crashed: true });
 				}
 			});
@@ -88,14 +88,14 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
-	log(`📊 <span style="color: #9d5cff;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
+	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
 
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
 			return r.value;
 		} else {
-			log(`⚠️ <span style="color: #ff4444;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
+			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
 			return { error: r.reason?.message || 'Promise rejected', crashed: true };
 		}
 	}).filter(Boolean);
@@ -172,12 +172,27 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		// Spoof time if requested
 		if (past) await forceSpoofTimeInBrowser(page);
 
-		log(`📍 <span style="color: #ff8800;">Navigating</span> to <span style="color: #80E1D9;">${url}</span>...`);
-		await page.goto(url);
-		log(`  └─ <span style="color: #00ff88;">Page loaded successfully</span>`);
+		// Validate URL before navigation
+		try {
+			new URL(url); // This will throw if URL is invalid
+		} catch (urlError) {
+			throw new Error(`Invalid URL provided: ${url} - ${urlError.message}`);
+		}
+
+		log(`📍 <span style="color: #F8BC3B;">Navigating</span> to <span style="color: #80E1D9;">${url}</span>...`);
+		try {
+			await page.goto(url);
+			await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
+
+
+		} catch (navError) {
+			// Provide more specific error information
+			throw new Error(`Navigation failed to ${url}: ${navError.message}`);
+		}
+		log(`  └─ <span style="color: #07B096;">Page loaded successfully</span>`);
 		await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
 		const persona = selectPersona();
-		log(`🎭 <span style="color: #9d5cff;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
+		log(`🎭 <span style="color: #7856FF;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
 
 		try {
 			const actions = await simulateUserSession(browser, page, persona, inject, maxActions);
@@ -196,14 +211,14 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 	} catch (error) {
 		// Handle timeout error (close browser if not already closed)
 		const errorMsg = error.message || 'Unknown error';
-		log(`🚨 <span style="color: #ff4444;">User simulation error:</span> ${errorMsg}`);
+		log(`🚨 <span style="color: #CC332B;">User simulation error:</span> ${errorMsg}`);
 
 		try {
 			if (browser) {
 				await browser.close();
 			}
 		} catch (closeError) {
-			log(`⚠️ <span style="color: #ffaa00;">Browser close error:</span> ${closeError.message}`);
+			log(`⚠️ <span style="color: #F8BC3B;">Browser close error:</span> ${closeError.message}`);
 		}
 
 		if (NODE_ENV === "dev") log("simulateUser Error:", error);
@@ -745,7 +760,7 @@ async function relaxCSP(page) {
 			// Set flag to indicate CSP relaxation was attempted
 			window.CSP_WAS_RELAXED = true;
 			window.CSP_RELAXED_TIMESTAMP = Date.now();
-			
+
 			// Override CSP enforcement in the page context
 			if (typeof document !== 'undefined') {
 				// Remove CSP meta tags
@@ -770,7 +785,7 @@ async function relaxCSP(page) {
 						console.log('[NPC] Removing CSP meta on DOMContentLoaded:', meta.outerHTML);
 						meta.remove();
 					});
-					
+
 					// Confirm CSP relaxation is still active
 					window.CSP_WAS_RELAXED = true;
 					window.CSP_RELAXED_TIMESTAMP = Date.now();
@@ -805,23 +820,33 @@ async function relaxCSP(page) {
 		// 4. Disable additional security features that might interfere
 		await page.setJavaScriptEnabled(true);
 
-		// 5. Set permissive permissions for all origins
+		// 5. Set permissive permissions for all origins (only for valid origins)
 		const context = page.browserContext();
-		await context.overridePermissions(page.url(), [
-			'geolocation',
-			'notifications',
-			'camera',
-			'microphone',
-			'background-sync',
-			'ambient-light-sensor',
-			'accelerometer',
-			'gyroscope',
-			'magnetometer',
-			'accessibility-events',
-			'clipboard-read',
-			'clipboard-write',
-			'payment-handler'
-		]);
+		const currentUrl = page.url();
+		
+		// Only set permissions for valid, non-opaque origins
+		if (currentUrl && !currentUrl.startsWith('about:') && !currentUrl.startsWith('data:') && !currentUrl.startsWith('chrome:')) {
+			try {
+				await context.overridePermissions(currentUrl, [
+					'geolocation',
+					'notifications',
+					'camera',
+					'microphone',
+					'background-sync',
+					'ambient-light-sensor',
+					'accelerometer',
+					'gyroscope',
+					'magnetometer',
+					'accessibility-events',
+					'clipboard-read',
+					'clipboard-write',
+					'payment-handler'
+				]);
+			} catch (permError) {
+				// Permission override failed for this origin, continue anyway
+				console.warn('Permission override failed for origin:', currentUrl, permError.message);
+			}
+		}
 
 	} catch (e) {
 		console.warn('CSP relaxation failed:', e.message);
@@ -841,7 +866,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	const usersHandle = u.makeName(4, "-");
 
 	// Enhanced logging with user context
-	log(`👤 <span style="color: #9d5cff; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
+	log(`👤 <span style="color: #7856FF; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
 
 	// Conditional Mixpanel injection
 	if (inject) {
@@ -854,9 +879,9 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		});
 
 		if (injectionSuccess) {
-			log(`  │  └─ ✅ <span style="color: #00ff88;">Mixpanel loaded successfully</span>`);
+			log(`  │  └─ ✅ <span style="color: #07B096;">Mixpanel loaded successfully</span>`);
 		} else {
-			log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Mixpanel injection may have failed</span>`);
+			log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel injection may have failed</span>`);
 		}
 	} else {
 		log(`  └─ ⏭️ Skipping Mixpanel injection`);
@@ -867,6 +892,12 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	const initialDomain = new URL(initialUrl).hostname;
 	const initialTopLevelDomain = extractTopLevelDomain(initialDomain);
 	let currentDomain = initialDomain;
+
+	// Log warning if we're still on about:blank (should be rare with improved navigation)
+	if (initialUrl.startsWith('about:')) {
+		log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Page still on about:blank, will proceed without domain monitoring</span>`);
+		// Continue without domain monitoring rather than exiting early
+	}
 	const mainPageTarget = await page.target();
 	const mainPageId = mainPageTarget._targetId;
 
@@ -875,75 +906,90 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	let hasNavigatedBack = false;
 	let consecutiveNavigationAttempts = 0;
 	const MAX_NAVIGATION_ATTEMPTS = 5;
-	
-	if (inject) {
+
+	if (inject && !initialUrl.startsWith('about:')) {
+		// Wait a moment for page to stabilize before starting monitoring
+		await u.sleep(1000);
+
 		monitoringInterval = setInterval(async () => {
 			try {
-				// Check if page is still responsive
-				const currentUrl = await page.url();
-				
-				// Handle special URLs that don't have normal domains
-				if (!currentUrl || currentUrl.startsWith('about:') || currentUrl.startsWith('chrome://') || currentUrl.startsWith('data:')) {
-					log(`  ├─ ⚠️ <span style="color: #ffaa00;">Special URL detected, skipping domain monitoring:</span> ${currentUrl}`);
+				// Check if page and frame are still valid
+				if (page.isClosed()) {
+					if (monitoringInterval) {
+						clearInterval(monitoringInterval);
+						monitoringInterval = null;
+					}
 					return;
 				}
-				
+
+				// Check if page is still responsive
+				const currentUrl = await page.url();
+
+				// Handle special URLs that don't have normal domains (silently skip about:blank during transitions)
+				if (!currentUrl || currentUrl.startsWith('about:') || currentUrl.startsWith('chrome://') || currentUrl.startsWith('data:')) {
+					// Only log if it's not about:blank (which is common during page transitions)
+					if (!currentUrl.startsWith('about:blank')) {
+						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Special URL detected, skipping domain monitoring:</span> ${currentUrl}`);
+					}
+					return;
+				}
+
 				let newDomain, newTopLevelDomain;
 				try {
 					newDomain = new URL(currentUrl).hostname;
 					newTopLevelDomain = extractTopLevelDomain(newDomain);
-					
+
 					// Add defensive check for empty domains
 					if (!newDomain) {
-						log(`  ├─ ⚠️ <span style="color: #ffaa00;">Empty hostname detected from URL:</span> ${currentUrl}`);
+						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Empty hostname detected from URL:</span> ${currentUrl}`);
 						return;
 					}
 					if (!newTopLevelDomain) {
-						log(`  ├─ ⚠️ <span style="color: #ffaa00;">Could not extract top-level domain from:</span> ${newDomain}`);
+						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Could not extract top-level domain from:</span> ${newDomain}`);
 						return;
 					}
 				} catch (urlError) {
-					log(`  ├─ ⚠️ <span style="color: #ffaa00;">URL parsing error:</span> ${urlError.message} (URL: ${currentUrl})`);
+					log(`  ├─ ⚠️ <span style="color: #F8BC3B;">URL parsing error:</span> ${urlError.message} (URL: ${currentUrl})`);
 					return;
 				}
 
 				// Check for top-level domain changes (should navigate back)
 				if (newTopLevelDomain !== initialTopLevelDomain && !hasNavigatedBack) {
 					consecutiveNavigationAttempts++;
-					log(`  ├─ 🚨 <span style="color: #ff4444;">Top-level domain change detected:</span> ${initialTopLevelDomain} → ${newTopLevelDomain} (attempt ${consecutiveNavigationAttempts}/${MAX_NAVIGATION_ATTEMPTS})`);
-					
+					log(`  ├─ 🚨 <span style="color: #CC332B;">Top-level domain change detected:</span> ${initialTopLevelDomain} → ${newTopLevelDomain} (attempt ${consecutiveNavigationAttempts}/${MAX_NAVIGATION_ATTEMPTS})`);
+
 					// If too many consecutive navigation attempts, return to original URL
 					if (consecutiveNavigationAttempts >= MAX_NAVIGATION_ATTEMPTS) {
-						log(`  │  └─ 🚨 <span style="color: #ff4444;">Too many navigation attempts, returning to origin:</span> ${initialUrl}`);
+						log(`  │  └─ 🚨 <span style="color: #CC332B;">Too many navigation attempts, returning to origin:</span> ${initialUrl}`);
 						try {
 							await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
 							await u.sleep(2000);
 							currentDomain = initialDomain;
 							consecutiveNavigationAttempts = 0; // Reset counter
-							log(`  │  └─ ✅ <span style="color: #00ff88;">Successfully returned to origin:</span> ${initialDomain}`);
+							log(`  │  └─ ✅ <span style="color: #07B096;">Successfully returned to origin:</span> ${initialDomain}`);
 						} catch (originError) {
-							log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Could not return to origin:</span> ${originError.message}`);
+							log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Could not return to origin:</span> ${originError.message}`);
 						}
 						hasNavigatedBack = false;
 						return;
 					}
-					
-					log(`  │  └─ 🔙 <span style="color: #ff8800;">Navigating back to original domain...</span>`);
-					
+
+					log(`  │  └─ 🔙 <span style="color: #F8BC3B;">Navigating back to original domain...</span>`);
+
 					hasNavigatedBack = true;
 					try {
 						await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
 						await u.sleep(1000); // Give time for navigation
-						
+
 						// Reset domain tracking after going back
 						const backUrl = await page.url();
 						currentDomain = new URL(backUrl).hostname;
-						log(`  │  └─ ✅ <span style="color: #00ff88;">Successfully navigated back to:</span> ${currentDomain}`);
-						
+						log(`  │  └─ ✅ <span style="color: #07B096;">Successfully navigated back to:</span> ${currentDomain}`);
+
 						// Reset navigation attempts on successful back navigation
 						consecutiveNavigationAttempts = 0;
 					} catch (backError) {
-						log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Could not navigate back:</span> ${backError.message}`);
+						log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Could not navigate back:</span> ${backError.message}`);
 					}
 					hasNavigatedBack = false; // Reset for future navigations
 					return;
@@ -954,16 +1000,16 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 				// Check for domain changes (subdomain navigation is OK)
 				if (newDomain !== currentDomain) {
-					log(`  ├─ 🔄 <span style="color: #ff8800;">Domain change detected:</span> ${currentDomain} → ${newDomain}`);
+					log(`  ├─ 🔄 <span style="color: #F8BC3B;">Domain change detected:</span> ${currentDomain} → ${newDomain}`);
 					currentDomain = newDomain;
-					
+
 					// Re-apply CSP relaxations for new domain
-					log(`  │  ├─ 🛡️ <span style="color: #ffaa00;">Re-applying CSP relaxations...</span>`);
+					log(`  │  ├─ 🛡️ <span style="color: #F8BC3B;">Re-applying CSP relaxations...</span>`);
 					try {
 						await relaxCSP(page);
-						log(`  │  │  └─ ✅ <span style="color: #00ff88;">CSP relaxations applied</span>`);
+						log(`  │  │  └─ ✅ <span style="color: #07B096;">CSP relaxations applied</span>`);
 					} catch (cspError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #ffaa00;">CSP relaxation failed:</span> ${cspError.message}`);
+						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">CSP relaxation failed:</span> ${cspError.message}`);
 					}
 				}
 
@@ -977,12 +1023,12 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 				});
 
 				if (!cspStatus.relaxed || !cspStatus.evalWorking) {
-					log(`  │  ├─ 🛡️ <span style="color: #ffaa00;">CSP relaxation check failed - re-applying...</span>`);
+					log(`  │  ├─ 🛡️ <span style="color: #F8BC3B;">CSP relaxation check failed - re-applying...</span>`);
 					try {
 						await relaxCSP(page);
-						log(`  │  │  └─ ✅ <span style="color: #00ff88;">CSP re-relaxation completed</span>`);
+						log(`  │  │  └─ ✅ <span style="color: #07B096;">CSP re-relaxation completed</span>`);
 					} catch (cspError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #ffaa00;">CSP re-relaxation failed:</span> ${cspError.message}`);
+						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">CSP re-relaxation failed:</span> ${cspError.message}`);
 					}
 				}
 
@@ -992,22 +1038,34 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 				});
 
 				if (!isInjected) {
-					log(`  │  ├─ 💉 <span style="color: #ffaa00;">Mixpanel not detected, re-injecting...</span>`);
+					log(`  │  ├─ 💉 <span style="color: #F8BC3B;">Mixpanel not detected, re-injecting...</span>`);
 					try {
 						await jamMixpanelIntoBrowser(page, usersHandle);
-						log(`  │  │  └─ ✅ <span style="color: #00ff88;">Mixpanel re-injection completed</span>`);
+						log(`  │  │  └─ ✅ <span style="color: #07B096;">Mixpanel re-injection completed</span>`);
 					} catch (mixpanelError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #ffaa00;">Mixpanel re-injection failed:</span> ${mixpanelError.message}`);
+						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel re-injection failed:</span> ${mixpanelError.message}`);
 					}
 				}
 
 			} catch (e) {
-				// Ignore errors during polling - page might be closed or navigating
-				if (!e.message?.includes('Target closed') && !e.message?.includes('Session closed')) {
-					log(`  │  └─ ⚠️ <span style="color: #ffaa00;">Monitoring error:</span> ${e.message}`);
+				// Handle common frame/page errors more gracefully - be more aggressive about filtering
+				if (e.message && (
+					e.message.includes('detached Frame') ||
+					e.message.includes('Target closed') ||
+					e.message.includes('Session closed') ||
+					e.message.includes('Protocol error') ||
+					e.message.includes('Attempted to use detached') ||
+					e.message.includes('frame was detached') ||
+					e.message.includes('Cannot find context')
+				)) {
+					// These are expected during page navigation - don't spam logs
+					return;
 				}
+
+				// Log only truly unexpected errors
+				log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Monitoring error:</span> ${e.message}`);
 			}
-		}, 2000); // Every 2 seconds for more responsive monitoring
+		}, 5000); // Every 5 seconds to reduce interference
 	}
 
 	// Set up tab listener to automatically close new tabs
@@ -1027,6 +1085,8 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	const numActions = actionSequence.length;
 	const actionResults = [];
 
+	log(`  ├─ 🎬 <span style="color: #7856FF;">Action sequence generated:</span> ${numActions} actions planned for ${persona} persona`);
+
 	// Track action history for context-aware decisions
 	const actionHistory = [];
 
@@ -1038,9 +1098,9 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	let hotZones = [];
 	try {
 		hotZones = await identifyHotZones(page);
-		log(`  ├─ 🎯 <span style="color: #ff8800;">Hot zones detected:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
+		log(`  ├─ 🎯 <span style="color: #F8BC3B;">Hot zones detected:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
 	} catch (e) {
-		log(`  ├─ ⚠️ <span style="color: #ffaa00;">Hot zone detection failed:</span> ${e.message} - using fallback targeting`);
+		log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Hot zone detection failed:</span> ${e.message} - using fallback targeting`);
 	}
 
 
@@ -1055,6 +1115,8 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		form: '📝',
 		back: '⬅️'
 	};
+
+	log(`  ├─ 🚀 <span style="color: #7856FF;">Starting action execution loop...</span>`);
 
 	for (const [index, originalAction] of actionSequence.entries()) {
 		// Apply context-aware action selection
@@ -1109,21 +1171,21 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 					// Action failed, still add to history for context
 					actionHistory.push(`${action}_failed`);
 					consecutiveFailures++;
-					log(`    └─ ⚠️ <span style="color: #ffaa00;">Action ${action} failed:</span> <span style="color: #888;">no result returned (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
+					log(`    └─ ⚠️ <span style="color: #F8BC3B;">Action ${action} failed:</span> <span style="color: #888;">no result returned (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
 				}
 			}
 			catch (e) {
 				// Log error but continue with simulation
 				const errorMsg = e.message || 'unknown error';
 				consecutiveFailures++;
-				log(`    └─ ⚠️ <span style="color: #ffaa00;">Action ${action} failed:</span> <span style="color: #888;">${errorMsg} (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
+				log(`    └─ ⚠️ <span style="color: #F8BC3B;">Action ${action} failed:</span> <span style="color: #888;">${errorMsg} (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
 				actionHistory.push(`${action}_error`);
 
 				// Check if page is still responsive after error
 				try {
 					await page.evaluate(() => document.readyState);
 				} catch (pageError) {
-					log(`    └─ 🚨 <span style="color: #ff4444;">Page unresponsive after ${action}</span> - stopping this user`);
+					log(`    └─ 🚨 <span style="color: #CC332B;">Page unresponsive after ${action}</span> - stopping this user`);
 					break; // Exit this user's action loop, but don't crash the whole simulation
 				}
 			}
@@ -1131,7 +1193,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 		// Circuit breaker: stop user if too many consecutive failures
 		if (consecutiveFailures >= maxConsecutiveFailures) {
-			log(`    └─ 🛑 <span style="color: #ff4444;">Too many consecutive failures</span> - stopping this user early`);
+			log(`    └─ 🛑 <span style="color: #CC332B;">Too many consecutive failures</span> - stopping this user early`);
 			break;
 		}
 
@@ -1144,7 +1206,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		clearInterval(monitoringInterval);
 	}
 
-	log(`  └─ ✅ <span style="color: #00ff88; font-weight: bold;">${usersHandle}</span> completed session: <span style="color: #888;">${actionResults.length}/${numActions} actions successful</span>`);
+	log(`  └─ ✅ <span style="color: #07B096; font-weight: bold;">${usersHandle}</span> completed session: <span style="color: #888;">${actionResults.length}/${numActions} actions successful</span>`);
 
 	return {
 		persona: personas[persona],
@@ -1276,11 +1338,11 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
 	const length = maxActions ? Math.min(maxActions, u.rand(25, 100)) : u.rand(25, 100);
 
 	// Create a more natural flow with better variety for longer sessions
-	let lastAction = '';
 	let consecutiveScrolls = 0;
 	let consecutiveClicks = 0;
 	let consecutiveWaits = 0;
 	let actionsSinceLastWait = 0;
+	let lastAction = null;
 
 	for (let i = 0; i < length; i++) {
 		let action = weightedRandom(actionTypes, weights);
@@ -1391,7 +1453,7 @@ export async function clickStuff(page, hotZones = []) {
 				button: 'left'
 			});
 
-			log(`    └─ 👆 <span style="color: #00ff00;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #ffff88;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
+			log(`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
 
 			// Pause after click to see results
 			await u.sleep(u.rand(300, 1000));
@@ -1520,7 +1582,6 @@ export async function clickStuff(page, hotZones = []) {
 		const targetY = rect.y + (rect.height * 0.5) + u.rand(-rect.height * 0.2, rect.height * 0.2);
 
 		// Natural mouse movement to target
-		const currentMouse = await page.mouse;
 		await moveMouse(page,
 			u.rand(0, page.viewport().width),
 			u.rand(0, page.viewport().height),
@@ -1538,7 +1599,7 @@ export async function clickStuff(page, hotZones = []) {
 			button: 'left'
 		});
 
-		log(`    └─ 👆 <span style="color: #00ff00;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #ffff88;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
+		log(`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
 
 		// Pause after click to see results (more realistic)
 		await u.sleep(u.rand(300, 1000));
@@ -1605,7 +1666,7 @@ export async function intelligentScroll(page, hotZones = []) {
 				const sortedZones = targetZones.sort((a, b) => b.priority - a.priority);
 				const targetZone = sortedZones[Math.floor(Math.random() * Math.min(3, sortedZones.length))]; // Pick from top 3
 				targetScroll = targetZone.y - (scrollInfo.viewportHeight * 0.3); // Center zone in viewport
-				log(`    └─ 📜 <span style="color: #ff8800;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`);
+				log(`    └─ 📜 <span style="color: #F8BC3B;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`);
 			} else {
 				// All hot zones visible, do regular content scroll
 				if (scrollInfo.targets.length > 0) {
@@ -1642,7 +1703,7 @@ export async function intelligentScroll(page, hotZones = []) {
 		// Wait for scroll to complete (more realistic timing)
 		await u.sleep(u.rand(800, 1500));
 
-		log(`    └─ 📜 <span style="color: #00aaff;">Scrolled</span> to position <span style="color: #ffff88;">${Math.round(targetScroll)}</span>`);
+		log(`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`);
 		return true;
 	} catch (error) {
 		return false;
@@ -1710,7 +1771,7 @@ export async function naturalMouseMovement(page, hotZones = []) {
 		// Longer, more realistic pause (users move mouse then pause to read/think)
 		await u.sleep(u.rand(800, 2000));
 
-		log(`    └─ 🖱️ <span style="color: #88aaff;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span>`);
+		log(`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span>`);
 		return true;
 	} catch (error) {
 		return false;
@@ -1720,7 +1781,7 @@ export async function naturalMouseMovement(page, hotZones = []) {
 /**
  * Natural pause to simulate realistic user rhythm
  */
-export async function shortPause(page) {
+export async function shortPause() {
 	const pauseDuration = u.rand(300, 1500);
 	await u.sleep(pauseDuration);
 	log(`    └─ ⏸️ <span style="color: #888;">Natural pause</span> (${pauseDuration}ms)`);
@@ -1742,11 +1803,11 @@ export async function interactWithForms(page) {
 				const rect = el.getBoundingClientRect();
 				const style = window.getComputedStyle(el);
 				// Better visibility check: element must be visible and either in viewport or scrollable into view
-				return rect.width > 0 && rect.height > 0 && 
-					   !el.disabled && !el.readOnly && 
-					   style.visibility !== 'hidden' && style.display !== 'none' &&
-					   (rect.bottom > 0 && rect.top < document.documentElement.scrollHeight);
-			}).map(el => {
+				return rect.width > 0 && rect.height > 0 &&
+					!el.disabled && !el.readOnly &&
+					style.visibility !== 'hidden' && style.display !== 'none' &&
+					(rect.bottom > 0 && rect.top < document.documentElement.scrollHeight);
+			}).map((el, index) => {
 				const rect = el.getBoundingClientRect();
 				return {
 					selector: el.tagName.toLowerCase() + (el.type ? `[type="${el.type}"]` : ''),
@@ -1755,7 +1816,8 @@ export async function interactWithForms(page) {
 					name: el.name || '',
 					id: el.id || '',
 					rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-					isInViewport: rect.top >= 0 && rect.top < window.innerHeight
+					isInViewport: rect.top >= 0 && rect.top < window.innerHeight,
+					index: index // Add index as a fallback selector
 				};
 			});
 		});
@@ -1771,12 +1833,40 @@ export async function interactWithForms(page) {
 
 		// Scroll element into view if it's not currently visible
 		if (!target.isInViewport) {
-			await page.evaluate((selector) => {
-				const element = document.querySelector(selector);
+			await page.evaluate((targetInfo) => {
+				// Try multiple selector strategies for robustness
+				let element = null;
+
+				// Strategy 1: Try ID selector (if valid)
+				if (targetInfo.id) {
+					try {
+						element = document.getElementById(targetInfo.id);
+					} catch (e) {
+						// Invalid ID, continue to next strategy
+					}
+				}
+
+				// Strategy 2: Try name selector
+				if (!element && targetInfo.name) {
+					try {
+						element = document.querySelector(`${targetInfo.selector}[name="${targetInfo.name}"]`);
+					} catch (e) {
+						// Invalid selector, continue
+					}
+				}
+
+				// Strategy 3: Use index-based selection as fallback
+				if (!element) {
+					const elements = document.querySelectorAll(targetInfo.selector);
+					if (elements[targetInfo.index]) {
+						element = elements[targetInfo.index];
+					}
+				}
+
 				if (element) {
 					element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 				}
-			}, `${target.selector}${target.id ? '#' + target.id : ''}${target.name ? '[name="' + target.name + '"]' : ''}`);
+			}, target);
 			await u.sleep(u.rand(500, 1000)); // Wait for scroll
 		}
 
@@ -1801,15 +1891,43 @@ export async function interactWithForms(page) {
 
 		// Handle select elements differently
 		if (target.type === 'select') {
-			await page.evaluate((selector) => {
-				const selectEl = document.querySelector(selector);
-				if (selectEl && selectEl.options.length > 1) {
+			await page.evaluate((targetInfo) => {
+				// Try multiple selector strategies for robustness
+				let selectEl = null;
+
+				// Strategy 1: Try ID selector (if valid)
+				if (targetInfo.id) {
+					try {
+						selectEl = document.getElementById(targetInfo.id);
+					} catch (e) {
+						// Invalid ID, continue to next strategy
+					}
+				}
+
+				// Strategy 2: Try name selector
+				if (!selectEl && targetInfo.name) {
+					try {
+						selectEl = document.querySelector(`${targetInfo.selector}[name="${targetInfo.name}"]`);
+					} catch (e) {
+						// Invalid selector, continue
+					}
+				}
+
+				// Strategy 3: Use index-based selection as fallback
+				if (!selectEl) {
+					const elements = document.querySelectorAll(targetInfo.selector);
+					if (elements[targetInfo.index]) {
+						selectEl = elements[targetInfo.index];
+					}
+				}
+
+				if (selectEl && selectEl.options && selectEl.options.length > 1) {
 					const randomIndex = Math.floor(Math.random() * selectEl.options.length);
 					selectEl.selectedIndex = randomIndex;
 					selectEl.dispatchEvent(new Event('change', { bubbles: true }));
 				}
-			}, `${target.selector}${target.id ? '#' + target.id : ''}${target.name ? '[name="' + target.name + '"]' : ''}`);
-			log(`    └─ 📝 <span style="color: #00aa00;">Select option chosen</span> in dropdown field`);
+			}, target);
+			log(`    └─ 📝 <span style="color: #07B096;">Select option chosen</span> in dropdown field`);
 			return true;
 		}
 
@@ -1836,16 +1954,16 @@ export async function interactWithForms(page) {
 		const action = Math.random();
 		if (action < 0.3) {
 			await page.keyboard.press('Enter');
-			log(`    └─ 📝 <span style="color: #00aa00;">Form submitted</span> "${term}" in ${target.type} field`);
+			log(`    └─ 📝 <span style="color: #07B096;">Form submitted</span> "${term}" in ${target.type} field`);
 		} else {
-			log(`    └─ 📝 <span style="color: #88aa00;">Form filled</span> "${term}" in ${target.type} field <span style="color: #888;">(abandoned)</span>`);
+			log(`    └─ 📝 <span style="color: #80E1D9;">Form filled</span> "${term}" in ${target.type} field <span style="color: #888;">(abandoned)</span>`);
 		}
 
 		return true;
 	} catch (error) {
 		// Log specific error but don't crash
 		if (error.message && !error.message.includes('Target closed')) {
-			log(`    └─ ⚠️ <span style="color: #ffaa00;">Form interaction failed:</span> ${error.message}`);
+			log(`    └─ ⚠️ <span style="color: #F8BC3B;">Form interaction failed:</span> ${error.message}`);
 		}
 		return false;
 	}
@@ -1875,7 +1993,7 @@ export async function hoverOverElements(page, hotZones = []) {
 				});
 
 				target = weightedZones[Math.floor(Math.random() * weightedZones.length)];
-				log(`    └─ 🎯 <span style="color: #ff8800;">Hovering hot zone</span> ${target.tag}: "<span style="color: #ffff88;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`);
+				log(`    └─ 🎯 <span style="color: #F8BC3B;">Hovering hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`);
 			}
 		}
 
@@ -1928,7 +2046,7 @@ export async function hoverOverElements(page, hotZones = []) {
 		}
 
 		if (!target.priority) {
-			log(`    └─ 🎯 <span style="color: #aa88ff;">Hovered</span> ${target.tag}: "<span style="color: #ffff88;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
+			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
 		}
 
 		return true;
@@ -1945,7 +2063,7 @@ export async function navigateBack(page) {
 		const canGoBack = await page.evaluate(() => window.history.length > 1);
 		if (canGoBack && Math.random() < 0.7) { // 70% chance to actually go back if possible
 			await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
-			log(`    └─ ⬅️ <span style="color: #88aaff;">Navigated back</span> in browser history`);
+			log(`    └─ ⬅️ <span style="color: #80E1D9;">Navigated back</span> in browser history`);
 			return true;
 		}
 		return false;
@@ -1967,7 +2085,7 @@ export async function identifyHotZones(page) {
 			// Priority 1: High-impact conversion elements (most important for heatmaps)
 			const highPrioritySelectors = [
 				'button[type="submit"]',
-				'input[type="submit"]', 
+				'input[type="submit"]',
 				'[class*="cta"]:not([class*="secondary"])', '[class*="CTA"]:not([class*="secondary"])',
 				'[class*="btn-primary"]', '[class*="primary-btn"]', '[class*="button-primary"]',
 				'[class*="buy"]:not([class*="guide"])', '[class*="purchase"]', '[class*="order"]',
@@ -2313,56 +2431,56 @@ export function extractTopLevelDomain(hostname) {
 	if (!hostname || typeof hostname !== 'string') {
 		return '[empty-hostname]';
 	}
-	
+
 	// Trim whitespace and handle empty after trim
 	hostname = hostname.trim();
 	if (!hostname) {
 		return '[empty-hostname]';
 	}
-	
+
 	// Handle IP addresses (IPv4)
 	if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
 		return hostname;
 	}
-	
+
 	// Handle IPv6 addresses (basic check)
 	if (hostname.includes(':') && hostname.includes('[')) {
 		return hostname;
 	}
-	
+
 	// Handle localhost and local domains
 	if (hostname === 'localhost' || hostname.endsWith('.local')) {
 		return hostname;
 	}
-	
+
 	// Handle invalid hostname characters
 	if (!/^[a-zA-Z0-9.-]+$/.test(hostname)) {
 		return '[invalid-hostname]';
 	}
-	
+
 	// Split hostname into parts
 	const parts = hostname.split('.');
-	
+
 	// Filter out empty parts
 	const validParts = parts.filter(part => part.length > 0);
-	
+
 	// If less than 2 valid parts, return as-is (could be localhost-style)
 	if (validParts.length < 2) {
 		return hostname;
 	}
-	
+
 	// Handle common TLD patterns
 	// For most cases, take the last 2 parts (domain.tld)
 	// For ccTLD + gTLD (like .co.uk), take last 3 parts if middle part is common
 	const commonSecondLevelDomains = ['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'blogspot', 'github'];
-	
+
 	if (validParts.length >= 3) {
 		const secondLevel = validParts[validParts.length - 2];
 		if (commonSecondLevelDomains.includes(secondLevel)) {
 			return validParts.slice(-3).join('.');
 		}
 	}
-	
+
 	// Default: return last 2 parts
 	return validParts.slice(-2).join('.');
 }
@@ -2373,7 +2491,7 @@ export function extractTopLevelDomain(hostname) {
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
 	const local = u.timer('headless');
 	local.start();
-	const result = await main({ concurrency: 1, users: 1, headless: false, url: "https://soundcloud.com" });
+	await main({ concurrency: 1, users: 1, headless: false, url: "https://soundcloud.com" });
 	local.stop(true);
 
 	if (NODE_ENV === 'dev') debugger;
