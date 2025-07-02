@@ -12,3 +12,4 @@ env.yaml
 .cache
 .claude
 .prettierrc
+CLAUDE.md
