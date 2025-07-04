@@ -15,6 +15,7 @@ let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./agents.json', true);
 import { log } from './logger.js';
+import injectMixpanel from './utils/injectMixpanel.js';
 
 /**
  * @typedef PARAMS
@@ -171,13 +172,14 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 
 		// Spoof time if requested
 		if (past) await forceSpoofTimeInBrowser(page);
+		if (inject)
 
-		// Validate URL before navigation
-		try {
-			new URL(url); // This will throw if URL is invalid
-		} catch (urlError) {
-			throw new Error(`Invalid URL provided: ${url} - ${urlError.message}`);
-		}
+			// Validate URL before navigation
+			try {
+				new URL(url); // This will throw if URL is invalid
+			} catch (urlError) {
+				throw new Error(`Invalid URL provided: ${url} - ${urlError.message}`);
+			}
 
 		log(`📍 <span style="color: #F8BC3B;">Navigating</span> to <span style="color: #80E1D9;">${url}</span>...`);
 		try {
@@ -237,14 +239,14 @@ async function retry(operation, maxRetries = 3, delay = 1000) {
 	}
 }
 
-// USER AGENT SPOOFING
-/**
+ /**
  * @param  {import('puppeteer').Page} page
  */
 export async function spoofAgent(page) {
 	const agent = u.shuffle(agents).slice().pop();
 	const { userAgent, ...headers } = agent;
 	const set = await setUserAgent(page, userAgent, headers);
+	log(`    │  └─ 🥸 <span style="color: #07B096;">User agent: ${userAgent}</span>`);
 	return set;
 }
 
@@ -279,6 +281,7 @@ export function getRandomTimestampWithinLast5Days() {
 export async function forceSpoofTimeInBrowser(page) {
 	const spoofedTimestamp = getRandomTimestampWithinLast5Days();
 	const spoofTimeFunctionString = spoofTime.toString();
+	log(`	├─ 🕰️ <span style="color: #F8BC3B;">Spoofing time to: ${dayjs(spoofedTimestamp).toISOString()}</span>`);
 
 	await retry(async () => {
 		await page.evaluateOnNewDocument((timestamp, spoofTimeFn) => {
@@ -389,328 +392,71 @@ async function jamMixpanelIntoBrowser(page, username) {
 	return true;
 }
 
-function injectMixpanel(token = process.env.MIXPANEL_TOKEN || "", userId = "") {
-
-	function reset() {
-		console.log('[NPC] RESET MIXPANEL\n\n');
-		if (mixpanel) {
-			if (mixpanel.headless) {
-				mixpanel.headless.reset();
-			}
-		}
-	}
-
-
-	const PARAMS = qsToObj(window.location.search);
-	let { user = "", project_token = "", ...restParams } = PARAMS;
-	if (!restParams) restParams = {};
-	if (!project_token) project_token = token;
-	if (!project_token) throw new Error("Project token is required when injecting mixpanel.");
-
-	// Function that contains the code to run after the script is loaded
-	function EMBED_TRACKING() {
-		if (window?.MIXPANEL_WAS_INJECTED) {
-			console.log('[NPC] MIXPANEL WAS ALREADY INJECTED\n\n');
-			return;
-		}
-		console.log('[NPC] EMBED TRACKING\n\n');
-		window.MIXPANEL_WAS_INJECTED = true;
-		if (window.mixpanel) {
-			mixpanel.init(project_token, {
-				loaded: function (mp) {
-					console.log('[NPC] MIXPANEL LOADED\n\n');
-					mp.register(restParams);
-					if (userId) mp.identify(userId);
-					if (userId) mp.people.set({ $name: userId, $email: userId });
-					setupPageExitTracking(mp);
-
-
-				},
-
-				//autocapture
-				autocapture: {
-					pageview: "full-url",
-					click: true,
-					input: true,
-					scroll: true,
-					submit: true,
-					capture_text_content: true
-				},
-
-				//session replay
-				record_sessions_percent: 100,
-				record_inline_images: true,
-				record_collect_fonts: true,
-				record_mask_text_selector: "nope",
-				record_block_selector: "nope",
-				record_block_class: "nope",
-				record_canvas: true,
-				record_heatmap_data: true,
-
-
-
-				//normal mixpanel
-				ignore_dnt: true,
-				batch_flush_interval_ms: 0,
-				api_host: "https://express-proxy-lmozz6xkha-uc.a.run.app",
-				api_transport: 'XHR',
-				persistence: "localStorage",
-				api_payload_format: 'json',
-				debug: true
-
-			}, "headless");
-		}
-	}
-
-	function qsToObj(queryString) {
-		try {
-			const parsedQs = new URLSearchParams(queryString);
-			const params = Object.fromEntries(parsedQs);
-			return params;
-		}
-
-		catch (e) {
-			return {};
-		}
-	}
-
-	function setupPageExitTracking(mp, options = {}) {
-		// Configuration with defaults
-		const config = {
-			heartbeatInterval: 30000, // 30 seconds
-			visibilityDelay: 100, // 100ms delay for visibility changes
-			includeAdvancedFeatures: true,
-			logToConsole: false,
-			...options
-		};
-
-		// State tracking
-		let hasTracked = false;
-		let sessionStartTime = Date.now();
-		let lastActivityTime = Date.now();
-		let lastBlurTime = null;
-		let visibilityTimeout = null;
-		let heartbeatInterval = null;
-
-		// Core tracking function
-		function track(reason, additionalData = {}) {
-			// Prevent duplicate tracking
-			if (hasTracked) return;
-			hasTracked = true;
-
-			const eventData = {
-				reason: reason,
-				time_on_page: Date.now() - sessionStartTime,
-				last_activity: Date.now() - lastActivityTime,
-				url: window.location.href,
-				referrer: document.referrer,
-				viewport_width: window.innerWidth,
-				viewport_height: window.innerHeight,
-				user_agent: navigator.userAgent,
-				timestamp: new Date().toISOString(),
-				...additionalData
+ /**
+ * Fast CSP check and relaxation - no-op if already relaxed
+ * @param  {import('puppeteer').Page} page
+ */
+async function ensureCSPRelaxed(page) {
+	try {
+		// Quick check if CSP is already relaxed
+		const cspStatus = await page.evaluate(() => {
+			return {
+				relaxed: !!(window?.CSP_WAS_RELAXED),
+				evalWorking: !!(window?.CSP_EVAL_WORKING),
+				timestamp: window?.CSP_RELAXED_TIMESTAMP || 0
 			};
+		});
 
-			if (config.logToConsole) {
-				console.log(`Page exit tracked: ${reason}`, eventData);
-			}
-
-			// Track with Mixpanel using reliable transport
-			mp.track("$mp_page_close", eventData, {
-				transport: "sendBeacon",
-				send_immediately: true
-			});
+		// If CSP is already relaxed and working, no-op (no logging)
+		if (cspStatus.relaxed && cspStatus.evalWorking) {
+			return true;
 		}
 
-		// Activity tracking
-		function updateActivity() {
-			lastActivityTime = Date.now();
+		// Log when we actually need to apply CSP relaxation
+		log(`    ├─ 🛡️ <span style="color: #F8BC3B;">CSP needs relaxation - applying...</span>`);
+		const result = await relaxCSP(page);
+		if (result) {
+			log(`    │  └─ ✅ <span style="color: #07B096;">CSP relaxation applied</span>`);
 		}
-
-		// Setup all event listeners
-		function setupListeners() {
-			// Primary exit detection
-			window.addEventListener("beforeunload", () => {
-				track("beforeunload");
-			}, { passive: true });
-
-			// Visibility API - most reliable for modern browsers
-			document.addEventListener("visibilitychange", () => {
-				if (document.visibilityState === "hidden") {
-					// Small delay to avoid false positives from quick tab switches
-					visibilityTimeout = setTimeout(() => {
-						track("visibility_hidden");
-					}, config.visibilityDelay);
-				} else if (document.visibilityState === "visible") {
-					// Cancel tracking if user comes back quickly
-					if (visibilityTimeout) {
-						clearTimeout(visibilityTimeout);
-						visibilityTimeout = null;
-						hasTracked = false; // Reset for quick tab switches
-					}
-				}
-			}, { passive: true });
-
-			// Page Lifecycle API
-			document.addEventListener("pagehide", (event) => {
-				track("pagehide", {
-					persisted: event.persisted,
-					page_cached: event.persisted
-				});
-			}, { passive: true });
-
-			// Mobile-specific freeze event
-			document.addEventListener("freeze", () => {
-				track("page_freeze");
-			}, { passive: true });
-
-			// Fallback unload event
-			window.addEventListener("unload", () => {
-				track("unload");
-			}, { passive: true });
-
-			// Browser navigation
-			window.addEventListener("popstate", () => {
-				track("navigation_back_forward");
-			}, { passive: true });
-
-			// Focus/blur for context
-			window.addEventListener("blur", () => {
-				lastBlurTime = Date.now();
-			}, { passive: true });
-
-			window.addEventListener("focus", () => {
-				if (lastBlurTime && Date.now() - lastBlurTime > 5000) {
-					// Reset tracking if blur was for more than 5 seconds
-					hasTracked = false;
-				}
-			}, { passive: true });
-
-			// Connection loss
-			window.addEventListener("offline", () => {
-				track("connection_lost");
-			}, { passive: true });
-
-			// Track user activity
-			const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-			activityEvents.forEach(eventType => {
-				document.addEventListener(eventType, updateActivity, {
-					passive: true,
-					capture: true
-				});
-			});
-		}
-
-		// Advanced features
-		function setupAdvancedFeatures() {
-			if (!config.includeAdvancedFeatures) return;
-
-			// Intersection Observer for page visibility
-			if ('IntersectionObserver' in window) {
-				const observer = new IntersectionObserver((entries) => {
-					entries.forEach(entry => {
-						if (!entry.isIntersecting && document.visibilityState === 'visible') {
-							setTimeout(() => {
-								if (!entry.isIntersecting && !hasTracked) {
-									track("intersection_hidden");
-								}
-							}, 2000);
-						}
-					});
-				}, { threshold: 0, rootMargin: '0px' });
-
-				observer.observe(document.documentElement);
-			}
-
-			// Performance monitoring
-			if ('PerformanceObserver' in window) {
-				try {
-					const observer = new PerformanceObserver((list) => {
-						const entries = list.getEntries();
-						entries.forEach(entry => {
-							if (entry.entryType === 'navigation') {
-								const loadTime = entry.loadEventEnd - entry.loadEventStart;
-								if (loadTime > 10000) {
-									track("slow_navigation", { load_time: loadTime });
-								}
-							}
-						});
-					});
-					observer.observe({ entryTypes: ['navigation'] });
-				} catch (e) {
-					if (config.logToConsole) {
-						console.warn('PerformanceObserver not fully supported');
-					}
-				}
-			}
-
-			// Memory pressure detection
-			if ('memory' in performance) {
-				const memoryCheck = setInterval(() => {
-					if (hasTracked) {
-						clearInterval(memoryCheck);
-						return;
-					}
-					const memory = performance.memory;
-					if (memory.usedJSHeapSize > memory.totalJSHeapSize * 0.9) {
-						track("memory_pressure", {
-							memory_used: memory.usedJSHeapSize,
-							memory_total: memory.totalJSHeapSize
-						});
-					}
-				}, 10000);
-			}
-		}
-
-
-		// Initialize everything
-		setupListeners();
-		setupAdvancedFeatures();
-
-
-		// Return utility functions for SPA support
-		return {
-			// Manual tracking
-			track: (reason, data = {}) => track(reason, data),
-
-			// Reset for SPA route changes
-			reset: () => {
-				hasTracked = false;
-				sessionStartTime = Date.now();
-				lastActivityTime = Date.now();
-				if (visibilityTimeout) {
-					clearTimeout(visibilityTimeout);
-					visibilityTimeout = null;
-				}
-			},
-
-			// Cleanup
-			destroy: () => {
-				if (heartbeatInterval) {
-					clearInterval(heartbeatInterval);
-				}
-				if (visibilityTimeout) {
-					clearTimeout(visibilityTimeout);
-				}
-				hasTracked = true; // Prevent further tracking
-			},
-
-			// Get current state
-			getState: () => ({
-				hasTracked,
-				sessionDuration: Date.now() - sessionStartTime,
-				timeSinceLastActivity: Date.now() - lastActivityTime
-			})
-		};
+		return result;
+	} catch (e) {
+		return false;
 	}
-
-
-
-	var MIXPANEL_CUSTOM_LIB_URL = 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js';
-	//prettier-ignore
-	(function (f, b) { if (!b.__SV) { var e, g, i, h; window.mixpanel = b; b._i = []; b.init = function (e, f, c) { function g(a, d) { var b = d.split("."); 2 == b.length && ((a = a[b[0]]), (d = b[1])); a[d] = function () { a.push([d].concat(Array.prototype.slice.call(arguments, 0))); }; } var a = b; "undefined" !== typeof c ? (a = b[c] = []) : (c = "mixpanel"); a.people = a.people || []; a.toString = function (a) { var d = "mixpanel"; "mixpanel" !== c && (d += "." + c); a || (d += " (stub)"); return d; }; a.people.toString = function () { return a.toString(1) + ".people (stub)"; }; i = "disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" "); for (h = 0; h < i.length; h++) g(a, i[h]); var j = "set set_once union unset remove delete".split(" "); a.get_group = function () { function b(c) { d[c] = function () { call2_args = arguments; call2 = [c].concat(Array.prototype.slice.call(call2_args, 0)); a.push([e, call2]); }; } for (var d = {}, e = ["get_group"].concat(Array.prototype.slice.call(arguments, 0)), c = 0; c < j.length; c++) b(j[c]); return d; }; b._i.push([e, f, c]); }; b.__SV = 1.2; e = f.createElement("script"); e.type = "text/javascript"; e.async = !0; e.src = "undefined" !== typeof MIXPANEL_CUSTOM_LIB_URL ? MIXPANEL_CUSTOM_LIB_URL : "file:" === f.location.protocol && "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//) ? "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js" : "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"; g = f.getElementsByTagName("script")[0]; g.parentNode.insertBefore(e, g); } })(document, window.mixpanel || []);
-	EMBED_TRACKING();
 }
+
+/**
+ * Fast Mixpanel check and injection - no-op if already injected
+ * @param  {import('puppeteer').Page} page
+ * @param  {string} username
+ */
+async function ensureMixpanelInjected(page, username) {
+	try {
+		// Quick check if Mixpanel is already injected and working
+		const mixpanelStatus = await page.evaluate(() => {
+			return {
+				injected: !!(window?.MIXPANEL_WAS_INJECTED),
+				hasSDK: !!(window?.mixpanel),
+				working: !!(window?.mixpanel && window?.MIXPANEL_WAS_INJECTED)
+			};
+		});
+
+		// If Mixpanel is already injected and working, no-op (no logging)
+		if (mixpanelStatus.working) {
+			return true;
+		}
+
+		// Log when we actually need to inject/re-inject Mixpanel
+		log(`    ├─ 💉 <span style="color: #F8BC3B;">Mixpanel needs injection - applying...</span>`);
+		const result = await jamMixpanelIntoBrowser(page, username);
+		if (result) {
+			log(`    │  └─ ✅ <span style="color: #07B096;">Mixpanel injected successfully</span>`);
+		}
+		return result;
+	} catch (e) {
+		return false;
+	}
+}
+
 
 /**
  * Comprehensive CSP and security bypass for reliable script injection
@@ -823,7 +569,7 @@ async function relaxCSP(page) {
 		// 5. Set permissive permissions for all origins (only for valid origins)
 		const context = page.browserContext();
 		const currentUrl = page.url();
-		
+
 		// Only set permissions for valid, non-opaque origins
 		if (currentUrl && !currentUrl.startsWith('about:') && !currentUrl.startsWith('data:') && !currentUrl.startsWith('chrome:')) {
 			try {
@@ -855,6 +601,29 @@ async function relaxCSP(page) {
 }
 
 /**
+ * Fast combined check and application of CSP relaxation and Mixpanel injection
+ * Only does work if needed - no-op when already applied
+ * @param  {import('puppeteer').Page} page
+ * @param  {string} username 
+ * @param  {boolean} inject - Whether to inject Mixpanel
+ */
+async function ensurePageSetup(page, username, inject = true) {
+	try {
+		// Always ensure CSP is relaxed (very fast if already done)
+		await ensureCSPRelaxed(page);
+
+		// Only inject Mixpanel if requested (very fast if already done)
+		if (inject) {
+			await ensureMixpanelInjected(page, username);
+		}
+
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+
+/**
  * Simulates a user session on the page, following a persona-based action sequence.
  * @param {import('puppeteer').Browser} browser - Puppeteer browser object.
  * @param {import('puppeteer').Page} page - Puppeteer page object.
@@ -868,11 +637,11 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	// Enhanced logging with user context
 	log(`👤 <span style="color: #7856FF; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
 
-	// Conditional Mixpanel injection
-	if (inject) {
-		log(`  └─ 💉 Injecting Mixpanel tracking...`);
-		await jamMixpanelIntoBrowser(page, usersHandle);
+	// Initial page setup - CSP relaxation and Mixpanel injection
+	log(`  └─ 🛠️ Setting up page environment...`);
+	await ensurePageSetup(page, usersHandle, inject);
 
+	if (inject) {
 		// Verify injection was successful
 		const injectionSuccess = await page.evaluate(() => {
 			return !!(window.mixpanel && window.MIXPANEL_WAS_INJECTED);
@@ -884,14 +653,13 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 			log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel injection may have failed</span>`);
 		}
 	} else {
-		log(`  └─ ⏭️ Skipping Mixpanel injection`);
+		log(`  │  └─ ⏭️ Skipping Mixpanel injection`);
 	}
 
 	// Store initial domain and page target ID
 	const initialUrl = await page.url();
 	const initialDomain = new URL(initialUrl).hostname;
 	const initialTopLevelDomain = extractTopLevelDomain(initialDomain);
-	let currentDomain = initialDomain;
 
 	// Log warning if we're still on about:blank (should be rare with improved navigation)
 	if (initialUrl.startsWith('about:')) {
@@ -901,171 +669,81 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	const mainPageTarget = await page.target();
 	const mainPageId = mainPageTarget._targetId;
 
-	// Set up comprehensive polling for CSP, Mixpanel, and domain monitoring
-	let monitoringInterval;
-	let hasNavigatedBack = false;
+	// Simplified domain monitoring - just track navigation attempts
 	let consecutiveNavigationAttempts = 0;
 	const MAX_NAVIGATION_ATTEMPTS = 5;
 
-	if (inject && !initialUrl.startsWith('about:')) {
-		// Wait a moment for page to stabilize before starting monitoring
-		await u.sleep(1000);
+	// Function to handle domain navigation checks and about:blank recovery
+	async function checkDomainNavigation() {
+		try {
+			const currentUrl = await page.url();
 
-		monitoringInterval = setInterval(async () => {
-			try {
-				// Check if page and frame are still valid
-				if (page.isClosed()) {
-					if (monitoringInterval) {
-						clearInterval(monitoringInterval);
-						monitoringInterval = null;
-					}
-					return;
-				}
+			// Handle about:blank pages - these need immediate recovery
+			if (currentUrl && currentUrl.startsWith('about:blank')) {
+				log(`    ├─ 🔄 <span style="color: #F8BC3B;">Detected about:blank page, recovering...</span>`);
 
-				// Check if page is still responsive
-				const currentUrl = await page.url();
-
-				// Handle special URLs that don't have normal domains (silently skip about:blank during transitions)
-				if (!currentUrl || currentUrl.startsWith('about:') || currentUrl.startsWith('chrome://') || currentUrl.startsWith('data:')) {
-					// Only log if it's not about:blank (which is common during page transitions)
-					if (!currentUrl.startsWith('about:blank')) {
-						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Special URL detected, skipping domain monitoring:</span> ${currentUrl}`);
-					}
-					return;
-				}
-
-				let newDomain, newTopLevelDomain;
+				// Try to go back first
 				try {
-					newDomain = new URL(currentUrl).hostname;
-					newTopLevelDomain = extractTopLevelDomain(newDomain);
-
-					// Add defensive check for empty domains
-					if (!newDomain) {
-						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Empty hostname detected from URL:</span> ${currentUrl}`);
-						return;
-					}
-					if (!newTopLevelDomain) {
-						log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Could not extract top-level domain from:</span> ${newDomain}`);
-						return;
-					}
-				} catch (urlError) {
-					log(`  ├─ ⚠️ <span style="color: #F8BC3B;">URL parsing error:</span> ${urlError.message} (URL: ${currentUrl})`);
-					return;
-				}
-
-				// Check for top-level domain changes (should navigate back)
-				if (newTopLevelDomain !== initialTopLevelDomain && !hasNavigatedBack) {
-					consecutiveNavigationAttempts++;
-					log(`  ├─ 🚨 <span style="color: #CC332B;">Top-level domain change detected:</span> ${initialTopLevelDomain} → ${newTopLevelDomain} (attempt ${consecutiveNavigationAttempts}/${MAX_NAVIGATION_ATTEMPTS})`);
-
-					// If too many consecutive navigation attempts, return to original URL
-					if (consecutiveNavigationAttempts >= MAX_NAVIGATION_ATTEMPTS) {
-						log(`  │  └─ 🚨 <span style="color: #CC332B;">Too many navigation attempts, returning to origin:</span> ${initialUrl}`);
-						try {
-							await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
-							await u.sleep(2000);
-							currentDomain = initialDomain;
-							consecutiveNavigationAttempts = 0; // Reset counter
-							log(`  │  └─ ✅ <span style="color: #07B096;">Successfully returned to origin:</span> ${initialDomain}`);
-						} catch (originError) {
-							log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Could not return to origin:</span> ${originError.message}`);
-						}
-						hasNavigatedBack = false;
-						return;
-					}
-
-					log(`  │  └─ 🔙 <span style="color: #F8BC3B;">Navigating back to original domain...</span>`);
-
-					hasNavigatedBack = true;
-					try {
+					const canGoBack = await page.evaluate(() => window.history.length > 1);
+					if (canGoBack) {
 						await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
-						await u.sleep(1000); // Give time for navigation
-
-						// Reset domain tracking after going back
-						const backUrl = await page.url();
-						currentDomain = new URL(backUrl).hostname;
-						log(`  │  └─ ✅ <span style="color: #07B096;">Successfully navigated back to:</span> ${currentDomain}`);
-
-						// Reset navigation attempts on successful back navigation
-						consecutiveNavigationAttempts = 0;
-					} catch (backError) {
-						log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Could not navigate back:</span> ${backError.message}`);
+						const recoveredUrl = await page.url();
+						if (!recoveredUrl.startsWith('about:blank')) {
+							log(`    │  └─ ✅ <span style="color: #07B096;">Recovered via back navigation</span>`);
+							return;
+						}
 					}
-					hasNavigatedBack = false; // Reset for future navigations
-					return;
-				} else if (newTopLevelDomain === initialTopLevelDomain && consecutiveNavigationAttempts > 0) {
-					// Reset counter when back on original domain
-					consecutiveNavigationAttempts = 0;
+				} catch (backError) {
+					// Back navigation failed, try forward navigation
 				}
 
-				// Check for domain changes (subdomain navigation is OK)
-				if (newDomain !== currentDomain) {
-					log(`  ├─ 🔄 <span style="color: #F8BC3B;">Domain change detected:</span> ${currentDomain} → ${newDomain}`);
-					currentDomain = newDomain;
-
-					// Re-apply CSP relaxations for new domain
-					log(`  │  ├─ 🛡️ <span style="color: #F8BC3B;">Re-applying CSP relaxations...</span>`);
-					try {
-						await relaxCSP(page);
-						log(`  │  │  └─ ✅ <span style="color: #07B096;">CSP relaxations applied</span>`);
-					} catch (cspError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">CSP relaxation failed:</span> ${cspError.message}`);
+				// If back navigation failed, try going forward
+				try {
+					const canGoForward = await page.evaluate(() => window.history.length > 1);
+					if (canGoForward) {
+						await page.goForward({ waitUntil: 'domcontentloaded', timeout: 5000 });
+						const recoveredUrl = await page.url();
+						if (!recoveredUrl.startsWith('about:blank')) {
+							log(`    │  └─ ✅ <span style="color: #07B096;">Recovered via forward navigation</span>`);
+							return;
+						}
 					}
+				} catch (forwardError) {
+					// Forward navigation failed, fall back to direct navigation
 				}
 
-				// Check CSP relaxation status
-				const cspStatus = await page.evaluate(() => {
-					return {
-						relaxed: !!(window?.CSP_WAS_RELAXED),
-						evalWorking: !!(window?.CSP_EVAL_WORKING),
-						timestamp: window?.CSP_RELAXED_TIMESTAMP || 0
-					};
-				});
-
-				if (!cspStatus.relaxed || !cspStatus.evalWorking) {
-					log(`  │  ├─ 🛡️ <span style="color: #F8BC3B;">CSP relaxation check failed - re-applying...</span>`);
-					try {
-						await relaxCSP(page);
-						log(`  │  │  └─ ✅ <span style="color: #07B096;">CSP re-relaxation completed</span>`);
-					} catch (cspError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">CSP re-relaxation failed:</span> ${cspError.message}`);
-					}
-				}
-
-				// Check Mixpanel injection status
-				const isInjected = await page.evaluate(() => {
-					return !!(window?.MIXPANEL_WAS_INJECTED);
-				});
-
-				if (!isInjected) {
-					log(`  │  ├─ 💉 <span style="color: #F8BC3B;">Mixpanel not detected, re-injecting...</span>`);
-					try {
-						await jamMixpanelIntoBrowser(page, usersHandle);
-						log(`  │  │  └─ ✅ <span style="color: #07B096;">Mixpanel re-injection completed</span>`);
-					} catch (mixpanelError) {
-						log(`  │  │  └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel re-injection failed:</span> ${mixpanelError.message}`);
-					}
-				}
-
-			} catch (e) {
-				// Handle common frame/page errors more gracefully - be more aggressive about filtering
-				if (e.message && (
-					e.message.includes('detached Frame') ||
-					e.message.includes('Target closed') ||
-					e.message.includes('Session closed') ||
-					e.message.includes('Protocol error') ||
-					e.message.includes('Attempted to use detached') ||
-					e.message.includes('frame was detached') ||
-					e.message.includes('Cannot find context')
-				)) {
-					// These are expected during page navigation - don't spam logs
-					return;
-				}
-
-				// Log only truly unexpected errors
-				log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Monitoring error:</span> ${e.message}`);
+				// If both back and forward failed, go directly to original URL
+				await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+				log(`    │  └─ ✅ <span style="color: #07B096;">Recovered via direct navigation to original URL</span>`);
+				return;
 			}
-		}, 5000); // Every 5 seconds to reduce interference
+
+			// Skip other special URLs
+			if (!currentUrl || currentUrl.startsWith('chrome://') || currentUrl.startsWith('data:')) {
+				return;
+			}
+
+			const newDomain = new URL(currentUrl).hostname;
+			const newTopLevelDomain = extractTopLevelDomain(newDomain);
+
+			// Check for top-level domain changes (should navigate back)
+			if (newTopLevelDomain !== initialTopLevelDomain) {
+				consecutiveNavigationAttempts++;
+
+				if (consecutiveNavigationAttempts >= MAX_NAVIGATION_ATTEMPTS) {
+					// Return to original URL
+					await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+					consecutiveNavigationAttempts = 0;
+				} else {
+					// Try to go back
+					await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
+				}
+			} else if (consecutiveNavigationAttempts > 0) {
+				consecutiveNavigationAttempts = 0; // Reset when back on original domain
+			}
+		} catch (e) {
+			// Ignore navigation errors
+		}
 	}
 
 	// Set up tab listener to automatically close new tabs
@@ -1092,15 +770,16 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 	// Circuit breaker to stop user if too many consecutive failures
 	let consecutiveFailures = 0;
-	const maxConsecutiveFailures = 8;
+	const maxConsecutiveFailures = 5;
 
 	// Identify hot zones for coordinated user behavior (always enabled for better heatmap data)
 	let hotZones = [];
 	try {
+		log(`  ├─ 🔍 <span style="color: #7856FF;">Indexing hot zones...</span> Analyzing page elements for optimal targeting`);
 		hotZones = await identifyHotZones(page);
-		log(`  ├─ 🎯 <span style="color: #F8BC3B;">Hot zones detected:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
+		log(`  │  └─ 🎯 <span style="color: #07B096;">Hot zones indexed:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
 	} catch (e) {
-		log(`  ├─ ⚠️ <span style="color: #F8BC3B;">Hot zone detection failed:</span> ${e.message} - using fallback targeting`);
+		log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Hot zone indexing failed:</span> ${e.message} - using fallback targeting`);
 	}
 
 
@@ -1146,12 +825,35 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 			case "back":
 				funcToPerform = () => navigateBack(page);
 				break;
+			case "forward":
+				funcToPerform = () => navigateForward(page);
+				break;
 			default:
 				funcToPerform = () => shortPause(page);
 				break;
 		}
 
 		if (funcToPerform) {
+			// Ensure page setup before each action (fast no-op if already done)
+			await ensurePageSetup(page, usersHandle, inject);
+
+			// Check for domain navigation and handle if needed
+			const previousUrl = await page.url();
+			await checkDomainNavigation();
+			const currentUrl = await page.url();
+
+			// Re-identify hotzones if the URL changed (new page/navigation)
+			if (previousUrl !== currentUrl) {
+				try {
+					log(`    ├─ 🔍 <span style="color: #7856FF;">Re-indexing hot zones...</span> New page detected, analyzing elements`);
+					const newHotZones = await identifyHotZones(page);
+					hotZones = newHotZones;
+					log(`    │  └─ 🎯 <span style="color: #07B096;">Hot zones re-indexed:</span> Found ${hotZones.length} elements on new page`);
+				} catch (e) {
+					log(`    │  └─ ⚠️ <span style="color: #F8BC3B;">Hot zone re-indexing failed:</span> ${e.message} - using existing zones`);
+				}
+			}
+
 			try {
 				// Add timeout for individual actions to prevent hanging
 				const actionTimeout = new Promise((_, reject) =>
@@ -1201,10 +903,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		await u.sleep(u.rand(500, 2000));
 	}
 
-	// Clean up intervals and listeners
-	if (monitoringInterval) {
-		clearInterval(monitoringInterval);
-	}
+	// No cleanup needed - monitoring is now per-action
 
 	log(`  └─ ✅ <span style="color: #07B096; font-weight: bold;">${usersHandle}</span> completed session: <span style="color: #888;">${actionResults.length}/${numActions} actions successful</span>`);
 
@@ -1220,35 +919,35 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 // Realistic user personas optimized for comprehensive engagement
 const personas = {
 	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.8, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2 },
+	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1 },
+	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.8, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1 },
 
 	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.7, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4 },
+	shopper: { scroll: 0.4, mouse: 0.2, click: 0.7, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1 },
+	comparison: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1 },
 
 	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.4, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.3, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3 },
+	reader: { scroll: 0.6, mouse: 0.2, click: 0.4, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1 },
+	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.3, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1 },
 
 	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.6, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.7, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1 },
+	explorer: { scroll: 0.4, mouse: 0.3, click: 0.6, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1 },
+	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.7, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1 },
 
 	// Mobile-like behavior (even on desktop)
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.6, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2 },
+	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.6, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1 },
 
 	// Efficient users
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1 },
+	decisive: { scroll: 0.2, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1 },
 
 	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2 },
+	researcher: { scroll: 0.7, mouse: 0.4, click: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1 },
+	methodical: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1 },
 
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.8, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1 }, // Optimize every action
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.4, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2 }, // Immersive experience
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1 }, // Click all the things!
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.5, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3 }, // Read everything twice
+	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.8, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1 }, // Optimize every action
+	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.4, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1 }, // Immersive experience
+	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1 }, // Click all the things!
+	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.5, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1 }, // Read everything twice
 
 };
 
@@ -1411,7 +1110,6 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
 	return sequence;
 }
 
-// Core action functions
 
 /**
  * Smart click targeting - prioritizes elements users actually click
@@ -2074,6 +1772,24 @@ export async function navigateBack(page) {
 }
 
 /**
+ * Navigate forward using browser forward button
+ */
+export async function navigateForward(page) {
+	try {
+		const canGoForward = await page.evaluate(() => window.history.length > 1);
+		if (canGoForward && Math.random() < 0.7) { // 70% chance to actually go forward if possible
+			await page.goForward({ waitUntil: 'domcontentloaded', timeout: 5000 });
+			log(`    └─ ➡️ <span style="color: #80E1D9;">Navigated forward</span> in browser history`);
+			return true;
+		}
+		return false;
+	} catch (error) {
+		// Forward navigation might fail for various reasons (no history, navigation restrictions, etc.)
+		return false;
+	}
+}
+
+/**
  * Identify hot zones on the page for heatmap generation
  * These are prominent, interactive elements that users should cluster around
  */
@@ -2231,6 +1947,7 @@ export async function identifyHotZones(page) {
 	}
 }
 
+
 export async function randomMouse(page) {
 	const startX = u.rand(0, page.viewport().width);
 	const startY = u.rand(0, page.viewport().height);
@@ -2250,7 +1967,7 @@ export async function moveMouse(page, startX, startY, endX, endY) {
 	try {
 		// More natural number of steps based on distance - faster movement
 		const distance = Math.hypot(endX - startX, endY - startY);
-		const baseSteps = Math.floor(distance / 70); // Fewer steps (was 50, now 70)
+		const baseSteps = Math.floor(distance / 50); 
 		const steps = Math.max(3, Math.min(25, baseSteps + u.rand(-1, 1))); // Fewer steps overall
 
 		// Less frequent pause before movement
@@ -2376,8 +2093,6 @@ export async function randomScroll(page) {
 	}
 }
 
-
-// More realistic wait patterns - faster and more varied
 async function wait() {
 	const waitType = Math.random();
 	if (waitType < 0.4) {
@@ -2391,7 +2106,6 @@ async function wait() {
 		await u.sleep(u.rand(200, 400));
 	}
 }
-
 
 export function bezierPoint(p0, p1, p2, p3, t) {
 	return Math.pow(1 - t, 3) * p0 +
@@ -2416,7 +2130,6 @@ export function weightedRandom(items, weights) {
 		if (randomValue < cumulativeWeight) return item;
 	}
 }
-
 
 export function coinFlip() {
 	return Math.random() < 0.5;
@@ -2484,8 +2197,6 @@ export function extractTopLevelDomain(hostname) {
 	// Default: return last 2 parts
 	return validParts.slice(-2).join('.');
 }
-
-
 
 
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {

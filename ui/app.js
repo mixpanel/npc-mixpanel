@@ -5,6 +5,8 @@ const success = document.querySelector('.success');
 const usersSlider = document.getElementById('users');
 const usersOutput = document.getElementById('usersOutput');
 const url = document.getElementById('url');
+const overview = document.getElementById('overview');
+const overviewText = overview.textContent?.toString();
 const formLine1 = document.getElementById('form-description-line1');
 const formLine2 = document.getElementById('form-description-line2');
 const possibleUrls = [
@@ -215,6 +217,7 @@ form.addEventListener('submit', async (e) => {
 			openTerminalButton.classList.remove('hidden');
 
 			// Restore original form text
+			overview.textContent = overviewText;
 			formLine1.innerHTML = 'meeples want <em>URL</em>';
 			formLine2.innerHTML = 'meeples need <em>project token</em>';
 
@@ -239,8 +242,9 @@ form.addEventListener('submit', async (e) => {
 	});
 
 	// Update form text to show in progress
-	formLine1.textContent = 'replays in progress...';
-	formLine2.textContent = 'check the terminal below!';
+	overview.textContent = 'Meeples are meepling...';
+	formLine1.textContent = 'replays in replayin\'';
+	formLine2.textContent = 'see the actions on the right!';
 
 	// Hide form inputs but keep the description text visible
 	const formInputs = form.querySelectorAll('input, button, label, output, a');

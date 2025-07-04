@@ -393,7 +393,7 @@ describe('Headless.js - Comprehensive Test Suite', () => {
       expect(sequence.length).toBeLessThanOrEqual(20);
       
       // Should contain valid actions
-      const validActions = ['click', 'scroll', 'mouse', 'wait', 'hover', 'form', 'back'];
+      const validActions = ['click', 'scroll', 'mouse', 'wait', 'hover', 'form', 'back', 'forward'];
       sequence.forEach(action => {
         expect(validActions).toContain(action);
       });
