@@ -24,7 +24,7 @@ export function cloudLog(message = "LOG:", data = {}, severity = 'INFO') {
     }
 
     // For Cloud Run: log the object directly (don't stringify)
-    console.log(structuredLog);
+    console.log(JSON.stringify(structuredLog));
     
     return structuredLog;
 }
