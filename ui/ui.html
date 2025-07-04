@@ -24,84 +24,185 @@
 				<div class="sparkle"></div>
 				<div class="sparkle"></div>
 			</div>
-			
+
 			<!-- Main central meeple -->
-			<svg class="main-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+			<svg class="main-meeple"
+				viewBox="0 0 100 92"
+				xmlns="http://www.w3.org/2000/svg">
 				<defs>
-					<linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-						<stop offset="0%" style="stop-color:#7856FF;stop-opacity:1" />
-						<stop offset="50%" style="stop-color:#FF7557;stop-opacity:1" />
-						<stop offset="100%" style="stop-color:#80E1D9;stop-opacity:1" />
+					<linearGradient id="mainGradient"
+						x1="0%"
+						y1="0%"
+						x2="100%"
+						y2="100%">
+						<stop offset="0%"
+							style="stop-color:#7856FF;stop-opacity:1" />
+						<stop offset="50%"
+							style="stop-color:#FF7557;stop-opacity:1" />
+						<stop offset="100%"
+							style="stop-color:#80E1D9;stop-opacity:1" />
 					</linearGradient>
 					<filter id="glow">
-						<feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-						<feMerge> 
-							<feMergeNode in="coloredBlur"/>
-							<feMergeNode in="SourceGraphic"/>
+						<feGaussianBlur stdDeviation="3"
+							result="coloredBlur" />
+						<feMerge>
+							<feMergeNode in="coloredBlur" />
+							<feMergeNode in="SourceGraphic" />
 						</feMerge>
 					</filter>
 				</defs>
-				<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" 
-				      fill="url(#mainGradient)" 
-				      filter="url(#glow)"/>
-				<circle cx="42" cy="30" r="4" fill="#ffffff"/>
-				<circle cx="58" cy="30" r="4" fill="#ffffff"/>
-				<path d="M 35 42 Q 50 52 65 42" 
-				      stroke="#ffffff" 
-				      stroke-width="3" 
-				      fill="none" 
-				      stroke-linecap="round"/>
-				<path d="M 42 20 C 40 25, 45 28, 50 26 C 55 28, 60 25, 58 20" 
-				      fill="#ffffff" 
-				      opacity="0.8"/>
+				<path
+					d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+					fill="url(#mainGradient)"
+					filter="url(#glow)" />
+				<circle cx="42"
+					cy="30"
+					r="4"
+					fill="#ffffff" />
+				<circle cx="58"
+					cy="30"
+					r="4"
+					fill="#ffffff" />
+				<path d="M 35 42 Q 50 52 65 42"
+					stroke="#ffffff"
+					stroke-width="3"
+					fill="none"
+					stroke-linecap="round" />
+				<path d="M 42 20 C 40 25, 45 28, 50 26 C 55 28, 60 25, 58 20"
+					fill="#ffffff"
+					opacity="0.8" />
 			</svg>
 
 			<!-- Dancing meeples around the main one -->
 			<div class="dancing-meeples">
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#FF7557"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#FF7557" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
-				
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#80E1D9"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#80E1D9" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
-				
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#7856FF"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#7856FF" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
-				
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#5B0237"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#5B0237" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
-				
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#F8BC3B"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#F8BC3B" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
-				
-				<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
-					<path d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z" fill="#07B096"/>
-					<circle cx="42" cy="30" r="3" fill="#ffffff"/>
-					<circle cx="58" cy="30" r="3" fill="#ffffff"/>
-					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+				<svg class="dancing-meeple"
+					viewBox="0 0 100 92"
+					xmlns="http://www.w3.org/2000/svg">
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="#07B096" />
+					<circle cx="42"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<circle cx="58"
+						cy="30"
+						r="3"
+						fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42"
+						stroke="#ffffff"
+						stroke-width="2"
+						fill="none"
+						stroke-linecap="round" />
 				</svg>
 			</div>
 		</div>
-		
+
 		<div class="title-text">
 			<h1 class="title">Meeple</h1>
 			<p class="subtitle">The Replay Simulator</p>
@@ -111,10 +212,15 @@
 		<div class="form-container">
 			<form id="simulatorForm">
 				<div id="overview">
-				<p>meeple that will <b>simulate real-end users</b> (<em>meeples</em>) interacting with a digital product. 
-					
-				<br/><br/>you can inject mixpanel into the site your specify, so it can send data to any project.
-				<br/><br/>use this tool to demonstrate how replays, heatmaps, and autocapture work on any website</p>
+					<p>
+						<span>meeple that will <b>simulate real-end users</b> (<em>meeples</em>) interacting with a
+							digital product.</span>
+
+						<span>you can inject mixpanel into the site your specify, so it can send data to any
+							project.</span>
+						<span>use this tool to demonstrate how replays, heatmaps, and autocapture work on any
+							website</span>
+					</p>
 				</div>
 				<p id="form-description-line1"><b>meeples want <em>URL</em></b></p>
 				<!-- <label for="url">URL:</label> -->
