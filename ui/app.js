@@ -83,6 +83,27 @@ usersSlider.addEventListener('input', (e) => {
 	usersOutput.textContent = `${e.target.value} meeples`;
 });
 
+// Update token field styling based on inject checkbox
+const injectCheckbox = document.getElementById('inject');
+const tokenField = document.getElementById('token');
+const tokenDescription = document.getElementById('form-description-line2');
+
+function updateTokenFieldState() {
+	if (injectCheckbox.checked) {
+		tokenField.style.opacity = '1';
+		tokenDescription.style.opacity = '1';
+		tokenDescription.innerHTML = '<b>meeples need <em>project token</em></b>';
+	} else {
+		tokenField.style.opacity = '0.5';
+		tokenDescription.style.opacity = '0.5';
+		tokenDescription.innerHTML = '<b>meeples need <em>project token</em></b> <small>(optional when not injecting)</small>';
+	}
+}
+
+injectCheckbox.addEventListener('change', updateTokenFieldState);
+// Initialize the state
+updateTokenFieldState();
+
 // Terminal utility functions
 function addTerminalLine(content, message) {
 	const timestamp = new Date().toLocaleTimeString();
@@ -114,6 +135,17 @@ function clearTerminal(content) {
 
 form.addEventListener('submit', async (e) => {
 	e.preventDefault();
+	
+	// Validate token field only if inject is checked
+	const injectCheckbox = form.querySelector('#inject');
+	const tokenField = form.querySelector('#token');
+	
+	if (injectCheckbox.checked && !tokenField.value.trim()) {
+		alert('Project token is required when "Inject Mixpanel in Site" is enabled.');
+		tokenField.focus();
+		return;
+	}
+	
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 	data.safeWord = "let me in...";
@@ -225,15 +257,10 @@ const openTerminalButton = document.getElementById('open-terminal');
 closeTerminalButton.addEventListener('click', () => {
 	const terminal = document.getElementById('terminal');
 
-	// Add exit animation
-	terminal.style.animation = 'slideDown 0.3s ease-in forwards';
-
-	setTimeout(() => {
-		terminal.classList.add('hidden');
-		terminal.style.animation = ''; // Reset animation
-		// Show the floating open button
-		openTerminalButton.classList.remove('hidden');
-	}, 300);
+	// Hide terminal with slide-out animation
+	terminal.classList.add('hidden');
+	// Show the floating open button
+	openTerminalButton.classList.remove('hidden');
 });
 
 // Open/expand terminal
@@ -265,57 +292,7 @@ terminalContent.addEventListener('scroll', () => {
 	// Note: We don't show the button on scroll up here - only when new messages arrive
 });
 
-// Terminal resize functionality
-const resizeHandle = document.getElementById('terminal-resize-handle');
-const terminal = document.getElementById('terminal');
-
-let isResizing = false;
-let startY = 0;
-let startHeight = 0;
-
-resizeHandle.addEventListener('mousedown', (e) => {
-	isResizing = true;
-	startY = e.clientY;
-	startHeight = parseInt(document.defaultView.getComputedStyle(terminal).height, 10);
-	document.body.style.userSelect = 'none'; // Prevent text selection while dragging
-	e.preventDefault();
-});
-
-document.addEventListener('mousemove', (e) => {
-	if (!isResizing) return;
-
-	const dy = startY - e.clientY; // Inverted because we're dragging from top
-	let newHeight = startHeight + dy;
-
-	// Apply constraints
-	const minHeight = 200;
-	const maxHeight = window.innerHeight * 0.8;
-	newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
-
-	terminal.style.height = newHeight + 'px';
-});
-
-document.addEventListener('mouseup', () => {
-	if (isResizing) {
-		isResizing = false;
-		document.body.style.userSelect = ''; // Re-enable text selection
-	}
-});
-
-// Add slide down animation for close
-const slideDownCSS = `
-			@keyframes slideDown {
-				from {
-					transform: translateY(0);
-				}
-				to {
-					transform: translateY(100%);
-				}
-			}
-		`;
-const style = document.createElement('style');
-style.textContent = slideDownCSS;
-document.head.appendChild(style);
+// Terminal resize functionality removed - no longer needed in side-by-side layout
 
 
 function qsToObj(queryString) {
