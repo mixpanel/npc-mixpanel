@@ -137,17 +137,17 @@ function clearTerminal(content) {
 
 form.addEventListener('submit', async (e) => {
 	e.preventDefault();
-	
+
 	// Validate token field only if inject is checked
 	const injectCheckbox = form.querySelector('#inject');
 	const tokenField = form.querySelector('#token');
-	
+
 	if (injectCheckbox.checked && !tokenField.value.trim()) {
 		alert('Project token is required when "Inject Mixpanel in Site" is enabled.');
 		tokenField.focus();
 		return;
 	}
-	
+
 	const formData = new FormData(form);
 	const data = Object.fromEntries(formData.entries());
 	data.safeWord = "let me in...";
@@ -179,7 +179,7 @@ form.addEventListener('submit', async (e) => {
 	addTerminalLine(terminalContent, '🔌 Connecting to server...');
 
 	// Connect to WebSocket (same server for Cloud Run)
-	const socket = io({ reconnection: false });
+	const socket = io({ reconnection: true });
 
 	socket.on('connect', () => {
 		startTime = Date.now();
@@ -224,7 +224,7 @@ form.addEventListener('submit', async (e) => {
 			// Show all form inputs again
 			const formInputs = form.querySelectorAll('input, button, label, output, a');
 			formInputs.forEach(input => input.style.display = '');
-			
+
 			form.style.display = 'flex';
 			loading.style.display = 'none';
 		}, 5000);
@@ -249,7 +249,7 @@ form.addEventListener('submit', async (e) => {
 	// Hide form inputs but keep the description text visible
 	const formInputs = form.querySelectorAll('input, button, label, output, a');
 	formInputs.forEach(input => input.style.display = 'none');
-	
+
 	// Show loading indicator as backup
 	loading.style.display = 'block';
 });
@@ -322,8 +322,15 @@ if (window.mixpanel) {
 			let { user = "", ...restParams } = PARAMS;
 			if (!restParams) restParams = {};
 			mp.register(restParams);
-			if (user) mp.identify(user);
-			if (user) mp.people.set({ $name: user, $email: user });
+			try {
+				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user']).split(":").pop();
+				if (userFromCookie) user = userFromCookie;
+				if (user) mp.identify(user);
+				if (user) mp.people.set({ $name: user, $email: user });
+				console.log(`\n\nMIXPANEL IDENTIFIED USER: ${user}\n\n`);
+			} catch (e) {
+				console.error("Error identifying user:", e);
+			}
 
 		},
 

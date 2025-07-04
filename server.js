@@ -7,6 +7,7 @@ import { log, setActiveSocket } from './logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { cloudLog, logger } from './utils/cloudLogger.js';
+import cookieParser from 'cookie-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,6 +120,22 @@ io.on('connection', (socket) => {
 
 // Serve static files (UI)
 app.use(express.static('ui'));
+app.use(cookieParser());
+
+app.use(function (req, res, next) {
+	//for idmgmt: https://cloud.google.com/iap/docs/identity-howto
+	const user = req.headers["x-goog-authenticated-user-email"];
+	if (user) {
+		res.cookie("user", user, {
+			maxAge: 900000,
+			httpOnly: false
+			//sameSite: 'none'
+		});
+	}
+	next();
+});
+
+
 
 // API routes
 app.get('/ping', async (req, res) => {
