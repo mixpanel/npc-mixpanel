@@ -2,11 +2,7 @@
 
 > **Generate realistic user behavior data for any website**
 
-A web automation service that creates authentic analytics data by simulating real human interactions. Built on the belief that **you should be able to generate good custom test data for any arbitrary website**.
-
-## 🎯 Why This Matters
-
-Most analytics testing uses fake data or simplistic bots that don't behave like real users. This creates blind spots where your analytics work with test data but fail with real users.
+A web automation service that creates authentic analytics data by simulating real human interactions. Also, it injects Mixpanel!
 
 **NPC Mixpanel** generates realistic user sessions with:
 - Natural mouse movements and scrolling patterns
@@ -14,7 +10,7 @@ Most analytics testing uses fake data or simplistic bots that don't behave like 
 - Persona-driven behaviors that reflect different user types
 - Human-like timing and decision patterns
 
-The result: test data that actually reflects how real users behave on your site.
+The result: test data that actually reflects how autocaptured data in Mixpanel would look, making it perfect for demos, testing, and validation.
 
 ## ✨ Key Features
 
@@ -24,6 +20,11 @@ The result: test data that actually reflects how real users behave on your site.
 - **Cloud-Ready**: Deploy to Google Cloud Run with automatic scaling
 
 ## 🚀 Quick Start
+
+### Use it in production:
+
+**[https://meeple.mixpanel.org](https://meeple.mixpanel.org)**
+_(you will need to be logged in via Okta)_
 
 ### Local Development
 
