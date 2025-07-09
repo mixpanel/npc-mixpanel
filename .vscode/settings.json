@@ -4,10 +4,21 @@
 	"jest.jestCommandLine": "npm run test --",
 	"cSpell.words": [
 		"autocapture",
+		"backgrounding",
+		"blogspot",
+		"clickables",
 		"EZTRACK",
+		"fixpanel",
+		"headlessly",
+		"hotzones",
+		"Maxer",
 		"Meeple",
 		"meeples",
 		"meepling",
-		"replayin"
+		"Metas",
+		"replayin",
+		"repost",
+		"Slawyer",
+		"targetcreated"
 	]
 }

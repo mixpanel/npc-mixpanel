@@ -777,10 +777,13 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	try {
 		log(`  ├─ 🔍 <span style="color: #7856FF;">Indexing hot zones...</span> Analyzing page elements for optimal targeting`);
 		hotZones = await identifyHotZones(page);
-		log(`  │  └─ 🎯 <span style="color: #07B096;">Hot zones indexed:</span> Found ${hotZones.length} prominent elements for realistic interactions`);
+		log(`  │  └─ 🎯 <span style="color: #07B096;">Hot zones indexed:</span> Found ${hotZones.length}/20 prominent elements for realistic interactions & <span style="color: #4ECDC4;">enhanced heatmap coverage</span>`);
 	} catch (e) {
 		log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Hot zone indexing failed:</span> ${e.message} - using fallback targeting`);
 	}
+
+	// Initialize hover history for return visit behavior
+	const hoverHistory = [];
 
 
 
@@ -817,7 +820,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 				funcToPerform = () => naturalMouseMovement(page, hotZones);
 				break;
 			case "hover":
-				funcToPerform = () => hoverOverElements(page, hotZones);
+				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory);
 				break;
 			case "form":
 				funcToPerform = () => interactWithForms(page);
@@ -1409,6 +1412,52 @@ export async function intelligentScroll(page, hotZones = []) {
 }
 
 /**
+ * Track mouse movement for heatmap data collection
+ */
+async function trackMouseMovement(page, target, log = null) {
+	try {
+		await page.evaluate((targetData) => {
+			// Only track if Mixpanel is available
+			if (typeof window.mixpanel !== 'undefined' && window.mixpanel.headless) {
+				const movementEvent = {
+					// Position data
+					x: targetData.x,
+					y: targetData.y,
+					
+					// Movement context
+					movement_type: 'natural_movement',
+					target_source: targetData.source || 'unknown',
+					
+					// Page context
+					page_url: window.location.href,
+					viewport_width: window.innerWidth,
+					viewport_height: window.innerHeight,
+					
+					// Calculate relative position
+					relative_x: targetData.x / window.innerWidth,
+					relative_y: targetData.y / window.innerHeight,
+					
+					// Timestamp
+					timestamp: Date.now(),
+					event_time: new Date().toISOString()
+				};
+				
+				// Track the movement event for heatmap aggregation
+				window.mixpanel.headless.track('heatmap_movement', movementEvent);
+			}
+		}, target);
+		
+		if (log) {
+			log(`        └─ 📊 <span style="color: #4ECDC4;">Mixpanel event sent:</span> heatmap_movement (${target.x}, ${target.y})`);
+		}
+	} catch (error) {
+		if (log) {
+			log(`        └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel tracking failed:</span> ${error.message}`);
+		}
+	}
+}
+
+/**
  * Natural mouse movement without clicking - simulates reading/hovering behavior
  */
 export async function naturalMouseMovement(page, hotZones = []) {
@@ -1469,7 +1518,10 @@ export async function naturalMouseMovement(page, hotZones = []) {
 		// Longer, more realistic pause (users move mouse then pause to read/think)
 		await u.sleep(u.rand(800, 2000));
 
-		log(`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span>`);
+		// Track mouse movement for heatmap data
+		await trackMouseMovement(page, target, log);
+
+		log(`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span> - <span style="color: #4ECDC4;">heatmap tracked</span>`);
 		return true;
 	} catch (error) {
 		return false;
@@ -1670,9 +1722,32 @@ export async function interactWithForms(page) {
 /**
  * Hover over elements to trigger dropdowns, tooltips, etc.
  */
-export async function hoverOverElements(page, hotZones = []) {
+export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = []) {
 	try {
 		let target;
+
+		// Return visit behavior - sometimes revisit previously hovered elements
+		if (hoverHistory.length > 0 && Math.random() < 0.25) { // 25% chance to return to previous element
+			const recentElements = hoverHistory.slice(-5); // Consider last 5 hovered elements
+			const revisitTarget = recentElements[Math.floor(Math.random() * recentElements.length)];
+			
+			// Check if the previous element is still valid and visible
+			const isValidForRevisit = await page.evaluate((prevTarget) => {
+				const element = document.querySelector(prevTarget.selector);
+				if (!element) return false;
+				
+				const rect = element.getBoundingClientRect();
+				return rect.width > 30 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0;
+			}, revisitTarget);
+			
+			if (isValidForRevisit) {
+				target = {
+					...revisitTarget,
+					isRevisit: true
+				};
+				log(`    └─ 🔄 <span style="color: #7856FF;">Revisiting element</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(return visit)</span> - <span style="color: #4ECDC4;">realistic heatmap pattern</span>`);
+			}
+		}
 
 		// If we have hot zones, prefer them (75% chance to use hot zone)
 		if (hotZones.length > 0 && Math.random() < 0.75) {
@@ -1730,21 +1805,52 @@ export async function hoverOverElements(page, hotZones = []) {
 			target.y + u.rand(-10, 10)
 		);
 
-		// More realistic hover duration - users take time to read/examine
-		const hoverDuration = u.rand(1000, 3000);
-		await u.sleep(hoverDuration);
+		// Calculate realistic hover duration based on content type and persona
+		const hoverDuration = calculateHoverDuration(target, persona);
+		
+		// Enhanced logging for heatmap data generation
+		const durationSeconds = (hoverDuration / 1000).toFixed(1);
+		const dwellCategory = hoverDuration < 2000 ? 'quick' : 
+							 hoverDuration < 5000 ? 'medium' : 
+							 hoverDuration < 10000 ? 'long' : 'very_long';
+		
+		log(`    ├─ 🔥 <span style="color: #FF6B6B;">Dwelling for ${durationSeconds}s</span> (${dwellCategory} dwell) - <span style="color: #4ECDC4;">generating heatmap data</span>`);
+		
+		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
+		await simulateReadingMovements(page, target, hoverDuration, persona, log);
 
-		// Often move slightly while hovering (reading tooltip/dropdown/examining element)
-		if (Math.random() < 0.6) {
-			await page.mouse.move(
-				target.x + u.rand(-30, 30),
-				target.y + u.rand(-30, 30)
-			);
-			await u.sleep(u.rand(500, 1200));
-		}
+		// Track explicit hover dwell event with Mixpanel
+		await trackHoverDwellEvent(page, target, hoverDuration, persona, log);
 
 		if (!target.priority) {
 			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
+		} else {
+			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms, priority: ${target.priority})</span>`);
+		}
+
+		// Add to hover history if not a revisit (to prevent infinite loops)
+		if (!target.isRevisit) {
+			const historyEntry = {
+				x: target.x,
+				y: target.y,
+				width: target.width,
+				height: target.height,
+				text: target.text,
+				tag: target.tag,
+				priority: target.priority,
+				selector: target.selector || `${target.tag}:contains("${target.text?.substring(0, 20)}")`,
+				timestamp: Date.now(),
+				hoverDuration: hoverDuration
+			};
+			
+			hoverHistory.push(historyEntry);
+			
+			// Keep only the last 10 entries to prevent memory issues
+			if (hoverHistory.length > 10) {
+				hoverHistory.shift();
+			}
+			
+			log(`      └─ 📊 <span style="color: #4ECDC4;">Heatmap data captured:</span> dwell event + movement tracking + history (${hoverHistory.length}/10 entries)`);
 		}
 
 		return true;
@@ -1789,6 +1895,7 @@ export async function navigateForward(page) {
 	}
 }
 
+
 /**
  * Identify hot zones on the page for heatmap generation
  * These are prominent, interactive elements that users should cluster around
@@ -1797,6 +1904,103 @@ export async function identifyHotZones(page) {
 	try {
 		return await page.evaluate(() => {
 			const hotZones = [];
+
+			// Calculate visual prominence score for an element
+			function calculateVisualProminence(element, rect) {
+				let score = 0;
+				
+				// 1. Size-based scoring (enhanced)
+				const area = rect.width * rect.height;
+				const aspectRatio = rect.width / rect.height;
+				
+				// Area scoring with aspect ratio consideration
+				if (area > 15000) score += 3; // Large, prominent elements
+				else if (area > 8000) score += 2; // Medium prominent elements
+				else if (area > 3000) score += 1; // Reasonably sized elements
+				else if (area < 800) score -= 2; // Too small, probably not main interaction
+				
+				// Aspect ratio scoring - elements closer to square/golden ratio are more prominent
+				if (aspectRatio >= 0.6 && aspectRatio <= 1.8) score += 1; // Good aspect ratio
+				else if (aspectRatio < 0.3 || aspectRatio > 4) score -= 1; // Poor aspect ratio
+				
+				// 2. Visual hierarchy analysis
+				try {
+					const computedStyle = window.getComputedStyle(element);
+					
+					// Z-index scoring - higher z-index elements are more prominent
+					const zIndex = parseInt(computedStyle.zIndex) || 0;
+					if (zIndex > 100) score += 2; // Very high z-index
+					else if (zIndex > 10) score += 1; // Moderate z-index
+					
+					// Font size scoring for text elements
+					const fontSize = parseInt(computedStyle.fontSize) || 16;
+					if (fontSize > 24) score += 2; // Large text
+					else if (fontSize > 18) score += 1; // Medium-large text
+					else if (fontSize < 12) score -= 1; // Small text
+					
+					// Font weight scoring
+					const fontWeight = computedStyle.fontWeight;
+					if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) score += 1;
+					
+					// Border prominence
+					const borderWidth = parseInt(computedStyle.borderWidth) || 0;
+					if (borderWidth > 2) score += 1; // Thick borders stand out
+					
+					// Button-like styling
+					const borderRadius = parseInt(computedStyle.borderRadius) || 0;
+					const padding = parseInt(computedStyle.padding) || 0;
+					if (borderRadius > 5 && padding > 5) score += 1; // Button-like appearance
+					
+					// Shadow effects
+					if (computedStyle.boxShadow && computedStyle.boxShadow !== 'none') score += 1;
+					
+					// Transform effects (scaled elements)
+					if (computedStyle.transform && computedStyle.transform !== 'none') score += 1;
+					
+					// Opacity penalty for semi-transparent elements
+					const opacity = parseFloat(computedStyle.opacity) || 1;
+					if (opacity < 0.8) score -= 1;
+					
+				} catch (e) {
+					// Fallback if style computation fails
+					score += 0;
+				}
+				
+				// 3. Content-based visual prominence
+				const text = element.textContent?.trim() || '';
+				
+				// All caps text is more prominent
+				if (text.length > 0 && text === text.toUpperCase() && text.length < 30) score += 1;
+				
+				// Short, action-oriented text is more prominent
+				if (text.length > 0 && text.length < 20) score += 1;
+				else if (text.length > 80) score -= 1; // Long text is less prominent
+				
+				// 4. Element type bonuses
+				const tagName = element.tagName.toLowerCase();
+				if (tagName === 'button') score += 1; // Buttons are inherently prominent
+				else if (tagName === 'input' && element.type === 'submit') score += 1; // Submit inputs
+				else if (tagName === 'a' && element.href) score += 0.5; // Links are moderately prominent
+				
+				// 5. Position-based visual prominence
+				const viewportHeight = window.innerHeight;
+				const viewportWidth = window.innerWidth;
+				
+				// Center-biased scoring - elements near center are more prominent
+				const centerX = viewportWidth / 2;
+				const centerY = viewportHeight / 2;
+				const distanceFromCenter = Math.sqrt(
+					Math.pow(rect.left + rect.width / 2 - centerX, 2) + 
+					Math.pow(rect.top + rect.height / 2 - centerY, 2)
+				);
+				const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+				const centerProximity = 1 - (distanceFromCenter / maxDistance);
+				
+				if (centerProximity > 0.7) score += 1; // Very close to center
+				else if (centerProximity > 0.4) score += 0.5; // Moderately close to center
+				
+				return Math.round(score * 10) / 10; // Round to 1 decimal place
+			}
 
 			// Priority 1: High-impact conversion elements (most important for heatmaps)
 			const highPrioritySelectors = [
@@ -1860,12 +2064,9 @@ export async function identifyHotZones(page) {
 								// Calculate priority based on size, position, and content
 								let priority = basePriority;
 
-								// Boost priority for appropriately sized interactive elements
-								const area = rect.width * rect.height;
-								if (area > 15000) priority += 3; // Large, prominent elements
-								else if (area > 8000) priority += 2; // Medium prominent elements
-								else if (area > 3000) priority += 1; // Reasonably sized elements
-								else if (area < 800) priority -= 2; // Too small, probably not main interaction
+								// Enhanced visual prominence scoring
+								const visualProminence = calculateVisualProminence(el, rect);
+								priority += visualProminence;
 
 								// Boost priority for elements in key positions
 								if (rect.top < window.innerHeight * 0.4) priority += 2; // Above the fold
@@ -1910,22 +2111,24 @@ export async function identifyHotZones(page) {
 			analyzeElements(mediumPrioritySelectors, 7);  // Navigation and key areas
 			analyzeElements(lowPrioritySelectors, 4);     // Secondary elements
 
-			// Sort by priority and limit to top candidates
+			// Sort by priority to ensure we get the highest priority zones first
 			hotZones.sort((a, b) => b.priority - a.priority);
 
 			// Remove overlapping zones and apply quality filters
 			const filteredZones = [];
 			hotZones.forEach(zone => {
-				// Only include zones with meaningful priority (above baseline)
-				if (zone.priority < 8) return;
+				// Only include zones with meaningful priority (lowered threshold for better coverage)
+				if (zone.priority < 6) return;
 
 				const isOverlapping = filteredZones.some(existing => {
 					const dx = Math.abs(zone.rect.x - existing.rect.x);
 					const dy = Math.abs(zone.rect.y - existing.rect.y);
-					return dx < 40 && dy < 40; // Tighter overlap detection
+					// Smart overlap detection - smaller threshold for high-priority elements
+					const overlapThreshold = (zone.priority >= 10 || existing.priority >= 10) ? 30 : 40;
+					return dx < overlapThreshold && dy < overlapThreshold;
 				});
 
-				if (!isOverlapping && filteredZones.length < 10) { // Limit to 10 highest quality hot zones
+				if (!isOverlapping && filteredZones.length < 20) { // Limit to 20 highest quality hot zones for better heatmap coverage
 					filteredZones.push(zone);
 				}
 			});
@@ -1947,6 +2150,253 @@ export async function identifyHotZones(page) {
 	}
 }
 
+
+/**
+ * Track explicit hover dwell event with Mixpanel for better heatmap data
+ */
+async function trackHoverDwellEvent(page, target, hoverDuration, persona, log = null) {
+	try {
+		await page.evaluate((targetData, duration, userPersona) => {
+			// Only track if Mixpanel is available
+			if (typeof window.mixpanel !== 'undefined' && window.mixpanel.headless) {
+				// Create comprehensive hover tracking event
+				const hoverEvent = {
+					// Dwell time measurements
+					dwell_time_ms: duration,
+					dwell_time_seconds: Math.round(duration / 1000 * 10) / 10,
+					
+					// Element information
+					element_type: targetData.tag,
+					element_text: targetData.text,
+					element_x: targetData.x,
+					element_y: targetData.y,
+					element_width: targetData.width,
+					element_height: targetData.height,
+					element_area: targetData.width * targetData.height,
+					
+					// User behavior context
+					user_persona: userPersona,
+					interaction_type: 'hover_dwell',
+					
+					// Page context
+					page_url: window.location.href,
+					viewport_width: window.innerWidth,
+					viewport_height: window.innerHeight,
+					
+					// Calculate relative position on page
+					relative_x: targetData.x / window.innerWidth,
+					relative_y: targetData.y / window.innerHeight,
+					
+					// Element prominence indicators
+					element_priority: targetData.priority || 0,
+					is_hot_zone: targetData.priority !== undefined,
+					
+					// Categorize dwell time
+					dwell_category: duration < 2000 ? 'quick' : 
+									duration < 5000 ? 'medium' : 
+									duration < 10000 ? 'long' : 'very_long',
+					
+					// Timestamp
+					timestamp: Date.now(),
+					event_time: new Date().toISOString()
+				};
+				
+				// Track the explicit dwell event
+				window.mixpanel.headless.track('hover_dwell', hoverEvent);
+				
+				// Also track a simplified heatmap event for aggregation
+				window.mixpanel.headless.track('heatmap_hover', {
+					x: targetData.x,
+					y: targetData.y,
+					dwell_time: duration,
+					element_type: targetData.tag,
+					persona: userPersona
+				});
+			}
+		}, target, hoverDuration, persona);
+		
+		if (log) {
+			log(`        └─ 📊 <span style="color: #4ECDC4;">Mixpanel events sent:</span> hover_dwell, heatmap_hover (${hoverDuration}ms dwell)`);
+		}
+	} catch (error) {
+		if (log) {
+			log(`        └─ ⚠️ <span style="color: #F8BC3B;">Mixpanel tracking failed:</span> ${error.message}`);
+		}
+	}
+}
+
+/**
+ * Simulate realistic reading-pattern micro-movements during hover
+ */
+async function simulateReadingMovements(page, target, hoverDuration, persona, log) {
+	// Determine reading behavior based on persona
+	const readingBehaviors = {
+		// High-engagement personas - more micro-movements
+		researcher: { intensity: 0.8, movements: 4, tremor: 0.3 },
+		ruleSlawyer: { intensity: 0.9, movements: 5, tremor: 0.2 },
+		discoverer: { intensity: 0.7, movements: 3, tremor: 0.4 },
+		comparison: { intensity: 0.6, movements: 3, tremor: 0.3 },
+		reader: { intensity: 0.8, movements: 4, tremor: 0.2 },
+		
+		// Medium-engagement personas
+		shopper: { intensity: 0.5, movements: 2, tremor: 0.3 },
+		explorer: { intensity: 0.6, movements: 3, tremor: 0.4 },
+		methodical: { intensity: 0.7, movements: 3, tremor: 0.2 },
+		rolePlayer: { intensity: 0.6, movements: 3, tremor: 0.3 },
+		
+		// Low-engagement personas - fewer micro-movements
+		powerUser: { intensity: 0.3, movements: 1, tremor: 0.2 },
+		taskFocused: { intensity: 0.2, movements: 1, tremor: 0.1 },
+		decisive: { intensity: 0.1, movements: 1, tremor: 0.1 },
+		mobileHabits: { intensity: 0.2, movements: 1, tremor: 0.3 },
+		murderHobo: { intensity: 0.1, movements: 0, tremor: 0.1 },
+		skimmer: { intensity: 0.4, movements: 2, tremor: 0.3 },
+		minMaxer: { intensity: 0.5, movements: 2, tremor: 0.2 }
+	};
+	
+	const behavior = readingBehaviors[persona] || { intensity: 0.5, movements: 2, tremor: 0.3 };
+	
+	// Only simulate reading movements if persona is engaged enough
+	if (Math.random() > behavior.intensity) {
+		log(`      ├─ 📖 <span style="color: #95A5A6;">Skipping reading movements</span> (${persona} intensity: ${behavior.intensity})`);
+		return;
+	}
+	
+	const numMovements = behavior.movements + u.rand(-1, 1);
+	const movementInterval = hoverDuration / Math.max(1, numMovements);
+	
+	log(`      ├─ 📖 <span style="color: #E74C3C;">Generating reading-pattern micro-movements</span> (${persona}: ${numMovements} movements, ${behavior.intensity} intensity)`);
+	
+	for (let i = 0; i < numMovements; i++) {
+		await u.sleep(movementInterval * (0.8 + Math.random() * 0.4)); // Vary timing
+		
+		// Simulate different types of reading movements
+		const movementType = Math.random();
+		let deltaX = 0, deltaY = 0;
+		let movementTypeName = '';
+		
+		if (movementType < 0.4) {
+			// Horizontal scanning (left-to-right reading)
+			deltaX = u.rand(10, 40) * (Math.random() < 0.8 ? 1 : -1); // Mostly left-to-right
+			deltaY = u.rand(-5, 5);
+			movementTypeName = 'horizontal';
+		} else if (movementType < 0.7) {
+			// Vertical scanning (top-to-bottom reading)
+			deltaX = u.rand(-8, 8);
+			movementTypeName = 'vertical';
+			deltaY = u.rand(8, 25);
+		} else {
+			// Natural tremor/micro-adjustments
+			deltaX = u.rand(-15, 15);
+			deltaY = u.rand(-15, 15);
+			movementTypeName = 'tremor';
+		}
+		
+		// Add tremor based on persona
+		if (Math.random() < behavior.tremor) {
+			deltaX += u.rand(-3, 3);
+			deltaY += u.rand(-3, 3);
+		}
+		
+		// Move mouse with constraints to stay near target
+		const newX = Math.max(50, Math.min(page.viewport().width - 50, target.x + deltaX));
+		const newY = Math.max(50, Math.min(page.viewport().height - 50, target.y + deltaY));
+		
+		// Log only the first movement to avoid spam
+		if (i === 0) {
+			log(`        ├─ 👁️ <span style="color: #3498DB;">Reading movement ${i + 1}/${numMovements}</span> (${movementTypeName}: Δx=${deltaX}, Δy=${deltaY})`);
+		}
+		
+		await page.mouse.move(newX, newY);
+		
+		// Brief pause to simulate fixation
+		await u.sleep(u.rand(100, 300));
+	}
+}
+
+/**
+ * Calculate realistic hover duration based on content type and persona
+ */
+function calculateHoverDuration(target, persona) {
+	// Base durations by content type (in milliseconds)
+	const contentTypeDurations = {
+		// Reading content - longer hover times
+		text: { min: 3000, max: 8000 },
+		paragraph: { min: 4000, max: 12000 },
+		article: { min: 5000, max: 15000 },
+		
+		// Interactive elements - moderate hover times
+		button: { min: 2000, max: 6000 },
+		link: { min: 1500, max: 5000 },
+		form: { min: 3000, max: 7000 },
+		
+		// Media content - variable hover times
+		image: { min: 2000, max: 8000 },
+		video: { min: 3000, max: 10000 },
+		
+		// Navigation - shorter hover times
+		nav: { min: 1000, max: 3000 },
+		menu: { min: 1500, max: 4000 },
+		
+		// Default for unknown content
+		default: { min: 2000, max: 6000 }
+	};
+	
+	// Determine content type based on target properties
+	let contentType = 'default';
+	if (target.text && target.text.length > 100) contentType = 'paragraph';
+	else if (target.text && target.text.length > 50) contentType = 'text';
+	else if (target.tag === 'button' || target.text?.toLowerCase().includes('button')) contentType = 'button';
+	else if (target.tag === 'a') contentType = 'link';
+	else if (target.tag === 'img') contentType = 'image';
+	else if (target.tag === 'video') contentType = 'video';
+	else if (target.tag === 'form' || target.tag === 'input' || target.tag === 'textarea') contentType = 'form';
+	else if (target.tag === 'nav' || target.text?.toLowerCase().includes('nav')) contentType = 'nav';
+	
+	// Get base duration range
+	const baseDuration = contentTypeDurations[contentType];
+	
+	// Persona-based modifiers
+	const personaModifiers = {
+		// High engagement personas - longer hover times
+		researcher: 1.5,
+		ruleSlawyer: 1.4,
+		discoverer: 1.3,
+		comparison: 1.2,
+		rolePlayer: 1.2,
+		
+		// Medium engagement personas
+		shopper: 1.1,
+		explorer: 1.0,
+		methodical: 1.1,
+		reader: 1.3,
+		
+		// Low engagement personas - shorter hover times
+		powerUser: 0.7,
+		taskFocused: 0.6,
+		decisive: 0.5,
+		mobileHabits: 0.4,
+		murderHobo: 0.3,
+		
+		// Variable engagement
+		skimmer: 0.8,
+		minMaxer: 0.9
+	};
+	
+	// Apply persona modifier
+	const modifier = personaModifiers[persona] || 1.0;
+	const adjustedMin = Math.round(baseDuration.min * modifier);
+	const adjustedMax = Math.round(baseDuration.max * modifier);
+	
+	// Add some randomness for naturalism
+	const baseHoverTime = u.rand(adjustedMin, adjustedMax);
+	
+	// Add micro-variations (±10%) for more realistic timing
+	const variation = baseHoverTime * 0.1;
+	const finalDuration = baseHoverTime + u.rand(-variation, variation);
+	
+	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
+}
 
 export async function randomMouse(page) {
 	const startX = u.rand(0, page.viewport().width);
@@ -1975,8 +2425,15 @@ export async function moveMouse(page, startX, startY, endX, endY) {
 
 		const humanizedPath = generateHumanizedPath(startX, startY, endX, endY, steps);
 
-		for (const [x, y] of humanizedPath) {
+		for (const pathPoint of humanizedPath) {
+			const [x, y, microPause] = pathPoint.length === 3 ? pathPoint : [pathPoint[0], pathPoint[1], false];
+			
 			await page.mouse.move(x, y);
+
+			// Handle micro-pauses for more natural movement
+			if (microPause) {
+				await u.sleep(u.rand(20, 50)); // Brief hesitation
+			}
 
 			// Faster variable speed that slows down near the target
 			const remainingDistance = Math.hypot(endX - x, endY - y);
@@ -2005,6 +2462,7 @@ export async function moveMouse(page, startX, startY, endX, endY) {
 
 export function generateHumanizedPath(startX, startY, endX, endY, steps) {
 	const path = [];
+	const distance = Math.hypot(endX - startX, endY - startY);
 
 	// Add slight initial deviation for more natural movement start
 	const initialDeviation = u.rand(5, 15);
@@ -2016,16 +2474,42 @@ export function generateHumanizedPath(startX, startY, endX, endY, steps) {
 	const controlPoint2X = startX + (endX - startX) * 0.7;
 	const controlPoint2Y = startY + (endY - startY) * 0.7;
 
+	// Natural tremor parameters
+	const tremorFrequency = 0.3 + Math.random() * 0.4; // 0.3-0.7 Hz
+	const tremorAmplitude = Math.min(2, distance / 200); // Scale tremor with distance
+	const fatigueFactor = Math.min(1.5, distance / 300); // Increase tremor on longer movements
+
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
 		const x = bezierPoint(startX, controlPoint1X, controlPoint2X, endX, t);
 		const y = bezierPoint(startY, controlPoint1Y, controlPoint2Y, endY, t);
 
-		// Add smaller jitter near the target
+		// Progressive jitter - more at start, less near target
 		const progressRatio = i / steps;
-		const jitterAmount = progressRatio < 0.8 ? u.rand(-3, 3) : u.rand(-1, 1);
-
-		path.push([x + jitterAmount, y + jitterAmount]);
+		const baseJitter = progressRatio < 0.8 ? u.rand(-3, 3) : u.rand(-1, 1);
+		
+		// Add natural hand tremor using sinusoidal oscillation
+		const tremorX = Math.sin(t * tremorFrequency * Math.PI * 8) * tremorAmplitude * fatigueFactor;
+		const tremorY = Math.cos(t * tremorFrequency * Math.PI * 6) * tremorAmplitude * fatigueFactor;
+		
+		// Add micro-corrections (small directional adjustments)
+		let microCorrectionX = 0, microCorrectionY = 0;
+		if (i > 0 && Math.random() < 0.15) { // 15% chance of micro-correction
+			microCorrectionX = u.rand(-2, 2);
+			microCorrectionY = u.rand(-2, 2);
+		}
+		
+		// Add occasional micro-pauses (simulate slight hesitation)
+		let microPause = false;
+		if (i > 0 && Math.random() < 0.05) { // 5% chance of micro-pause
+			microPause = true;
+		}
+		
+		// Combine all movement components
+		const finalX = x + baseJitter + tremorX + microCorrectionX;
+		const finalY = y + baseJitter + tremorY + microCorrectionY;
+		
+		path.push([finalX, finalY, microPause]);
 	}
 	return path;
 }
