@@ -9,9 +9,9 @@ export function setActiveSocket(socket) {
 	activeSocket = socket;
 }
 
-export function log(message) {
+export function log(message, meepleId = null) {
 	if (NODE_ENV !== "production") console.log(message);
 	if (activeSocket) {
-		activeSocket.emit('job_update', message);
+		activeSocket.emit('job_update', { message, meepleId });
 	}
 }

@@ -90,6 +90,7 @@ io.on('connection', (socket) => {
 			};
 
 			socket.emit('job_update', `🚀 Starting simulation job: ${jobId}`);
+			socket.emit('job_update', `look in the console tabs for meeple updates`);
 			logger.notice(`/SIMULATE START`, coercedData);
 			const result = await main(coercedData, log);
 			const endTime = Date.now();

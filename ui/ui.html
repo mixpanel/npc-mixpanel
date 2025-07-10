@@ -277,11 +277,17 @@
 		<div id="terminal"
 			class="hidden">
 			<div id="terminal-body">
-				<h3>🛬 Terminal Output</h3>
-				<button id="close-terminal">−</button>
+				<div id="terminal-header">
+					<h3>🛬 Terminal Output</h3>
+					<button id="close-terminal">−</button>
+				</div>
+				<div id="terminal-tab-controls">
+					<button id="tab-nav-left" class="tab-nav-arrow">←</button>
+					<div id="terminal-tabs"></div>
+					<button id="tab-nav-right" class="tab-nav-arrow">→</button>
+				</div>
 				<div id="terminal-content"></div>
-				<button id="scroll-to-bottom"
-					class="hidden">↓ New messages</button>
+				<button id="scroll-to-bottom">↓ Scroll</button>
 			</div>
 		</div>
 	</div>

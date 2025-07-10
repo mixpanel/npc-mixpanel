@@ -480,7 +480,7 @@ button:hover {
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(157, 92, 255, 0.3);
   transition: all 0.3s ease;
-  animation: bounce 1s infinite;
+  animation: bounce 6s infinite;
   z-index: 10;
 }
 
@@ -489,9 +489,7 @@ button:hover {
   transform: translateY(-2px);
 }
 
-#scroll-to-bottom.hidden {
-  display: none !important;
-}
+/* Scroll to bottom button is now always visible */
 
 @keyframes bounce {
   0%,
@@ -509,6 +507,130 @@ button:hover {
   60% {
     transform: translateY(-3px);
   }
+}
+
+/* Terminal Tab System */
+#terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+#terminal-tab-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+#terminal-tabs {
+  display: flex;
+  gap: 4px;
+  flex-grow: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#terminal-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.terminal-tab {
+  background-color: rgba(120, 86, 255, 0.2);
+  border: 1px solid rgba(120, 86, 255, 0.3);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  min-width: 80px;
+  text-align: center;
+  color: #ccc;
+}
+
+.terminal-tab:hover {
+  background-color: rgba(120, 86, 255, 0.3);
+  border-color: rgba(120, 86, 255, 0.5);
+}
+
+.terminal-tab.active {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(120, 86, 255, 0.5);
+}
+
+.tab-nav-arrow {
+  background-color: rgba(120, 86, 255, 0.2);
+  border: 1px solid rgba(120, 86, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  color: #ccc;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.tab-nav-arrow:hover {
+  background-color: rgba(120, 86, 255, 0.4);
+  border-color: rgba(120, 86, 255, 0.6);
+  color: white;
+}
+
+.tab-nav-arrow:active {
+  transform: scale(0.95);
+}
+
+.terminal-tab-content {
+  display: none;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  color: #00ff00;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  height: 100%;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.terminal-tab-content.active {
+  display: block;
+}
+
+.terminal-tab-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-tab-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.terminal-tab-content::-webkit-scrollbar-thumb {
+  background: rgba(120, 86, 255, 0.5);
+  border-radius: 4px;
+}
+
+.terminal-tab-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 86, 255, 0.7);
+}
+
+/* Update terminal content area to work with tabs */
+#terminal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  flex-grow: 1;
 }
 
 #overview {

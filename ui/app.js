@@ -106,8 +106,12 @@ injectCheckbox.addEventListener('change', updateTokenFieldState);
 // Initialize the state
 updateTokenFieldState();
 
+// Tab management system
+let meepleTabsData = {};
+let activeTabId = null;
+
 // Terminal utility functions
-function addTerminalLine(content, message) {
+function addTerminalLine(content, message, meepleId = null) {
 	const timestamp = new Date().toLocaleTimeString();
 	const line = document.createElement('div');
 	line.className = 'terminal-line';
@@ -121,13 +125,158 @@ function addTerminalLine(content, message) {
 	// Only auto-scroll if user was already at the bottom
 	if (isAtBottom) {
 		content.scrollTop = content.scrollHeight;
-		// Hide scroll-to-bottom button if it was showing
-		const scrollButton = document.getElementById('scroll-to-bottom');
-		if (scrollButton) scrollButton.classList.add('hidden');
+	}
+}
+
+function createMeepleTab(meepleId) {
+	if (meepleTabsData[meepleId]) return; // Tab already exists
+	
+	const tabContainer = document.getElementById('terminal-tabs');
+	const tabHeader = document.createElement('div');
+	tabHeader.className = 'terminal-tab';
+	tabHeader.dataset.meepleId = meepleId;
+	tabHeader.innerHTML = `<span>${meepleId}</span>`;
+	
+	// Make tab clickable
+	tabHeader.addEventListener('click', () => {
+		switchToTab(meepleId);
+	});
+	
+	const tabContent = document.createElement('div');
+	tabContent.className = 'terminal-tab-content';
+	tabContent.dataset.meepleId = meepleId;
+	
+	tabContainer.appendChild(tabHeader);
+	document.getElementById('terminal-content').appendChild(tabContent);
+	
+	meepleTabsData[meepleId] = {
+		header: tabHeader,
+		content: tabContent,
+		active: false
+	};
+	
+	// If this is the first tab, make it active
+	if (!activeTabId) {
+		switchToTab(meepleId);
+	}
+	
+	updateTabNavigation();
+}
+
+function switchToTab(meepleId) {
+	// Hide all tabs
+	Object.values(meepleTabsData).forEach(tab => {
+		tab.header.classList.remove('active');
+		tab.content.classList.remove('active');
+		tab.active = false;
+	});
+	
+	// Show selected tab
+	if (meepleTabsData[meepleId]) {
+		meepleTabsData[meepleId].header.classList.add('active');
+		meepleTabsData[meepleId].content.classList.add('active');
+		meepleTabsData[meepleId].active = true;
+		activeTabId = meepleId;
+	}
+	
+	updateTabNavigation();
+	scrollActiveTabIntoView();
+}
+
+function closeMeepleTab(meepleId) {
+	if (!meepleTabsData[meepleId]) return;
+	
+	const tab = meepleTabsData[meepleId];
+	tab.header.remove();
+	tab.content.remove();
+	delete meepleTabsData[meepleId];
+	
+	// If this was the active tab, switch to another
+	if (activeTabId === meepleId) {
+		const remainingTabs = Object.keys(meepleTabsData);
+		if (remainingTabs.length > 0) {
+			switchToTab(remainingTabs[0]);
+		} else {
+			activeTabId = null;
+		}
+	}
+	
+	updateTabNavigation();
+}
+
+function updateTabNavigation() {
+	const leftArrow = document.getElementById('tab-nav-left');
+	const rightArrow = document.getElementById('tab-nav-right');
+	const tabsContainer = document.getElementById('terminal-tabs');
+	const tabsCount = Object.keys(meepleTabsData).length;
+	
+	if (tabsCount <= 1) {
+		leftArrow.style.display = 'none';
+		rightArrow.style.display = 'none';
 	} else {
-		// Show scroll-to-bottom button if user is scrolled up
-		const scrollButton = document.getElementById('scroll-to-bottom');
-		if (scrollButton) scrollButton.classList.remove('hidden');
+		leftArrow.style.display = 'block';
+		rightArrow.style.display = 'block';
+		
+		// Scroll active tab into view if it's not visible
+		scrollActiveTabIntoView();
+	}
+}
+
+function scrollActiveTabIntoView() {
+	const tabsContainer = document.getElementById('terminal-tabs');
+	const activeTab = document.querySelector('.terminal-tab.active');
+	
+	if (!activeTab || !tabsContainer) return;
+	
+	const containerRect = tabsContainer.getBoundingClientRect();
+	const activeTabRect = activeTab.getBoundingClientRect();
+	
+	// Check if active tab is out of view
+	if (activeTabRect.left < containerRect.left) {
+		// Tab is too far left, scroll left
+		tabsContainer.scrollLeft -= (containerRect.left - activeTabRect.left) + 20;
+	} else if (activeTabRect.right > containerRect.right) {
+		// Tab is too far right, scroll right
+		tabsContainer.scrollLeft += (activeTabRect.right - containerRect.right) + 20;
+	}
+}
+
+function navigateTab(direction) {
+	const tabIds = Object.keys(meepleTabsData);
+	const currentIndex = tabIds.indexOf(activeTabId);
+	
+	let newIndex;
+	if (direction === 'left') {
+		newIndex = currentIndex > 0 ? currentIndex - 1 : tabIds.length - 1;
+	} else {
+		newIndex = currentIndex < tabIds.length - 1 ? currentIndex + 1 : 0;
+	}
+	
+	switchToTab(tabIds[newIndex]);
+}
+
+function addTerminalLineToTab(meepleId, message) {
+	if (!meepleId || !meepleTabsData[meepleId]) {
+		// If no meeple ID or tab doesn't exist, create one or use general tab
+		if (!meepleId) {
+			meepleId = 'general';
+		}
+		if (!meepleTabsData[meepleId]) {
+			createMeepleTab(meepleId);
+		}
+	}
+	
+	const tab = meepleTabsData[meepleId];
+	if (tab) {
+		addTerminalLine(tab.content, message, meepleId);
+		
+		// Check if this message indicates meeple completion/failure
+		if (message.includes('completed!') || message.includes('failed:') || message.includes('timed out') || message.includes('completed with issues')) {
+			// Close the tab after a brief delay to let users see the final message
+			setTimeout(() => {
+				closeMeepleTab(meepleId);
+			}, 3000); // 3 second delay
+		}
 	}
 }
 
@@ -188,21 +337,31 @@ form.addEventListener('submit', async (e) => {
 		loading.style.display = 'none';
 	});
 
-	socket.on('job_update', (message) => {
+	socket.on('job_update', (data) => {
+		// Handle both old string format and new object format
+		let message, meepleId;
+		if (typeof data === 'string') {
+			message = data;
+			meepleId = null;
+		} else {
+			message = data.message;
+			meepleId = data.meepleId;
+		}
+		
 		// Handle multiple lines in a single message
 		const lines = message.split('\n').filter(line => line.trim());
 		lines.forEach(line => {
 			if (line.trim()) {
-				addTerminalLine(terminalContent, line);
+				addTerminalLineToTab(meepleId, line);
 			}
 		});
 	});
 
 	socket.on('job_complete', (result) => {
 		const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-		addTerminalLine(terminalContent, '');
-		addTerminalLine(terminalContent, `🎉 Simulation completed successfully! in ${duration} seconds`);
-		addTerminalLine(terminalContent, '');
+		addTerminalLineToTab('general', '');
+		addTerminalLineToTab('general', `🎉 Simulation completed successfully! in ${duration} seconds`);
+		addTerminalLineToTab('general', '');
 
 		// Auto-close terminal after 3 seconds
 		setTimeout(() => {
@@ -283,17 +442,14 @@ const scrollToBottomButton = document.getElementById('scroll-to-bottom');
 const terminalContent = document.getElementById('terminal-content');
 
 scrollToBottomButton.addEventListener('click', () => {
-	terminalContent.scrollTop = terminalContent.scrollHeight;
-	scrollToBottomButton.classList.add('hidden');
-});
-
-// Listen for manual scrolling to hide/show the scroll-to-bottom button
-terminalContent.addEventListener('scroll', () => {
-	const isAtBottom = (terminalContent.scrollTop + terminalContent.clientHeight) >= (terminalContent.scrollHeight - 50);
-	if (isAtBottom) {
-		scrollToBottomButton.classList.add('hidden');
+	// Scroll the currently active tab content to bottom
+	const activeTab = document.querySelector('.terminal-tab-content.active');
+	if (activeTab) {
+		activeTab.scrollTop = activeTab.scrollHeight;
+	} else {
+		// Fallback to old behavior if no active tab
+		terminalContent.scrollTop = terminalContent.scrollHeight;
 	}
-	// Note: We don't show the button on scroll up here - only when new messages arrive
 });
 
 // Terminal resize functionality removed - no longer needed in side-by-side layout
@@ -311,6 +467,63 @@ function qsToObj(queryString) {
 	}
 }
 
+// Tab navigation event handlers
+document.addEventListener('keydown', (e) => {
+	// Only handle arrow keys when terminal is visible
+	const terminal = document.getElementById('terminal');
+	if (terminal.classList.contains('hidden')) return;
+	
+	if (e.key === 'ArrowLeft') {
+		e.preventDefault();
+		navigateTab('left');
+	} else if (e.key === 'ArrowRight') {
+		e.preventDefault();
+		navigateTab('right');
+	}
+});
+
+// Manual tab scrolling functions
+function scrollTabsLeft() {
+	const tabsContainer = document.getElementById('terminal-tabs');
+	if (tabsContainer) {
+		tabsContainer.scrollLeft -= 100; // Scroll left by 100px
+	}
+}
+
+function scrollTabsRight() {
+	const tabsContainer = document.getElementById('terminal-tabs');
+	if (tabsContainer) {
+		tabsContainer.scrollLeft += 100; // Scroll right by 100px
+	}
+}
+
+// Click handlers for tab navigation arrows
+document.addEventListener('DOMContentLoaded', () => {
+	const leftArrow = document.getElementById('tab-nav-left');
+	const rightArrow = document.getElementById('tab-nav-right');
+	
+	if (leftArrow) {
+		leftArrow.addEventListener('click', () => {
+			// First try keyboard navigation, then manual scrolling
+			if (Object.keys(meepleTabsData).length > 1) {
+				navigateTab('left');
+			} else {
+				scrollTabsLeft();
+			}
+		});
+	}
+	
+	if (rightArrow) {
+		rightArrow.addEventListener('click', () => {
+			// First try keyboard navigation, then manual scrolling
+			if (Object.keys(meepleTabsData).length > 1) {
+				navigateTab('right');
+			} else {
+				scrollTabsRight();
+			}
+		});
+	}
+});
 
 // analytics
 const PROJECT_TOKEN = `6c3bc01ddc1f16d01e4fda11d3a4d166`;

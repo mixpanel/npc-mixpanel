@@ -14,7 +14,7 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./agents.json', true);
-import { log } from './logger.js';
+import { log as globalLog } from './logger.js';
 import injectMixpanel from './utils/injectMixpanel.js';
 
 /**
@@ -57,23 +57,25 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 		return limit(() => {
 			return new Promise(async (resolve) => {
 				try {
-					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning user ${i + 1}/${users}</span> on <span style="color: #80E1D9;">${url}</span>...`);
+					// Generate unique username for this meeple
+					const usersHandle = u.makeName(3, "-");
+					globalLog(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
-					const result = await simulateUser(url, headless, inject, past, maxActions);
+					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle);
 
 					if (result && !result.error && !result.timedOut) {
-						log(`✅ <span style="color: #07B096;">User ${i + 1}/${users} completed!</span> Session data captured.`);
+						globalLog(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
 					} else if (result && result.timedOut) {
-						log(`⏰ <span style="color: #F8BC3B;">User ${i + 1}/${users} timed out</span> - but simulation continues`);
+						globalLog(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
 					} else {
-						log(`⚠️ <span style="color: #F8BC3B;">User ${i + 1}/${users} completed with issues</span> - but simulation continues`);
+						globalLog(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
 					}
 
 					resolve(result || { error: 'Unknown error', user: i + 1 });
 				}
 				catch (e) {
 					const errorMsg = e.message || 'Unknown error';
-					log(`❌ <span style="color: #CC332B;">User ${i + 1}/${users} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`);
+					globalLog(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
 					resolve({ error: errorMsg, user: i + 1, crashed: true });
 				}
 			});
@@ -89,14 +91,14 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
-	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
+	globalLog(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
 
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
 			return r.value;
 		} else {
-			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
+			globalLog(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
 			return { error: r.reason?.message || 'Promise rejected', crashed: true };
 		}
 	}).filter(Boolean);
@@ -112,7 +114,10 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
  * @param {boolean} past - Whether to simulate time in past.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null) {
+export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null) {
+	// Create user-specific logger that automatically includes the usersHandle
+	const log = usersHandle ? (message) => globalLog(message, usersHandle) : globalLog;
+	
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
 	const timeoutPromise = new Promise((resolve) =>
@@ -164,14 +169,14 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		const page = (await browser.pages())[0];
 		await page.setDefaultTimeout(pageTimeout);
 		await page.setDefaultNavigationTimeout(pageTimeout);
-		await relaxCSP(page);
+		await relaxCSP(page, log);
 		await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false, hasTouch: false, isLandscape: true });
 
 		// Spoof user agent for realistic browser fingerprinting
-		await spoofAgent(page);
+		await spoofAgent(page, log);
 
 		// Spoof time if requested
-		if (past) await forceSpoofTimeInBrowser(page);
+		if (past) await forceSpoofTimeInBrowser(page, log);
 		if (inject)
 
 			// Validate URL before navigation
@@ -193,11 +198,11 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		}
 		log(`  └─ <span style="color: #07B096;">Page loaded successfully</span>`);
 		await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
-		const persona = selectPersona();
+		const persona = selectPersona(log);
 		log(`🎭 <span style="color: #7856FF;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
 
 		try {
-			const actions = await simulateUserSession(browser, page, persona, inject, maxActions);
+			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle);
 			await browser.close();
 			return actions;
 		}
@@ -242,10 +247,10 @@ async function retry(operation, maxRetries = 3, delay = 1000) {
  /**
  * @param  {import('puppeteer').Page} page
  */
-export async function spoofAgent(page) {
+export async function spoofAgent(page, log = globalLog) {
 	const agent = u.shuffle(agents).slice().pop();
 	const { userAgent, ...headers } = agent;
-	const set = await setUserAgent(page, userAgent, headers);
+	const set = await setUserAgent(page, userAgent, headers, log);
 	log(`    │  └─ 🥸 <span style="color: #07B096;">User agent: ${userAgent}</span>`);
 	return set;
 }
@@ -256,7 +261,7 @@ export async function spoofAgent(page) {
  * @param  {string} userAgent
  * @param  {Object} additionalHeaders
  */
-export async function setUserAgent(page, userAgent, additionalHeaders = {}) {
+export async function setUserAgent(page, userAgent, additionalHeaders = {}, log = globalLog) {
 	if (!page) throw new Error("Browser not initialized");
 
 	await page.setUserAgent(userAgent);
@@ -269,7 +274,7 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}) {
 }
 
 // TIME SPOOFING
-export function getRandomTimestampWithinLast5Days() {
+export function getRandomTimestampWithinLast5Days(log = globalLog) {
 	const now = Date.now();
 	const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000); // 5 days ago in milliseconds
 	const timeChosen = Math.floor(Math.random() * (now - fiveDaysAgo)) + fiveDaysAgo;
@@ -278,8 +283,8 @@ export function getRandomTimestampWithinLast5Days() {
 }
 
 // Function to inject and execute time spoofing
-export async function forceSpoofTimeInBrowser(page) {
-	const spoofedTimestamp = getRandomTimestampWithinLast5Days();
+export async function forceSpoofTimeInBrowser(page, log = globalLog) {
+	const spoofedTimestamp = getRandomTimestampWithinLast5Days(log);
 	const spoofTimeFunctionString = spoofTime.toString();
 	log(`	├─ 🕰️ <span style="color: #F8BC3B;">Spoofing time to: ${dayjs(spoofedTimestamp).toISOString()}</span>`);
 
@@ -334,7 +339,7 @@ function spoofTime(startTimestamp) {
 	return DO_TIME_SPOOF();
 }
 
-async function jamMixpanelIntoBrowser(page, username) {
+async function jamMixpanelIntoBrowser(page, username, log = globalLog) {
 	await retry(async () => {
 		// Enhanced injection with multiple fallback strategies
 		const injectMixpanelString = injectMixpanel.toString();
@@ -396,7 +401,7 @@ async function jamMixpanelIntoBrowser(page, username) {
  * Fast CSP check and relaxation - no-op if already relaxed
  * @param  {import('puppeteer').Page} page
  */
-async function ensureCSPRelaxed(page) {
+async function ensureCSPRelaxed(page, log = globalLog) {
 	try {
 		// Quick check if CSP is already relaxed
 		const cspStatus = await page.evaluate(() => {
@@ -414,7 +419,7 @@ async function ensureCSPRelaxed(page) {
 
 		// Log when we actually need to apply CSP relaxation
 		log(`    ├─ 🛡️ <span style="color: #F8BC3B;">CSP needs relaxation - applying...</span>`);
-		const result = await relaxCSP(page);
+		const result = await relaxCSP(page, log);
 		if (result) {
 			log(`    │  └─ ✅ <span style="color: #07B096;">CSP relaxation applied</span>`);
 		}
@@ -429,7 +434,7 @@ async function ensureCSPRelaxed(page) {
  * @param  {import('puppeteer').Page} page
  * @param  {string} username
  */
-async function ensureMixpanelInjected(page, username) {
+async function ensureMixpanelInjected(page, username, log = globalLog) {
 	try {
 		// Quick check if Mixpanel is already injected and working
 		const mixpanelStatus = await page.evaluate(() => {
@@ -447,7 +452,7 @@ async function ensureMixpanelInjected(page, username) {
 
 		// Log when we actually need to inject/re-inject Mixpanel
 		log(`    ├─ 💉 <span style="color: #F8BC3B;">Mixpanel needs injection - applying...</span>`);
-		const result = await jamMixpanelIntoBrowser(page, username);
+		const result = await jamMixpanelIntoBrowser(page, username, log);
 		if (result) {
 			log(`    │  └─ ✅ <span style="color: #07B096;">Mixpanel injected successfully</span>`);
 		}
@@ -462,7 +467,7 @@ async function ensureMixpanelInjected(page, username) {
  * Comprehensive CSP and security bypass for reliable script injection
  * @param  {import('puppeteer').Page} page
  */
-async function relaxCSP(page) {
+async function relaxCSP(page, log = globalLog) {
 	try {
 		// 1. Enable CSP bypass at the browser level
 		await page.setBypassCSP(true);
@@ -607,14 +612,14 @@ async function relaxCSP(page) {
  * @param  {string} username 
  * @param  {boolean} inject - Whether to inject Mixpanel
  */
-async function ensurePageSetup(page, username, inject = true) {
+async function ensurePageSetup(page, username, inject = true, log = globalLog) {
 	try {
 		// Always ensure CSP is relaxed (very fast if already done)
-		await ensureCSPRelaxed(page);
+		await ensureCSPRelaxed(page, log);
 
 		// Only inject Mixpanel if requested (very fast if already done)
 		if (inject) {
-			await ensureMixpanelInjected(page, username);
+			await ensureMixpanelInjected(page, username, log);
 		}
 
 		return true;
@@ -631,15 +636,21 @@ async function ensurePageSetup(page, username, inject = true) {
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null) {
-	const usersHandle = u.makeName(4, "-");
+export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null, usersHandle = null) {
+	// If no handle provided, generate one (for backward compatibility)
+	if (!usersHandle) {
+		usersHandle = u.makeName(4, "-");
+	}
+
+	// Create user-specific logger that automatically includes the usersHandle
+	const log = (message) => globalLog(message, usersHandle);
 
 	// Enhanced logging with user context
 	log(`👤 <span style="color: #7856FF; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
 
 	// Initial page setup - CSP relaxation and Mixpanel injection
 	log(`  └─ 🛠️ Setting up page environment...`);
-	await ensurePageSetup(page, usersHandle, inject);
+	await ensurePageSetup(page, usersHandle, inject, log);
 
 	if (inject) {
 		// Verify injection was successful
@@ -802,7 +813,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 	for (const [index, originalAction] of actionSequence.entries()) {
 		// Apply context-aware action selection
-		const action = getContextAwareAction(actionHistory, originalAction);
+		const action = getContextAwareAction(actionHistory, originalAction, log);
 
 		const emoji = actionEmojis[action] || '🎯';
 		const contextNote = action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
@@ -811,34 +822,34 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		let funcToPerform;
 		switch (action) {
 			case "click":
-				funcToPerform = () => clickStuff(page, hotZones);
+				funcToPerform = () => clickStuff(page, hotZones, log);
 				break;
 			case "scroll":
-				funcToPerform = () => intelligentScroll(page, hotZones);
+				funcToPerform = () => intelligentScroll(page, hotZones, log);
 				break;
 			case "mouse":
-				funcToPerform = () => naturalMouseMovement(page, hotZones);
+				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
 				break;
 			case "hover":
-				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory);
+				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
 				break;
 			case "form":
-				funcToPerform = () => interactWithForms(page);
+				funcToPerform = () => interactWithForms(page, log);
 				break;
 			case "back":
-				funcToPerform = () => navigateBack(page);
+				funcToPerform = () => navigateBack(page, log);
 				break;
 			case "forward":
-				funcToPerform = () => navigateForward(page);
+				funcToPerform = () => navigateForward(page, log);
 				break;
 			default:
-				funcToPerform = () => shortPause(page);
+				funcToPerform = () => shortPause(log);
 				break;
 		}
 
 		if (funcToPerform) {
 			// Ensure page setup before each action (fast no-op if already done)
-			await ensurePageSetup(page, usersHandle, inject);
+			await ensurePageSetup(page, usersHandle, inject, log);
 
 			// Check for domain navigation and handle if needed
 			const previousUrl = await page.url();
@@ -957,7 +968,7 @@ const personas = {
 /**
  * Selects a random persona.
  */
-export function selectPersona() {
+export function selectPersona(log = globalLog) {
 	const personaKeys = Object.keys(personas);
 	return personaKeys[Math.floor(Math.random() * personaKeys.length)];
 }
@@ -968,7 +979,7 @@ export function selectPersona() {
  * @param {string} suggestedAction - Action suggested by persona weighting
  * @returns {string} - The action to perform (may override suggestion)
  */
-export function getContextAwareAction(actionHistory, suggestedAction) {
+export function getContextAwareAction(actionHistory, suggestedAction, log = globalLog) {
 	if (actionHistory.length === 0) return suggestedAction;
 
 	const lastAction = actionHistory[actionHistory.length - 1];
@@ -1118,7 +1129,7 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
  * Smart click targeting - prioritizes elements users actually click
  * @param  {import('puppeteer').Page} page
  */
-export async function clickStuff(page, hotZones = []) {
+export async function clickStuff(page, hotZones = [], log = globalLog) {
 	try {
 		// If we have hot zones, prefer them (80% chance to use hot zone)
 		if (hotZones.length > 0 && Math.random() < 0.8) {
@@ -1141,7 +1152,8 @@ export async function clickStuff(page, hotZones = []) {
 				u.rand(0, page.viewport().width),
 				u.rand(0, page.viewport().height),
 				targetX,
-				targetY
+				targetY,
+				log
 			);
 
 			// More realistic pause before clicking (humans don't click immediately)
@@ -1287,7 +1299,8 @@ export async function clickStuff(page, hotZones = []) {
 			u.rand(0, page.viewport().width),
 			u.rand(0, page.viewport().height),
 			targetX,
-			targetY
+			targetY,
+			log
 		);
 
 		// More realistic pause before clicking (humans take time to aim)
@@ -1314,7 +1327,7 @@ export async function clickStuff(page, hotZones = []) {
 /**
  * Intelligent scrolling that feels natural and content-aware
  */
-export async function intelligentScroll(page, hotZones = []) {
+export async function intelligentScroll(page, hotZones = [], log = globalLog) {
 	try {
 		const scrollInfo = await page.evaluate(() => {
 			const scrollHeight = document.documentElement.scrollHeight;
@@ -1460,7 +1473,7 @@ async function trackMouseMovement(page, target, log = null) {
 /**
  * Natural mouse movement without clicking - simulates reading/hovering behavior
  */
-export async function naturalMouseMovement(page, hotZones = []) {
+export async function naturalMouseMovement(page, hotZones = [], log = globalLog) {
 	try {
 		let target;
 
@@ -1512,7 +1525,8 @@ export async function naturalMouseMovement(page, hotZones = []) {
 			u.rand(0, page.viewport().width),
 			u.rand(0, page.viewport().height),
 			target.x,
-			target.y
+			target.y,
+			log
 		);
 
 		// Longer, more realistic pause (users move mouse then pause to read/think)
@@ -1531,7 +1545,7 @@ export async function naturalMouseMovement(page, hotZones = []) {
 /**
  * Natural pause to simulate realistic user rhythm
  */
-export async function shortPause() {
+export async function shortPause(log = globalLog) {
 	const pauseDuration = u.rand(300, 1500);
 	await u.sleep(pauseDuration);
 	log(`    └─ ⏸️ <span style="color: #888;">Natural pause</span> (${pauseDuration}ms)`);
@@ -1541,7 +1555,7 @@ export async function shortPause() {
 /**
  * Interact with forms - search boxes, email inputs, etc.
  */
-export async function interactWithForms(page) {
+export async function interactWithForms(page, log = globalLog) {
 	try {
 		// Check if page is still responsive
 		await page.evaluate(() => document.readyState);
@@ -1722,7 +1736,7 @@ export async function interactWithForms(page) {
 /**
  * Hover over elements to trigger dropdowns, tooltips, etc.
  */
-export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = []) {
+export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = [], log = globalLog) {
 	try {
 		let target;
 
@@ -1802,7 +1816,8 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 			u.rand(0, page.viewport().width),
 			u.rand(0, page.viewport().height),
 			target.x + u.rand(-10, 10),
-			target.y + u.rand(-10, 10)
+			target.y + u.rand(-10, 10),
+			log
 		);
 
 		// Calculate realistic hover duration based on content type and persona
@@ -1862,7 +1877,7 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 /**
  * Navigate back using browser back button
  */
-export async function navigateBack(page) {
+export async function navigateBack(page, log = globalLog) {
 	try {
 		const canGoBack = await page.evaluate(() => window.history.length > 1);
 		if (canGoBack && Math.random() < 0.7) { // 70% chance to actually go back if possible
@@ -1880,7 +1895,7 @@ export async function navigateBack(page) {
 /**
  * Navigate forward using browser forward button
  */
-export async function navigateForward(page) {
+export async function navigateForward(page, log = globalLog) {
 	try {
 		const canGoForward = await page.evaluate(() => window.history.length > 1);
 		if (canGoForward && Math.random() < 0.7) { // 70% chance to actually go forward if possible
@@ -2392,12 +2407,12 @@ function calculateHoverDuration(target, persona) {
 	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
 }
 
-export async function randomMouse(page) {
+export async function randomMouse(page, log = globalLog) {
 	const startX = u.rand(0, page.viewport().width);
 	const startY = u.rand(0, page.viewport().height);
 	const endX = u.rand(0, page.viewport().width);
 	const endY = u.rand(0, page.viewport().height);
-	return await moveMouse(page, startX, startY, endX, endY);
+	return await moveMouse(page, startX, startY, endX, endY, log);
 }
 
 /**
@@ -2407,7 +2422,7 @@ export async function randomMouse(page) {
  * @param  {number} endX
  * @param  {number} endY
  */
-export async function moveMouse(page, startX, startY, endX, endY) {
+export async function moveMouse(page, startX, startY, endX, endY, log = globalLog) {
 	try {
 		// More natural number of steps based on distance - faster movement
 		const distance = Math.hypot(endX - startX, endY - startY);
@@ -2511,7 +2526,7 @@ export function generateHumanizedPath(startX, startY, endX, endY, steps) {
 /**
  * @param  {import('puppeteer').Page} page
  */
-export async function randomScroll(page) {
+export async function randomScroll(page, log = globalLog) {
 	try {
 		const scrollable = await page.evaluate(() => {
 			return document.documentElement.scrollHeight > window.innerHeight;
