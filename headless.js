@@ -777,7 +777,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	try {
 		log(`  ├─ 🔍 <span style="color: #7856FF;">Indexing hot zones...</span> Analyzing page elements for optimal targeting`);
 		hotZones = await identifyHotZones(page);
-		log(`  │  └─ 🎯 <span style="color: #07B096;">Hot zones indexed:</span> Found ${hotZones.length}/20 prominent elements for realistic interactions & <span style="color: #4ECDC4;">enhanced heatmap coverage</span>`);
+		log(`  │  └─ 🎯 <span style="color: #07B096;">Hot zones indexed:</span> Found ${hotZones.length}/25 prominent elements for realistic interactions & <span style="color: #4ECDC4;">enhanced heatmap coverage</span>`);
 	} catch (e) {
 		log(`  │  └─ ⚠️ <span style="color: #F8BC3B;">Hot zone indexing failed:</span> ${e.message} - using fallback targeting`);
 	}
@@ -1443,7 +1443,7 @@ async function trackMouseMovement(page, target, log = null) {
 				};
 				
 				// Track the movement event for heatmap aggregation
-				window.mixpanel.headless.track('heatmap_movement', movementEvent);
+				// window.mixpanel.headless.track('heatmap_movement', movementEvent);
 			}
 		}, target);
 		
@@ -1897,257 +1897,259 @@ export async function navigateForward(page) {
 
 
 /**
- * Identify hot zones on the page for heatmap generation
- * These are prominent, interactive elements that users should cluster around
+ * Enhanced hot zone detection optimized for marketing landing pages
+ * Incorporates research-based improvements while maintaining simplicity
  */
 export async function identifyHotZones(page) {
-	try {
-		return await page.evaluate(() => {
-			const hotZones = [];
+    try {
+        return await page.evaluate(() => {
+            const hotZones = [];
+            
+            // Performance optimization: cache computed styles
+            const styleCache = new WeakMap();
+            
+            function getCachedStyle(element) {
+                if (!styleCache.has(element)) {
+                    styleCache.set(element, window.getComputedStyle(element));
+                }
+                return styleCache.get(element);
+            }
 
-			// Calculate visual prominence score for an element
-			function calculateVisualProminence(element, rect) {
-				let score = 0;
-				
-				// 1. Size-based scoring (enhanced)
-				const area = rect.width * rect.height;
-				const aspectRatio = rect.width / rect.height;
-				
-				// Area scoring with aspect ratio consideration
-				if (area > 15000) score += 3; // Large, prominent elements
-				else if (area > 8000) score += 2; // Medium prominent elements
-				else if (area > 3000) score += 1; // Reasonably sized elements
-				else if (area < 800) score -= 2; // Too small, probably not main interaction
-				
-				// Aspect ratio scoring - elements closer to square/golden ratio are more prominent
-				if (aspectRatio >= 0.6 && aspectRatio <= 1.8) score += 1; // Good aspect ratio
-				else if (aspectRatio < 0.3 || aspectRatio > 4) score -= 1; // Poor aspect ratio
-				
-				// 2. Visual hierarchy analysis
-				try {
-					const computedStyle = window.getComputedStyle(element);
-					
-					// Z-index scoring - higher z-index elements are more prominent
-					const zIndex = parseInt(computedStyle.zIndex) || 0;
-					if (zIndex > 100) score += 2; // Very high z-index
-					else if (zIndex > 10) score += 1; // Moderate z-index
-					
-					// Font size scoring for text elements
-					const fontSize = parseInt(computedStyle.fontSize) || 16;
-					if (fontSize > 24) score += 2; // Large text
-					else if (fontSize > 18) score += 1; // Medium-large text
-					else if (fontSize < 12) score -= 1; // Small text
-					
-					// Font weight scoring
-					const fontWeight = computedStyle.fontWeight;
-					if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) score += 1;
-					
-					// Border prominence
-					const borderWidth = parseInt(computedStyle.borderWidth) || 0;
-					if (borderWidth > 2) score += 1; // Thick borders stand out
-					
-					// Button-like styling
-					const borderRadius = parseInt(computedStyle.borderRadius) || 0;
-					const padding = parseInt(computedStyle.padding) || 0;
-					if (borderRadius > 5 && padding > 5) score += 1; // Button-like appearance
-					
-					// Shadow effects
-					if (computedStyle.boxShadow && computedStyle.boxShadow !== 'none') score += 1;
-					
-					// Transform effects (scaled elements)
-					if (computedStyle.transform && computedStyle.transform !== 'none') score += 1;
-					
-					// Opacity penalty for semi-transparent elements
-					const opacity = parseFloat(computedStyle.opacity) || 1;
-					if (opacity < 0.8) score -= 1;
-					
-				} catch (e) {
-					// Fallback if style computation fails
-					score += 0;
-				}
-				
-				// 3. Content-based visual prominence
-				const text = element.textContent?.trim() || '';
-				
-				// All caps text is more prominent
-				if (text.length > 0 && text === text.toUpperCase() && text.length < 30) score += 1;
-				
-				// Short, action-oriented text is more prominent
-				if (text.length > 0 && text.length < 20) score += 1;
-				else if (text.length > 80) score -= 1; // Long text is less prominent
-				
-				// 4. Element type bonuses
-				const tagName = element.tagName.toLowerCase();
-				if (tagName === 'button') score += 1; // Buttons are inherently prominent
-				else if (tagName === 'input' && element.type === 'submit') score += 1; // Submit inputs
-				else if (tagName === 'a' && element.href) score += 0.5; // Links are moderately prominent
-				
-				// 5. Position-based visual prominence
-				const viewportHeight = window.innerHeight;
-				const viewportWidth = window.innerWidth;
-				
-				// Center-biased scoring - elements near center are more prominent
-				const centerX = viewportWidth / 2;
-				const centerY = viewportHeight / 2;
-				const distanceFromCenter = Math.sqrt(
-					Math.pow(rect.left + rect.width / 2 - centerX, 2) + 
-					Math.pow(rect.top + rect.height / 2 - centerY, 2)
-				);
-				const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
-				const centerProximity = 1 - (distanceFromCenter / maxDistance);
-				
-				if (centerProximity > 0.7) score += 1; // Very close to center
-				else if (centerProximity > 0.4) score += 0.5; // Moderately close to center
-				
-				return Math.round(score * 10) / 10; // Round to 1 decimal place
-			}
+            // Enhanced visual prominence scoring based on research
+            function calculateVisualProminence(element, rect) {
+                let score = 0;
+                const style = getCachedStyle(element);
+                
+                // 1. Size and position scoring (F-pattern weighted)
+                const area = rect.width * rect.height;
+                const viewportArea = window.innerWidth * window.innerHeight;
+                const relativeSize = area / viewportArea;
+                
+                // Boost scores for F-pattern positioning (top and left areas)
+                const fPatternBoost = rect.top < window.innerHeight * 0.3 ? 1.5 : 
+                                     rect.left < window.innerWidth * 0.4 ? 1.2 : 1;
+                
+                if (relativeSize > 0.02) score += 3 * fPatternBoost; // Large CTAs
+                else if (relativeSize > 0.01) score += 2 * fPatternBoost; // Medium buttons
+                else if (relativeSize > 0.005) score += 1 * fPatternBoost; // Standard links
+                else if (relativeSize < 0.001) score -= 2; // Too small
+                
+                // 2. Visual hierarchy scoring
+                const zIndex = parseInt(style.zIndex) || 0;
+                if (zIndex > 1000) score += 3; // Modals, popups
+                else if (zIndex > 100) score += 2; // Floating elements
+                else if (zIndex > 10) score += 1; // Elevated elements
+                
+                // Color contrast scoring (simplified)
+                const bgColor = style.backgroundColor;
+                const hasHighContrast = bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && 
+                                       bgColor !== 'transparent';
+                if (hasHighContrast) score += 1;
+                
+                // Marketing-specific visual cues
+                const hasShadow = style.boxShadow && style.boxShadow !== 'none';
+                const hasGradient = style.backgroundImage && style.backgroundImage.includes('gradient');
+                const hasTransform = style.transform && style.transform !== 'none';
+                const hasTransition = style.transition && style.transition !== 'none';
+                
+                if (hasShadow) score += 1.5; // Elevated appearance
+                if (hasGradient) score += 1; // Modern CTA styling
+                if (hasTransform || hasTransition) score += 0.5; // Interactive feel
+                
+                // Button-like appearance scoring
+                const borderRadius = parseInt(style.borderRadius) || 0;
+                const padding = parseInt(style.padding) || 0;
+                if (borderRadius > 4 && padding > 8) score += 2; // Likely a button
+                
+                // 3. Typography prominence
+                const fontSize = parseInt(style.fontSize) || 16;
+                const fontWeight = style.fontWeight;
+                
+                if (fontSize > 20) score += 1.5;
+                else if (fontSize > 16) score += 0.5;
+                else if (fontSize < 12) score -= 1;
+                
+                if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) score += 1;
+                
+                // 4. Interactive state indicators
+                const cursor = style.cursor;
+                if (cursor === 'pointer') score += 2;
+                else if (cursor === 'grab' || cursor === 'move') score += 1;
+                
+                // 5. Content analysis for marketing CTAs
+                const text = element.textContent?.trim().toLowerCase() || '';
+                const actionWords = [
+                    'buy', 'shop', 'get', 'start', 'try', 'demo', 'download', 
+                    'signup', 'sign up', 'register', 'join', 'save', 'claim',
+                    'book', 'schedule', 'contact', 'call', 'learn', 'discover',
+                    'free', 'trial', 'now', 'today', 'limited', 'offer'
+                ];
+                
+                const matchedWords = actionWords.filter(word => text.includes(word));
+                score += matchedWords.length * 2;
+                
+                // Short, punchy text is often a CTA
+                if (text.length > 0 && text.length < 25) score += 1;
+                
+                return Math.round(score * 10) / 10;
+            }
 
-			// Priority 1: High-impact conversion elements (most important for heatmaps)
-			const highPrioritySelectors = [
-				'button[type="submit"]',
-				'input[type="submit"]',
-				'[class*="cta"]:not([class*="secondary"])', '[class*="CTA"]:not([class*="secondary"])',
-				'[class*="btn-primary"]', '[class*="primary-btn"]', '[class*="button-primary"]',
-				'[class*="buy"]:not([class*="guide"])', '[class*="purchase"]', '[class*="order"]',
-				'[class*="signup"]', '[class*="sign-up"]', '[class*="register"]',
-				'[class*="get-started"]', '[class*="start-trial"]', '[class*="free-trial"]',
-				'[class*="download"]', '[class*="subscribe"]',
-				'[class*="add-to-cart"]', '[class*="checkout"]',
-				'[role="button"][class*="primary"]',
-				'[data-action*="purchase"]', '[data-action*="signup"]'
-			];
+            // Check if element is actually visible and interactive
+            function isElementInteractive(el, rect, style) {
+                // Skip if hidden
+                if (style.display === 'none' || style.visibility === 'hidden' ||
+                    style.opacity === '0' || el.disabled || el.hidden) {
+                    return false;
+                }
+                
+                // Check if behind modal/overlay
+                if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])') ||
+                    document.querySelector('.modal.show, .modal.open, .modal.active')) {
+                    // Element needs high z-index to be interactive when modal is open
+                    const zIndex = parseInt(style.zIndex) || 0;
+                    if (zIndex < 1000) {
+                        const modalRect = document.querySelector('[role="dialog"], .modal')?.getBoundingClientRect();
+                        if (modalRect && rectsOverlap(rect, modalRect)) {
+                            return false;
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            
+            function rectsOverlap(rect1, rect2) {
+                return !(rect1.right < rect2.left || rect1.left > rect2.right ||
+                        rect1.bottom < rect2.top || rect1.top > rect2.bottom);
+            }
 
-			// Priority 2: Navigation and key interactive areas  
-			const mediumPrioritySelectors = [
-				'nav a[href]:not([href="#"])', 'header nav a[href]', '[class*="nav-main"] a[href]',
-				'[class*="menu-item"] a[href]', '[class*="navigation"] a[href]',
-				'[class*="hero"] button', '[class*="hero"] a[class*="btn"]',
-				'[class*="banner"] button', '[class*="banner"] a[class*="btn"]',
-				'[class*="card"] button', '[class*="card"] a[class*="btn"]',
-				'[class*="product"] button', '[class*="service"] button',
-				'[class*="pricing"] button', '[class*="plan"] button',
-				'form button:not([type="reset"])', 'form input[type="submit"]',
-				'[class*="search"] button', '[class*="filter"] button',
-				'[class*="tab"]:not([class*="table"]) button', '[role="tab"]',
-				'[class*="toggle"] button'
-			];
+            // Enhanced selector list incorporating ARIA and modern patterns
+            const interactiveSelectors = [
+                // High-priority marketing elements
+                'button[class*="cta"], button[class*="CTA"], button[class*="btn-primary"]',
+                'a[class*="button"], a[class*="btn"], a[class*="cta"]',
+                '[role="button"][class*="primary"], [role="button"][class*="cta"]',
+                'button[type="submit"], input[type="submit"]',
+                '[data-action*="buy"], [data-action*="purchase"], [data-action*="checkout"]',
+                '[data-action*="signup"], [data-action*="register"], [data-action*="start"]',
+                
+                // ARIA-enhanced interactive elements
+                '[role="button"]:not([aria-hidden="true"])',
+                '[role="link"]:not([aria-hidden="true"])',
+                '[role="menuitem"], [role="tab"], [role="option"]',
+                '[aria-expanded], [aria-haspopup], [aria-controls]',
+                
+                // Standard interactive elements
+                'button:not([aria-hidden="true"]):not(.close):not(.dismiss)',
+                'a[href]:not([href="#"]):not([href=""]):not([aria-hidden="true"])',
+                'input[type="button"], input[type="submit"], input[type="image"]',
+                '[onclick]:not([aria-hidden="true"])',
+                '[tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])',
+                
+                // Marketing-specific patterns
+                '[class*="hero"] button, [class*="hero"] a[class*="btn"]',
+                '[class*="banner"] button, [class*="banner"] a[class*="btn"]',
+                '[class*="pricing"] button, [class*="plan"] button',
+                '[class*="testimonial"] a[class*="btn"], [class*="review"] button',
+                '[class*="countdown"] button, [class*="timer"] button',
+                'form button:not([type="reset"]), form input[type="submit"]'
+            ];
 
-			// Priority 3: Secondary interactive elements (be selective but broader for arbitrary sites)
-			const lowPrioritySelectors = [
-				'button:not([class*="close"]):not([class*="dismiss"]):not([aria-hidden="true"])',
-				'a[href]:not([href="#"]):not([href=""]):not([href^="mailto"]):not([href^="tel"]):not([href^="javascript:"])',
-				'[role="button"]:not([aria-hidden="true"]):not([class*="close"])',
-				'[class*="link"]:not([class*="footer-link"])',
-				'[onclick]:not([class*="close"]):not([class*="dismiss"])'
-			];
+            // Analyze elements with batching for performance
+            const allElements = [];
+            interactiveSelectors.forEach(selector => {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(el => {
+                        if (!allElements.includes(el)) {
+                            allElements.push(el);
+                        }
+                    });
+                } catch (e) {
+                    // Ignore invalid selectors
+                }
+            });
 
-			function analyzeElements(selectors, basePriority) {
-				selectors.forEach(selector => {
-					try {
-						const elements = document.querySelectorAll(selector);
-						elements.forEach(el => {
-							const rect = el.getBoundingClientRect();
+            // Process elements
+            allElements.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                const style = getCachedStyle(el);
 
-							// Element must be visible and appropriately sized for interaction
-							if (rect.width > 30 && rect.height > 20 &&
-								rect.top >= 0 && rect.top < window.innerHeight &&
-								rect.left >= 0 && rect.left < window.innerWidth &&
-								rect.bottom > 0 && rect.right > 0) {
+                // Must be visible and reasonably sized
+                if (rect.width > 20 && rect.height > 15 &&
+                    rect.top < window.innerHeight && rect.bottom > 0 &&
+                    rect.left < window.innerWidth && rect.right > 0 &&
+                    isElementInteractive(el, rect, style)) {
 
-								// Check if element is actually visible
-								const style = window.getComputedStyle(el);
-								if (style.display === 'none' || style.visibility === 'hidden' ||
-									style.opacity === '0' || el.disabled || el.hidden) {
-									return; // Skip hidden/disabled elements
-								}
+                    const visualProminence = calculateVisualProminence(el, rect);
+                    
+                    // Marketing pages often have prominent CTAs
+                    const baseThreshold = 4; // Lower threshold for marketing sites
+                    
+                    if (visualProminence >= baseThreshold) {
+                        hotZones.push({
+                            element: el,
+                            rect: {
+                                x: rect.x + rect.width / 2,
+                                y: rect.y + rect.height / 2,
+                                width: rect.width,
+                                height: rect.height,
+                                top: rect.top,
+                                left: rect.left
+                            },
+                            priority: visualProminence,
+                            text: (el.textContent || '').trim().substring(0, 50),
+                            tag: el.tagName.toLowerCase(),
+                            href: el.href || null,
+                            ariaRole: el.getAttribute('role'),
+                            ariaLabel: el.getAttribute('aria-label')
+                        });
+                    }
+                }
+            });
 
-								// Calculate priority based on size, position, and content
-								let priority = basePriority;
+            // Sort by priority and remove overlaps
+            hotZones.sort((a, b) => b.priority - a.priority);
 
-								// Enhanced visual prominence scoring
-								const visualProminence = calculateVisualProminence(el, rect);
-								priority += visualProminence;
+            // Smart overlap removal - keep highest priority elements
+            const filteredZones = [];
+            const overlapThreshold = 40; // pixels
+            
+            hotZones.forEach(zone => {
+                const hasOverlap = filteredZones.some(existing => {
+                    const dx = Math.abs(zone.rect.x - existing.rect.x);
+                    const dy = Math.abs(zone.rect.y - existing.rect.y);
+                    
+                    // For marketing sites, be more aggressive about keeping multiple CTAs
+                    const isLikelyCTA = zone.priority > 10;
+                    const threshold = isLikelyCTA ? overlapThreshold * 0.6 : overlapThreshold;
+                    
+                    return dx < threshold && dy < threshold;
+                });
 
-								// Boost priority for elements in key positions
-								if (rect.top < window.innerHeight * 0.4) priority += 2; // Above the fold
-								else if (rect.top < window.innerHeight * 0.8) priority += 1; // Still visible
+                if (!hasOverlap && filteredZones.length < 25) { // Allow more hot zones
+                    filteredZones.push(zone);
+                }
+            });
 
-								// Boost priority for elements with action-oriented text
-								const text = el.textContent?.trim().toLowerCase() || '';
-								const actionWords = ['buy', 'shop', 'get', 'start', 'learn', 'try', 'demo', 'download', 'signup', 'subscribe', 'register', 'join', 'contact', 'book', 'order'];
-								const wordMatches = actionWords.filter(word => text.includes(word)).length;
-								priority += wordMatches * 2; // Each action word adds priority
-
-								// Reduce priority for likely non-interactive content
-								if (text.length > 100) priority -= 1; // Probably text content, not button
-								if (el.tagName === 'A' && !el.getAttribute('href')) priority -= 2; // Non-functional links
-
-								hotZones.push({
-									element: el,
-									rect: {
-										x: rect.x + rect.width / 2,
-										y: rect.y + rect.height / 2,
-										width: rect.width,
-										height: rect.height,
-										top: rect.top,
-										left: rect.left
-									},
-									priority,
-									selector: selector,
-									text: text.substring(0, 50),
-									tag: el.tagName.toLowerCase(),
-									area: area
-								});
-							}
-						});
-					} catch (e) {
-						// Ignore selector errors
-					}
-				});
-			}
-
-			// Analyze elements by priority (more focused scoring)
-			analyzeElements(highPrioritySelectors, 12);  // High-impact conversion elements
-			analyzeElements(mediumPrioritySelectors, 7);  // Navigation and key areas
-			analyzeElements(lowPrioritySelectors, 4);     // Secondary elements
-
-			// Sort by priority to ensure we get the highest priority zones first
-			hotZones.sort((a, b) => b.priority - a.priority);
-
-			// Remove overlapping zones and apply quality filters
-			const filteredZones = [];
-			hotZones.forEach(zone => {
-				// Only include zones with meaningful priority (lowered threshold for better coverage)
-				if (zone.priority < 6) return;
-
-				const isOverlapping = filteredZones.some(existing => {
-					const dx = Math.abs(zone.rect.x - existing.rect.x);
-					const dy = Math.abs(zone.rect.y - existing.rect.y);
-					// Smart overlap detection - smaller threshold for high-priority elements
-					const overlapThreshold = (zone.priority >= 10 || existing.priority >= 10) ? 30 : 40;
-					return dx < overlapThreshold && dy < overlapThreshold;
-				});
-
-				if (!isOverlapping && filteredZones.length < 20) { // Limit to 20 highest quality hot zones for better heatmap coverage
-					filteredZones.push(zone);
-				}
-			});
-
-			return filteredZones.map(zone => ({
-				x: zone.rect.x,
-				y: zone.rect.y,
-				width: zone.rect.width,
-				height: zone.rect.height,
-				priority: zone.priority,
-				text: zone.text,
-				tag: zone.tag,
-				selector: zone.selector
-			}));
-		});
-	} catch (error) {
-		console.error('Hot zone detection failed:', error);
-		return [];
-	}
+            return filteredZones.map(zone => ({
+                x: zone.rect.x,
+                y: zone.rect.y,
+                width: zone.rect.width,
+                height: zone.rect.height,
+                priority: zone.priority,
+                text: zone.text,
+                tag: zone.tag,
+                selector: zone.tag, // Maintain compatibility
+                href: zone.href,
+                ariaRole: zone.ariaRole,
+                ariaLabel: zone.ariaLabel
+            }));
+        });
+    } catch (error) {
+        console.error('Hot zone detection failed:', error);
+        return [];
+    }
 }
 
 
@@ -2202,16 +2204,8 @@ async function trackHoverDwellEvent(page, target, hoverDuration, persona, log = 
 				};
 				
 				// Track the explicit dwell event
-				window.mixpanel.headless.track('hover_dwell', hoverEvent);
-				
-				// Also track a simplified heatmap event for aggregation
-				window.mixpanel.headless.track('heatmap_hover', {
-					x: targetData.x,
-					y: targetData.y,
-					dwell_time: duration,
-					element_type: targetData.tag,
-					persona: userPersona
-				});
+				//window.mixpanel.headless.track('hover_dwell', hoverEvent);
+			
 			}
 		}, target, hoverDuration, persona);
 		

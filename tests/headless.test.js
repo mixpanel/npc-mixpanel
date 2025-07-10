@@ -541,9 +541,12 @@ describe('Headless.js - Comprehensive Test Suite', () => {
           expect(zone.priority).toBeGreaterThan(0);
         });
         
-        // Should prioritize high-value elements
-        const highPriorityZones = hotZones.filter(zone => zone.priority >= 10);
+        // Should prioritize high-value elements (priority threshold is 4)
+        const highPriorityZones = hotZones.filter(zone => zone.priority >= 4);
         expect(highPriorityZones.length).toBeGreaterThan(0);
+        
+        // Should not exceed 25 zones
+        expect(hotZones.length).toBeLessThanOrEqual(25);
       }
     });
 
