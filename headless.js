@@ -117,7 +117,7 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null) {
 	// Create user-specific logger that automatically includes the usersHandle
 	const log = usersHandle ? (message) => globalLog(message, usersHandle) : globalLog;
-	
+
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
 	const timeoutPromise = new Promise((resolve) =>
@@ -201,14 +201,25 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		const persona = selectPersona(log);
 		log(`🎭 <span style="color: #7856FF;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
 
+		const startTime = Date.now();
+		let durationSec;
+		let result;
 		try {
 			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle);
 			await browser.close();
-			return actions;
+			durationSec = Math.round((Date.now() - startTime) / 1000);
+			log(`⏱️ <span style="color: #7856FF;">User simulation completed in ${durationSec} seconds</span>`);
+			result = actions;
 		}
 		catch (error) {
 			await browser.close();
-			return { error: error.message, timedOut: false };
+			log(`🚨 <span style="color: #CC332B;">User simulation error:</span> ${error.message}`);
+
+			result = { error: error.message, timedOut: false };
+		}
+		finally {
+			log(`${usersHandle} simulation complete.`);
+			return result;
 		}
 	})();
 
@@ -244,9 +255,9 @@ async function retry(operation, maxRetries = 3, delay = 1000) {
 	}
 }
 
- /**
- * @param  {import('puppeteer').Page} page
- */
+/**
+* @param  {import('puppeteer').Page} page
+*/
 export async function spoofAgent(page, log = globalLog) {
 	const agent = u.shuffle(agents).slice().pop();
 	const { userAgent, ...headers } = agent;
@@ -397,10 +408,10 @@ async function jamMixpanelIntoBrowser(page, username, log = globalLog) {
 	return true;
 }
 
- /**
- * Fast CSP check and relaxation - no-op if already relaxed
- * @param  {import('puppeteer').Page} page
- */
+/**
+* Fast CSP check and relaxation - no-op if already relaxed
+* @param  {import('puppeteer').Page} page
+*/
 async function ensureCSPRelaxed(page, log = globalLog) {
 	try {
 		// Quick check if CSP is already relaxed
@@ -456,6 +467,7 @@ async function ensureMixpanelInjected(page, username, log = globalLog) {
 		if (result) {
 			log(`    │  └─ ✅ <span style="color: #07B096;">Mixpanel injected successfully</span>`);
 		}
+		await u.sleep(500);
 		return result;
 	} catch (e) {
 		return false;
@@ -1436,30 +1448,30 @@ async function trackMouseMovement(page, target, log = null) {
 					// Position data
 					x: targetData.x,
 					y: targetData.y,
-					
+
 					// Movement context
 					movement_type: 'natural_movement',
 					target_source: targetData.source || 'unknown',
-					
+
 					// Page context
 					page_url: window.location.href,
 					viewport_width: window.innerWidth,
 					viewport_height: window.innerHeight,
-					
+
 					// Calculate relative position
 					relative_x: targetData.x / window.innerWidth,
 					relative_y: targetData.y / window.innerHeight,
-					
+
 					// Timestamp
 					timestamp: Date.now(),
 					event_time: new Date().toISOString()
 				};
-				
+
 				// Track the movement event for heatmap aggregation
 				// window.mixpanel.headless.track('heatmap_movement', movementEvent);
 			}
 		}, target);
-		
+
 		if (log) {
 			log(`        └─ 📊 <span style="color: #4ECDC4;">Mixpanel event sent:</span> heatmap_movement (${target.x}, ${target.y})`);
 		}
@@ -1744,16 +1756,16 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 		if (hoverHistory.length > 0 && Math.random() < 0.25) { // 25% chance to return to previous element
 			const recentElements = hoverHistory.slice(-5); // Consider last 5 hovered elements
 			const revisitTarget = recentElements[Math.floor(Math.random() * recentElements.length)];
-			
+
 			// Check if the previous element is still valid and visible
 			const isValidForRevisit = await page.evaluate((prevTarget) => {
 				const element = document.querySelector(prevTarget.selector);
 				if (!element) return false;
-				
+
 				const rect = element.getBoundingClientRect();
 				return rect.width > 30 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0;
 			}, revisitTarget);
-			
+
 			if (isValidForRevisit) {
 				target = {
 					...revisitTarget,
@@ -1822,15 +1834,15 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 
 		// Calculate realistic hover duration based on content type and persona
 		const hoverDuration = calculateHoverDuration(target, persona);
-		
+
 		// Enhanced logging for heatmap data generation
 		const durationSeconds = (hoverDuration / 1000).toFixed(1);
-		const dwellCategory = hoverDuration < 2000 ? 'quick' : 
-							 hoverDuration < 5000 ? 'medium' : 
-							 hoverDuration < 10000 ? 'long' : 'very_long';
-		
+		const dwellCategory = hoverDuration < 2000 ? 'quick' :
+			hoverDuration < 5000 ? 'medium' :
+				hoverDuration < 10000 ? 'long' : 'very_long';
+
 		log(`    ├─ 🔥 <span style="color: #FF6B6B;">Dwelling for ${durationSeconds}s</span> (${dwellCategory} dwell) - <span style="color: #4ECDC4;">generating heatmap data</span>`);
-		
+
 		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
 		await simulateReadingMovements(page, target, hoverDuration, persona, log);
 
@@ -1857,14 +1869,14 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 				timestamp: Date.now(),
 				hoverDuration: hoverDuration
 			};
-			
+
 			hoverHistory.push(historyEntry);
-			
+
 			// Keep only the last 10 entries to prevent memory issues
 			if (hoverHistory.length > 10) {
 				hoverHistory.shift();
 			}
-			
+
 			log(`      └─ 📊 <span style="color: #4ECDC4;">Heatmap data captured:</span> dwell event + movement tracking + history (${hoverHistory.length}/10 entries)`);
 		}
 
@@ -1916,255 +1928,255 @@ export async function navigateForward(page, log = globalLog) {
  * Incorporates research-based improvements while maintaining simplicity
  */
 export async function identifyHotZones(page) {
-    try {
-        return await page.evaluate(() => {
-            const hotZones = [];
-            
-            // Performance optimization: cache computed styles
-            const styleCache = new WeakMap();
-            
-            function getCachedStyle(element) {
-                if (!styleCache.has(element)) {
-                    styleCache.set(element, window.getComputedStyle(element));
-                }
-                return styleCache.get(element);
-            }
+	try {
+		return await page.evaluate(() => {
+			const hotZones = [];
 
-            // Enhanced visual prominence scoring based on research
-            function calculateVisualProminence(element, rect) {
-                let score = 0;
-                const style = getCachedStyle(element);
-                
-                // 1. Size and position scoring (F-pattern weighted)
-                const area = rect.width * rect.height;
-                const viewportArea = window.innerWidth * window.innerHeight;
-                const relativeSize = area / viewportArea;
-                
-                // Boost scores for F-pattern positioning (top and left areas)
-                const fPatternBoost = rect.top < window.innerHeight * 0.3 ? 1.5 : 
-                                     rect.left < window.innerWidth * 0.4 ? 1.2 : 1;
-                
-                if (relativeSize > 0.02) score += 3 * fPatternBoost; // Large CTAs
-                else if (relativeSize > 0.01) score += 2 * fPatternBoost; // Medium buttons
-                else if (relativeSize > 0.005) score += 1 * fPatternBoost; // Standard links
-                else if (relativeSize < 0.001) score -= 2; // Too small
-                
-                // 2. Visual hierarchy scoring
-                const zIndex = parseInt(style.zIndex) || 0;
-                if (zIndex > 1000) score += 3; // Modals, popups
-                else if (zIndex > 100) score += 2; // Floating elements
-                else if (zIndex > 10) score += 1; // Elevated elements
-                
-                // Color contrast scoring (simplified)
-                const bgColor = style.backgroundColor;
-                const hasHighContrast = bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && 
-                                       bgColor !== 'transparent';
-                if (hasHighContrast) score += 1;
-                
-                // Marketing-specific visual cues
-                const hasShadow = style.boxShadow && style.boxShadow !== 'none';
-                const hasGradient = style.backgroundImage && style.backgroundImage.includes('gradient');
-                const hasTransform = style.transform && style.transform !== 'none';
-                const hasTransition = style.transition && style.transition !== 'none';
-                
-                if (hasShadow) score += 1.5; // Elevated appearance
-                if (hasGradient) score += 1; // Modern CTA styling
-                if (hasTransform || hasTransition) score += 0.5; // Interactive feel
-                
-                // Button-like appearance scoring
-                const borderRadius = parseInt(style.borderRadius) || 0;
-                const padding = parseInt(style.padding) || 0;
-                if (borderRadius > 4 && padding > 8) score += 2; // Likely a button
-                
-                // 3. Typography prominence
-                const fontSize = parseInt(style.fontSize) || 16;
-                const fontWeight = style.fontWeight;
-                
-                if (fontSize > 20) score += 1.5;
-                else if (fontSize > 16) score += 0.5;
-                else if (fontSize < 12) score -= 1;
-                
-                if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) score += 1;
-                
-                // 4. Interactive state indicators
-                const cursor = style.cursor;
-                if (cursor === 'pointer') score += 2;
-                else if (cursor === 'grab' || cursor === 'move') score += 1;
-                
-                // 5. Content analysis for marketing CTAs
-                const text = element.textContent?.trim().toLowerCase() || '';
-                const actionWords = [
-                    'buy', 'shop', 'get', 'start', 'try', 'demo', 'download', 
-                    'signup', 'sign up', 'register', 'join', 'save', 'claim',
-                    'book', 'schedule', 'contact', 'call', 'learn', 'discover',
-                    'free', 'trial', 'now', 'today', 'limited', 'offer'
-                ];
-                
-                const matchedWords = actionWords.filter(word => text.includes(word));
-                score += matchedWords.length * 2;
-                
-                // Short, punchy text is often a CTA
-                if (text.length > 0 && text.length < 25) score += 1;
-                
-                return Math.round(score * 10) / 10;
-            }
+			// Performance optimization: cache computed styles
+			const styleCache = new WeakMap();
 
-            // Check if element is actually visible and interactive
-            function isElementInteractive(el, rect, style) {
-                // Skip if hidden
-                if (style.display === 'none' || style.visibility === 'hidden' ||
-                    style.opacity === '0' || el.disabled || el.hidden) {
-                    return false;
-                }
-                
-                // Check if behind modal/overlay
-                if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])') ||
-                    document.querySelector('.modal.show, .modal.open, .modal.active')) {
-                    // Element needs high z-index to be interactive when modal is open
-                    const zIndex = parseInt(style.zIndex) || 0;
-                    if (zIndex < 1000) {
-                        const modalRect = document.querySelector('[role="dialog"], .modal')?.getBoundingClientRect();
-                        if (modalRect && rectsOverlap(rect, modalRect)) {
-                            return false;
-                        }
-                    }
-                }
-                
-                return true;
-            }
-            
-            function rectsOverlap(rect1, rect2) {
-                return !(rect1.right < rect2.left || rect1.left > rect2.right ||
-                        rect1.bottom < rect2.top || rect1.top > rect2.bottom);
-            }
+			function getCachedStyle(element) {
+				if (!styleCache.has(element)) {
+					styleCache.set(element, window.getComputedStyle(element));
+				}
+				return styleCache.get(element);
+			}
 
-            // Enhanced selector list incorporating ARIA and modern patterns
-            const interactiveSelectors = [
-                // High-priority marketing elements
-                'button[class*="cta"], button[class*="CTA"], button[class*="btn-primary"]',
-                'a[class*="button"], a[class*="btn"], a[class*="cta"]',
-                '[role="button"][class*="primary"], [role="button"][class*="cta"]',
-                'button[type="submit"], input[type="submit"]',
-                '[data-action*="buy"], [data-action*="purchase"], [data-action*="checkout"]',
-                '[data-action*="signup"], [data-action*="register"], [data-action*="start"]',
-                
-                // ARIA-enhanced interactive elements
-                '[role="button"]:not([aria-hidden="true"])',
-                '[role="link"]:not([aria-hidden="true"])',
-                '[role="menuitem"], [role="tab"], [role="option"]',
-                '[aria-expanded], [aria-haspopup], [aria-controls]',
-                
-                // Standard interactive elements
-                'button:not([aria-hidden="true"]):not(.close):not(.dismiss)',
-                'a[href]:not([href="#"]):not([href=""]):not([aria-hidden="true"])',
-                'input[type="button"], input[type="submit"], input[type="image"]',
-                '[onclick]:not([aria-hidden="true"])',
-                '[tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])',
-                
-                // Marketing-specific patterns
-                '[class*="hero"] button, [class*="hero"] a[class*="btn"]',
-                '[class*="banner"] button, [class*="banner"] a[class*="btn"]',
-                '[class*="pricing"] button, [class*="plan"] button',
-                '[class*="testimonial"] a[class*="btn"], [class*="review"] button',
-                '[class*="countdown"] button, [class*="timer"] button',
-                'form button:not([type="reset"]), form input[type="submit"]'
-            ];
+			// Enhanced visual prominence scoring based on research
+			function calculateVisualProminence(element, rect) {
+				let score = 0;
+				const style = getCachedStyle(element);
 
-            // Analyze elements with batching for performance
-            const allElements = [];
-            interactiveSelectors.forEach(selector => {
-                try {
-                    const elements = document.querySelectorAll(selector);
-                    elements.forEach(el => {
-                        if (!allElements.includes(el)) {
-                            allElements.push(el);
-                        }
-                    });
-                } catch (e) {
-                    // Ignore invalid selectors
-                }
-            });
+				// 1. Size and position scoring (F-pattern weighted)
+				const area = rect.width * rect.height;
+				const viewportArea = window.innerWidth * window.innerHeight;
+				const relativeSize = area / viewportArea;
 
-            // Process elements
-            allElements.forEach(el => {
-                const rect = el.getBoundingClientRect();
-                const style = getCachedStyle(el);
+				// Boost scores for F-pattern positioning (top and left areas)
+				const fPatternBoost = rect.top < window.innerHeight * 0.3 ? 1.5 :
+					rect.left < window.innerWidth * 0.4 ? 1.2 : 1;
 
-                // Must be visible and reasonably sized
-                if (rect.width > 20 && rect.height > 15 &&
-                    rect.top < window.innerHeight && rect.bottom > 0 &&
-                    rect.left < window.innerWidth && rect.right > 0 &&
-                    isElementInteractive(el, rect, style)) {
+				if (relativeSize > 0.02) score += 3 * fPatternBoost; // Large CTAs
+				else if (relativeSize > 0.01) score += 2 * fPatternBoost; // Medium buttons
+				else if (relativeSize > 0.005) score += 1 * fPatternBoost; // Standard links
+				else if (relativeSize < 0.001) score -= 2; // Too small
 
-                    const visualProminence = calculateVisualProminence(el, rect);
-                    
-                    // Marketing pages often have prominent CTAs
-                    const baseThreshold = 4; // Lower threshold for marketing sites
-                    
-                    if (visualProminence >= baseThreshold) {
-                        hotZones.push({
-                            element: el,
-                            rect: {
-                                x: rect.x + rect.width / 2,
-                                y: rect.y + rect.height / 2,
-                                width: rect.width,
-                                height: rect.height,
-                                top: rect.top,
-                                left: rect.left
-                            },
-                            priority: visualProminence,
-                            text: (el.textContent || '').trim().substring(0, 50),
-                            tag: el.tagName.toLowerCase(),
-                            href: el.href || null,
-                            ariaRole: el.getAttribute('role'),
-                            ariaLabel: el.getAttribute('aria-label')
-                        });
-                    }
-                }
-            });
+				// 2. Visual hierarchy scoring
+				const zIndex = parseInt(style.zIndex) || 0;
+				if (zIndex > 1000) score += 3; // Modals, popups
+				else if (zIndex > 100) score += 2; // Floating elements
+				else if (zIndex > 10) score += 1; // Elevated elements
 
-            // Sort by priority and remove overlaps
-            hotZones.sort((a, b) => b.priority - a.priority);
+				// Color contrast scoring (simplified)
+				const bgColor = style.backgroundColor;
+				const hasHighContrast = bgColor && bgColor !== 'rgba(0, 0, 0, 0)' &&
+					bgColor !== 'transparent';
+				if (hasHighContrast) score += 1;
 
-            // Smart overlap removal - keep highest priority elements
-            const filteredZones = [];
-            const overlapThreshold = 40; // pixels
-            
-            hotZones.forEach(zone => {
-                const hasOverlap = filteredZones.some(existing => {
-                    const dx = Math.abs(zone.rect.x - existing.rect.x);
-                    const dy = Math.abs(zone.rect.y - existing.rect.y);
-                    
-                    // For marketing sites, be more aggressive about keeping multiple CTAs
-                    const isLikelyCTA = zone.priority > 10;
-                    const threshold = isLikelyCTA ? overlapThreshold * 0.6 : overlapThreshold;
-                    
-                    return dx < threshold && dy < threshold;
-                });
+				// Marketing-specific visual cues
+				const hasShadow = style.boxShadow && style.boxShadow !== 'none';
+				const hasGradient = style.backgroundImage && style.backgroundImage.includes('gradient');
+				const hasTransform = style.transform && style.transform !== 'none';
+				const hasTransition = style.transition && style.transition !== 'none';
 
-                if (!hasOverlap && filteredZones.length < 25) { // Allow more hot zones
-                    filteredZones.push(zone);
-                }
-            });
+				if (hasShadow) score += 1.5; // Elevated appearance
+				if (hasGradient) score += 1; // Modern CTA styling
+				if (hasTransform || hasTransition) score += 0.5; // Interactive feel
 
-            return filteredZones.map(zone => ({
-                x: zone.rect.x,
-                y: zone.rect.y,
-                width: zone.rect.width,
-                height: zone.rect.height,
-                priority: zone.priority,
-                text: zone.text,
-                tag: zone.tag,
-                selector: zone.tag, // Maintain compatibility
-                href: zone.href,
-                ariaRole: zone.ariaRole,
-                ariaLabel: zone.ariaLabel
-            }));
-        });
-    } catch (error) {
-        console.error('Hot zone detection failed:', error);
-        return [];
-    }
+				// Button-like appearance scoring
+				const borderRadius = parseInt(style.borderRadius) || 0;
+				const padding = parseInt(style.padding) || 0;
+				if (borderRadius > 4 && padding > 8) score += 2; // Likely a button
+
+				// 3. Typography prominence
+				const fontSize = parseInt(style.fontSize) || 16;
+				const fontWeight = style.fontWeight;
+
+				if (fontSize > 20) score += 1.5;
+				else if (fontSize > 16) score += 0.5;
+				else if (fontSize < 12) score -= 1;
+
+				if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) score += 1;
+
+				// 4. Interactive state indicators
+				const cursor = style.cursor;
+				if (cursor === 'pointer') score += 2;
+				else if (cursor === 'grab' || cursor === 'move') score += 1;
+
+				// 5. Content analysis for marketing CTAs
+				const text = element.textContent?.trim().toLowerCase() || '';
+				const actionWords = [
+					'buy', 'shop', 'get', 'start', 'try', 'demo', 'download',
+					'signup', 'sign up', 'register', 'join', 'save', 'claim',
+					'book', 'schedule', 'contact', 'call', 'learn', 'discover',
+					'free', 'trial', 'now', 'today', 'limited', 'offer'
+				];
+
+				const matchedWords = actionWords.filter(word => text.includes(word));
+				score += matchedWords.length * 2;
+
+				// Short, punchy text is often a CTA
+				if (text.length > 0 && text.length < 25) score += 1;
+
+				return Math.round(score * 10) / 10;
+			}
+
+			// Check if element is actually visible and interactive
+			function isElementInteractive(el, rect, style) {
+				// Skip if hidden
+				if (style.display === 'none' || style.visibility === 'hidden' ||
+					style.opacity === '0' || el.disabled || el.hidden) {
+					return false;
+				}
+
+				// Check if behind modal/overlay
+				if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])') ||
+					document.querySelector('.modal.show, .modal.open, .modal.active')) {
+					// Element needs high z-index to be interactive when modal is open
+					const zIndex = parseInt(style.zIndex) || 0;
+					if (zIndex < 1000) {
+						const modalRect = document.querySelector('[role="dialog"], .modal')?.getBoundingClientRect();
+						if (modalRect && rectsOverlap(rect, modalRect)) {
+							return false;
+						}
+					}
+				}
+
+				return true;
+			}
+
+			function rectsOverlap(rect1, rect2) {
+				return !(rect1.right < rect2.left || rect1.left > rect2.right ||
+					rect1.bottom < rect2.top || rect1.top > rect2.bottom);
+			}
+
+			// Enhanced selector list incorporating ARIA and modern patterns
+			const interactiveSelectors = [
+				// High-priority marketing elements
+				'button[class*="cta"], button[class*="CTA"], button[class*="btn-primary"]',
+				'a[class*="button"], a[class*="btn"], a[class*="cta"]',
+				'[role="button"][class*="primary"], [role="button"][class*="cta"]',
+				'button[type="submit"], input[type="submit"]',
+				'[data-action*="buy"], [data-action*="purchase"], [data-action*="checkout"]',
+				'[data-action*="signup"], [data-action*="register"], [data-action*="start"]',
+
+				// ARIA-enhanced interactive elements
+				'[role="button"]:not([aria-hidden="true"])',
+				'[role="link"]:not([aria-hidden="true"])',
+				'[role="menuitem"], [role="tab"], [role="option"]',
+				'[aria-expanded], [aria-haspopup], [aria-controls]',
+
+				// Standard interactive elements
+				'button:not([aria-hidden="true"]):not(.close):not(.dismiss)',
+				'a[href]:not([href="#"]):not([href=""]):not([aria-hidden="true"])',
+				'input[type="button"], input[type="submit"], input[type="image"]',
+				'[onclick]:not([aria-hidden="true"])',
+				'[tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])',
+
+				// Marketing-specific patterns
+				'[class*="hero"] button, [class*="hero"] a[class*="btn"]',
+				'[class*="banner"] button, [class*="banner"] a[class*="btn"]',
+				'[class*="pricing"] button, [class*="plan"] button',
+				'[class*="testimonial"] a[class*="btn"], [class*="review"] button',
+				'[class*="countdown"] button, [class*="timer"] button',
+				'form button:not([type="reset"]), form input[type="submit"]'
+			];
+
+			// Analyze elements with batching for performance
+			const allElements = [];
+			interactiveSelectors.forEach(selector => {
+				try {
+					const elements = document.querySelectorAll(selector);
+					elements.forEach(el => {
+						if (!allElements.includes(el)) {
+							allElements.push(el);
+						}
+					});
+				} catch (e) {
+					// Ignore invalid selectors
+				}
+			});
+
+			// Process elements
+			allElements.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				const style = getCachedStyle(el);
+
+				// Must be visible and reasonably sized
+				if (rect.width > 20 && rect.height > 15 &&
+					rect.top < window.innerHeight && rect.bottom > 0 &&
+					rect.left < window.innerWidth && rect.right > 0 &&
+					isElementInteractive(el, rect, style)) {
+
+					const visualProminence = calculateVisualProminence(el, rect);
+
+					// Marketing pages often have prominent CTAs
+					const baseThreshold = 4; // Lower threshold for marketing sites
+
+					if (visualProminence >= baseThreshold) {
+						hotZones.push({
+							element: el,
+							rect: {
+								x: rect.x + rect.width / 2,
+								y: rect.y + rect.height / 2,
+								width: rect.width,
+								height: rect.height,
+								top: rect.top,
+								left: rect.left
+							},
+							priority: visualProminence,
+							text: (el.textContent || '').trim().substring(0, 50),
+							tag: el.tagName.toLowerCase(),
+							href: el.href || null,
+							ariaRole: el.getAttribute('role'),
+							ariaLabel: el.getAttribute('aria-label')
+						});
+					}
+				}
+			});
+
+			// Sort by priority and remove overlaps
+			hotZones.sort((a, b) => b.priority - a.priority);
+
+			// Smart overlap removal - keep highest priority elements
+			const filteredZones = [];
+			const overlapThreshold = 40; // pixels
+
+			hotZones.forEach(zone => {
+				const hasOverlap = filteredZones.some(existing => {
+					const dx = Math.abs(zone.rect.x - existing.rect.x);
+					const dy = Math.abs(zone.rect.y - existing.rect.y);
+
+					// For marketing sites, be more aggressive about keeping multiple CTAs
+					const isLikelyCTA = zone.priority > 10;
+					const threshold = isLikelyCTA ? overlapThreshold * 0.6 : overlapThreshold;
+
+					return dx < threshold && dy < threshold;
+				});
+
+				if (!hasOverlap && filteredZones.length < 25) { // Allow more hot zones
+					filteredZones.push(zone);
+				}
+			});
+
+			return filteredZones.map(zone => ({
+				x: zone.rect.x,
+				y: zone.rect.y,
+				width: zone.rect.width,
+				height: zone.rect.height,
+				priority: zone.priority,
+				text: zone.text,
+				tag: zone.tag,
+				selector: zone.tag, // Maintain compatibility
+				href: zone.href,
+				ariaRole: zone.ariaRole,
+				ariaLabel: zone.ariaLabel
+			}));
+		});
+	} catch (error) {
+		console.error('Hot zone detection failed:', error);
+		return [];
+	}
 }
 
 
@@ -2181,7 +2193,7 @@ async function trackHoverDwellEvent(page, target, hoverDuration, persona, log = 
 					// Dwell time measurements
 					dwell_time_ms: duration,
 					dwell_time_seconds: Math.round(duration / 1000 * 10) / 10,
-					
+
 					// Element information
 					element_type: targetData.tag,
 					element_text: targetData.text,
@@ -2190,40 +2202,40 @@ async function trackHoverDwellEvent(page, target, hoverDuration, persona, log = 
 					element_width: targetData.width,
 					element_height: targetData.height,
 					element_area: targetData.width * targetData.height,
-					
+
 					// User behavior context
 					user_persona: userPersona,
 					interaction_type: 'hover_dwell',
-					
+
 					// Page context
 					page_url: window.location.href,
 					viewport_width: window.innerWidth,
 					viewport_height: window.innerHeight,
-					
+
 					// Calculate relative position on page
 					relative_x: targetData.x / window.innerWidth,
 					relative_y: targetData.y / window.innerHeight,
-					
+
 					// Element prominence indicators
 					element_priority: targetData.priority || 0,
 					is_hot_zone: targetData.priority !== undefined,
-					
+
 					// Categorize dwell time
-					dwell_category: duration < 2000 ? 'quick' : 
-									duration < 5000 ? 'medium' : 
-									duration < 10000 ? 'long' : 'very_long',
-					
+					dwell_category: duration < 2000 ? 'quick' :
+						duration < 5000 ? 'medium' :
+							duration < 10000 ? 'long' : 'very_long',
+
 					// Timestamp
 					timestamp: Date.now(),
 					event_time: new Date().toISOString()
 				};
-				
+
 				// Track the explicit dwell event
 				//window.mixpanel.headless.track('hover_dwell', hoverEvent);
-			
+
 			}
 		}, target, hoverDuration, persona);
-		
+
 		if (log) {
 			log(`        └─ 📊 <span style="color: #4ECDC4;">Mixpanel events sent:</span> hover_dwell, heatmap_hover (${hoverDuration}ms dwell)`);
 		}
@@ -2246,13 +2258,13 @@ async function simulateReadingMovements(page, target, hoverDuration, persona, lo
 		discoverer: { intensity: 0.7, movements: 3, tremor: 0.4 },
 		comparison: { intensity: 0.6, movements: 3, tremor: 0.3 },
 		reader: { intensity: 0.8, movements: 4, tremor: 0.2 },
-		
+
 		// Medium-engagement personas
 		shopper: { intensity: 0.5, movements: 2, tremor: 0.3 },
 		explorer: { intensity: 0.6, movements: 3, tremor: 0.4 },
 		methodical: { intensity: 0.7, movements: 3, tremor: 0.2 },
 		rolePlayer: { intensity: 0.6, movements: 3, tremor: 0.3 },
-		
+
 		// Low-engagement personas - fewer micro-movements
 		powerUser: { intensity: 0.3, movements: 1, tremor: 0.2 },
 		taskFocused: { intensity: 0.2, movements: 1, tremor: 0.1 },
@@ -2262,28 +2274,28 @@ async function simulateReadingMovements(page, target, hoverDuration, persona, lo
 		skimmer: { intensity: 0.4, movements: 2, tremor: 0.3 },
 		minMaxer: { intensity: 0.5, movements: 2, tremor: 0.2 }
 	};
-	
+
 	const behavior = readingBehaviors[persona] || { intensity: 0.5, movements: 2, tremor: 0.3 };
-	
+
 	// Only simulate reading movements if persona is engaged enough
 	if (Math.random() > behavior.intensity) {
 		log(`      ├─ 📖 <span style="color: #95A5A6;">Skipping reading movements</span> (${persona} intensity: ${behavior.intensity})`);
 		return;
 	}
-	
+
 	const numMovements = behavior.movements + u.rand(-1, 1);
 	const movementInterval = hoverDuration / Math.max(1, numMovements);
-	
+
 	log(`      ├─ 📖 <span style="color: #E74C3C;">Generating reading-pattern micro-movements</span> (${persona}: ${numMovements} movements, ${behavior.intensity} intensity)`);
-	
+
 	for (let i = 0; i < numMovements; i++) {
 		await u.sleep(movementInterval * (0.8 + Math.random() * 0.4)); // Vary timing
-		
+
 		// Simulate different types of reading movements
 		const movementType = Math.random();
 		let deltaX = 0, deltaY = 0;
 		let movementTypeName = '';
-		
+
 		if (movementType < 0.4) {
 			// Horizontal scanning (left-to-right reading)
 			deltaX = u.rand(10, 40) * (Math.random() < 0.8 ? 1 : -1); // Mostly left-to-right
@@ -2300,24 +2312,24 @@ async function simulateReadingMovements(page, target, hoverDuration, persona, lo
 			deltaY = u.rand(-15, 15);
 			movementTypeName = 'tremor';
 		}
-		
+
 		// Add tremor based on persona
 		if (Math.random() < behavior.tremor) {
 			deltaX += u.rand(-3, 3);
 			deltaY += u.rand(-3, 3);
 		}
-		
+
 		// Move mouse with constraints to stay near target
 		const newX = Math.max(50, Math.min(page.viewport().width - 50, target.x + deltaX));
 		const newY = Math.max(50, Math.min(page.viewport().height - 50, target.y + deltaY));
-		
+
 		// Log only the first movement to avoid spam
 		if (i === 0) {
 			log(`        ├─ 👁️ <span style="color: #3498DB;">Reading movement ${i + 1}/${numMovements}</span> (${movementTypeName}: Δx=${deltaX}, Δy=${deltaY})`);
 		}
-		
+
 		await page.mouse.move(newX, newY);
-		
+
 		// Brief pause to simulate fixation
 		await u.sleep(u.rand(100, 300));
 	}
@@ -2333,24 +2345,24 @@ function calculateHoverDuration(target, persona) {
 		text: { min: 3000, max: 8000 },
 		paragraph: { min: 4000, max: 12000 },
 		article: { min: 5000, max: 15000 },
-		
+
 		// Interactive elements - moderate hover times
 		button: { min: 2000, max: 6000 },
 		link: { min: 1500, max: 5000 },
 		form: { min: 3000, max: 7000 },
-		
+
 		// Media content - variable hover times
 		image: { min: 2000, max: 8000 },
 		video: { min: 3000, max: 10000 },
-		
+
 		// Navigation - shorter hover times
 		nav: { min: 1000, max: 3000 },
 		menu: { min: 1500, max: 4000 },
-		
+
 		// Default for unknown content
 		default: { min: 2000, max: 6000 }
 	};
-	
+
 	// Determine content type based on target properties
 	let contentType = 'default';
 	if (target.text && target.text.length > 100) contentType = 'paragraph';
@@ -2361,10 +2373,10 @@ function calculateHoverDuration(target, persona) {
 	else if (target.tag === 'video') contentType = 'video';
 	else if (target.tag === 'form' || target.tag === 'input' || target.tag === 'textarea') contentType = 'form';
 	else if (target.tag === 'nav' || target.text?.toLowerCase().includes('nav')) contentType = 'nav';
-	
+
 	// Get base duration range
 	const baseDuration = contentTypeDurations[contentType];
-	
+
 	// Persona-based modifiers
 	const personaModifiers = {
 		// High engagement personas - longer hover times
@@ -2373,37 +2385,37 @@ function calculateHoverDuration(target, persona) {
 		discoverer: 1.3,
 		comparison: 1.2,
 		rolePlayer: 1.2,
-		
+
 		// Medium engagement personas
 		shopper: 1.1,
 		explorer: 1.0,
 		methodical: 1.1,
 		reader: 1.3,
-		
+
 		// Low engagement personas - shorter hover times
 		powerUser: 0.7,
 		taskFocused: 0.6,
 		decisive: 0.5,
 		mobileHabits: 0.4,
 		murderHobo: 0.3,
-		
+
 		// Variable engagement
 		skimmer: 0.8,
 		minMaxer: 0.9
 	};
-	
+
 	// Apply persona modifier
 	const modifier = personaModifiers[persona] || 1.0;
 	const adjustedMin = Math.round(baseDuration.min * modifier);
 	const adjustedMax = Math.round(baseDuration.max * modifier);
-	
+
 	// Add some randomness for naturalism
 	const baseHoverTime = u.rand(adjustedMin, adjustedMax);
-	
+
 	// Add micro-variations (±10%) for more realistic timing
 	const variation = baseHoverTime * 0.1;
 	const finalDuration = baseHoverTime + u.rand(-variation, variation);
-	
+
 	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
 }
 
@@ -2426,7 +2438,7 @@ export async function moveMouse(page, startX, startY, endX, endY, log = globalLo
 	try {
 		// More natural number of steps based on distance - faster movement
 		const distance = Math.hypot(endX - startX, endY - startY);
-		const baseSteps = Math.floor(distance / 50); 
+		const baseSteps = Math.floor(distance / 50);
 		const steps = Math.max(3, Math.min(25, baseSteps + u.rand(-1, 1))); // Fewer steps overall
 
 		// Less frequent pause before movement
@@ -2436,7 +2448,7 @@ export async function moveMouse(page, startX, startY, endX, endY, log = globalLo
 
 		for (const pathPoint of humanizedPath) {
 			const [x, y, microPause] = pathPoint.length === 3 ? pathPoint : [pathPoint[0], pathPoint[1], false];
-			
+
 			await page.mouse.move(x, y);
 
 			// Handle micro-pauses for more natural movement
@@ -2496,28 +2508,28 @@ export function generateHumanizedPath(startX, startY, endX, endY, steps) {
 		// Progressive jitter - more at start, less near target
 		const progressRatio = i / steps;
 		const baseJitter = progressRatio < 0.8 ? u.rand(-3, 3) : u.rand(-1, 1);
-		
+
 		// Add natural hand tremor using sinusoidal oscillation
 		const tremorX = Math.sin(t * tremorFrequency * Math.PI * 8) * tremorAmplitude * fatigueFactor;
 		const tremorY = Math.cos(t * tremorFrequency * Math.PI * 6) * tremorAmplitude * fatigueFactor;
-		
+
 		// Add micro-corrections (small directional adjustments)
 		let microCorrectionX = 0, microCorrectionY = 0;
 		if (i > 0 && Math.random() < 0.15) { // 15% chance of micro-correction
 			microCorrectionX = u.rand(-2, 2);
 			microCorrectionY = u.rand(-2, 2);
 		}
-		
+
 		// Add occasional micro-pauses (simulate slight hesitation)
 		let microPause = false;
 		if (i > 0 && Math.random() < 0.05) { // 5% chance of micro-pause
 			microPause = true;
 		}
-		
+
 		// Combine all movement components
 		const finalX = x + baseJitter + tremorX + microCorrectionX;
 		const finalY = y + baseJitter + tremorY + microCorrectionY;
-		
+
 		path.push([finalX, finalY, microPause]);
 	}
 	return path;

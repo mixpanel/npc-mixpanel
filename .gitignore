@@ -13,3 +13,4 @@ env.yaml
 .claude
 .prettierrc
 CLAUDE.md
+vscode-profile-*

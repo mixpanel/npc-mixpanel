@@ -256,26 +256,30 @@ function navigateTab(direction) {
 }
 
 function addTerminalLineToTab(meepleId, message) {
-	if (!meepleId || !meepleTabsData[meepleId]) {
-		// If no meeple ID or tab doesn't exist, create one or use general tab
-		if (!meepleId) {
-			meepleId = 'general';
-		}
-		if (!meepleTabsData[meepleId]) {
-			createMeepleTab(meepleId);
-		}
+	// If no meeple ID, use general tab
+	if (!meepleId) {
+		meepleId = 'general';
 	}
 	
+	// Only create tab if it's the general tab or if meeple tab doesn't exist yet
+	// This prevents accidental recreation of existing tabs
+	if (!meepleTabsData[meepleId]) {
+		// Only create new tab - never recreate existing ones
+		createMeepleTab(meepleId);
+	}
+	
+	// Always append to existing tab if it exists
 	const tab = meepleTabsData[meepleId];
-	if (tab) {
+	if (tab && tab.content) {
 		addTerminalLine(tab.content, message, meepleId);
 		
 		// Check if this message indicates meeple completion/failure
-		if (message.includes('completed!') || message.includes('failed:') || message.includes('timed out') || message.includes('completed with issues')) {
-			// Close the tab after a brief delay to let users see the final message
+		// ONLY close on the final "simulation complete." message, not intermediate "completed" messages
+		if (message.includes('simulation complete.')) {
+			// Close the tab after a longer delay to let users see the final message
 			setTimeout(() => {
 				closeMeepleTab(meepleId);
-			}, 3000); // 3 second delay
+			}, 20000); // 20 second delay
 		}
 	}
 }
