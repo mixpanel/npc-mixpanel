@@ -911,7 +911,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 				// Page load click burst - 13% chance for 2-3 immediate exploratory clicks
 				if (Math.random() < 0.13) {
 					const burstClicks = Math.floor(Math.random() * 2) + 2; // 2-3 clicks
-					log(`  ├─ 🎯 <span style="color: #F8BC3B;">Click burst of (${burstClicks} clicks)...</span>`);
+					log(`  ├─ 🎯 <span style="color: #F8BC3B;">Click burst of (${burstClicks} exploratory click sessions)...</span>`);
 					for (let i = 0; i < burstClicks; i++) {
 						await exploratoryClick(page, log);
 						await u.sleep(u.rand(300, 800));
@@ -1959,7 +1959,7 @@ export async function navigateForward(page, log = console.log) {
  */
 export async function identifyHotZones(page) {
 	try {
-		return await page.evaluate((interactiveSelectors) => {
+		return await page.evaluate((interactiveSelectors, actionWords) => {
 			const hotZones = [];
 
 			// Performance optimization: cache computed styles
@@ -2164,7 +2164,7 @@ export async function identifyHotZones(page) {
 				ariaRole: zone.ariaRole,
 				ariaLabel: zone.ariaLabel
 			}));
-		}, interactiveSelectors);
+		}, interactiveSelectors, actionWords);
 	} catch (error) {
 		console.error('Hot zone detection failed:', error);
 		return [];
