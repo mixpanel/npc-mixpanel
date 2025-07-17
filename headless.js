@@ -17,6 +17,58 @@ const agents = await u.load('./agents.json', true);
 import { log as globalLog } from './logger.js';
 import injectMixpanel from './utils/injectMixpanel.js';
 
+
+
+const personas = {
+	// Power users - confident, fast, goal-oriented
+	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1 },
+	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1 },
+
+	// Shopping/conversion oriented
+	shopper: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.5, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1 },
+	comparison: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1 },
+
+	// Content consumption
+	reader: { scroll: 0.6, mouse: 0.2, click: 0.75, exploratoryClick: 0.2, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1 },
+	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.7, exploratoryClick: 0.2, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1 },
+
+	// Exploration patterns
+	explorer: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.7, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1 },
+	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.85, exploratoryClick: 0.8, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1 },
+
+	// Mobile-like behavior (even on desktop)
+	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.75, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1 },
+
+	// Efficient users
+	decisive: { scroll: 0.2, mouse: 0.1, click: 0.95, exploratoryClick: 0.2, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1 },
+
+	// Deep engagement patterns
+	researcher: { scroll: 0.7, mouse: 0.4, click: 0.65, exploratoryClick: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1 },
+	methodical: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1 },
+
+	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.9, exploratoryClick: 0.6, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1 }, // Optimize every action
+	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.75, exploratoryClick: 0.3, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1 }, // Immersive experience
+	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, exploratoryClick: 0.9, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1 }, // Click all the things!
+	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1 }, // Read everything twice
+
+};
+
+
+const CLICK_FUZZINESS = {
+	HOT_ZONE: 0.5,        // ±50% (increased from ±30%)
+	REGULAR_ELEMENT: 0.4,  // ±40% (increased from ±20%)
+	FORM_FIELD: 0.35,     // ±35% (increased from ±20%)
+	EXPLORATORY: 0.6      // ±60% for random exploratory clicks
+};
+
+// Utility function to ensure clicks stay within viewport bounds
+function boundClickPosition(x, y, viewport) {
+	return {
+		x: Math.max(0, Math.min(viewport.width, x)),
+		y: Math.max(0, Math.min(viewport.height, y))
+	};
+}
+
 /**
  * @typedef PARAMS
  * @property {string} url URL to simulate
@@ -197,6 +249,17 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			throw new Error(`Navigation failed to ${url}: ${navError.message}`);
 		}
 		log(`  └─ <span style="color: #07B096;">Page loaded successfully</span>`);
+		
+		// Page load click burst - 70% chance for 2-3 immediate exploratory clicks
+		if (Math.random() < 0.7) {
+			const burstClicks = Math.floor(Math.random() * 2) + 2; // 2-3 clicks
+			log(`  ├─ 🎯 <span style="color: #F8BC3B;">Page load click burst (${burstClicks} clicks)...</span>`);
+			for (let i = 0; i < burstClicks; i++) {
+				await exploratoryClick(page, log);
+				await u.sleep(u.rand(300, 800));
+			}
+		}
+		
 		await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
 		const persona = selectPersona(log);
 		log(`🎭 <span style="color: #7856FF;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
@@ -813,6 +876,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	// Action emoji mapping
 	const actionEmojis = {
 		click: '👆',
+		exploratoryClick: '🔍',
 		scroll: '📜',
 		mouse: '🖱️',
 		wait: '⏸️',
@@ -835,6 +899,9 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		switch (action) {
 			case "click":
 				funcToPerform = () => clickStuff(page, hotZones, log);
+				break;
+			case "exploratoryClick":
+				funcToPerform = () => exploratoryClick(page, log);
 				break;
 			case "scroll":
 				funcToPerform = () => intelligentScroll(page, hotZones, log);
@@ -942,40 +1009,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 	};
 }
 
-// Realistic user personas optimized for comprehensive engagement
-const personas = {
-	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.8, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1 },
 
-	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.7, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1 },
-
-	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.4, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.3, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1 },
-
-	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.6, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.7, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1 },
-
-	// Mobile-like behavior (even on desktop)
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.6, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1 },
-
-	// Efficient users
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.9, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1 },
-
-	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.6, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1 },
-
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.8, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1 }, // Optimize every action
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.4, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1 }, // Immersive experience
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1 }, // Click all the things!
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.5, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1 }, // Read everything twice
-
-};
 
 /**
  * Selects a random persona.
@@ -1016,7 +1050,7 @@ export function getContextAwareAction(actionHistory, suggestedAction, log = glob
 	}
 
 	// After hovering, users often click what they were examining
-	if (lastAction === 'hover' && Math.random() < 0.4) {
+	if (lastAction === 'hover' && Math.random() < 0.6) {
 		return 'click';
 	}
 
@@ -1086,7 +1120,9 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
 
 		if (action === 'click') {
 			consecutiveClicks++;
-			if (consecutiveClicks > 3) {
+			// Higher limits for click-heavy personas
+			const clickLimit = (persona.click >= 0.9) ? 12 : 7;
+			if (consecutiveClicks > clickLimit) {
 				// After clicking, users often scroll to see results or wait
 				action = Math.random() < 0.7 ? 'scroll' : 'wait';
 				consecutiveClicks = 0;
@@ -1121,7 +1157,7 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
 
 	// Ensure we have enough clicks for longer sessions (users come to sites to interact)
 	const clickCount = sequence.filter(a => a === 'click').length;
-	const minClicks = Math.max(5, Math.floor(length * 0.15)); // At least 15% clicks
+	const minClicks = Math.max(20, Math.floor(length * 0.40)); // At least 40% clicks
 	if (clickCount < minClicks) {
 		// Replace some non-click actions with clicks
 		const indicesToReplace = Math.min(minClicks - clickCount, sequence.length);
@@ -1156,8 +1192,8 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 			const selectedZone = weightedHotZones[Math.floor(Math.random() * weightedHotZones.length)];
 
 			// More natural click positioning within the hot zone
-			const targetX = selectedZone.x + u.rand(-selectedZone.width * 0.3, selectedZone.width * 0.3);
-			const targetY = selectedZone.y + u.rand(-selectedZone.height * 0.3, selectedZone.height * 0.3);
+			const targetX = selectedZone.x + u.rand(-selectedZone.width * CLICK_FUZZINESS.HOT_ZONE, selectedZone.width * CLICK_FUZZINESS.HOT_ZONE);
+			const targetY = selectedZone.y + u.rand(-selectedZone.height * CLICK_FUZZINESS.HOT_ZONE, selectedZone.height * CLICK_FUZZINESS.HOT_ZONE);
 
 			// Slower, more realistic mouse movement to target
 			await moveMouse(page,
@@ -1303,8 +1339,8 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 		const rect = selectedInfo.rect;
 
 		// More natural click positioning within the element
-		const targetX = rect.x + (rect.width * 0.5) + u.rand(-rect.width * 0.2, rect.width * 0.2);
-		const targetY = rect.y + (rect.height * 0.5) + u.rand(-rect.height * 0.2, rect.height * 0.2);
+		const targetX = rect.x + (rect.width * 0.5) + u.rand(-rect.width * CLICK_FUZZINESS.REGULAR_ELEMENT, rect.width * CLICK_FUZZINESS.REGULAR_ELEMENT);
+		const targetY = rect.y + (rect.height * 0.5) + u.rand(-rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT, rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT);
 
 		// Natural mouse movement to target
 		await moveMouse(page,
@@ -1327,11 +1363,95 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 
 		log(`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
 
+		// Click multiplier logic - 25% chance to perform additional rapid clicks
+		if (Math.random() < 0.25) {
+			const additionalClicks = Math.floor(Math.random() * 2) + 1; // 1-2 additional clicks
+			
+			for (let i = 0; i < additionalClicks; i++) {
+				// Brief pause between rapid clicks
+				await u.sleep(u.rand(100, 300));
+				
+				// Nearby click with smaller fuzziness (frustrated clicking behavior)
+				const nearbyX = rect.x + (rect.width * 0.5) + u.rand(-rect.width * 0.15, rect.width * 0.15);
+				const nearbyY = rect.y + (rect.height * 0.5) + u.rand(-rect.height * 0.15, rect.height * 0.15);
+				
+				// Ensure click stays within viewport bounds
+				const bounded = boundClickPosition(nearbyX, nearbyY, page.viewport());
+				await page.mouse.click(bounded.x, bounded.y);
+				log(`    ├─ 👆 <span style="color: #DA6B16;">Rapid click ${i + 1}/${additionalClicks}</span> near target (frustrated/double-tap behavior)`);
+			}
+		}
+
 		// Pause after click to see results (more realistic)
 		await u.sleep(u.rand(300, 1000));
 
 		return true;
 	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Performs exploratory clicks on random content areas to generate diverse heatmap data
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} - Success status
+ */
+async function exploratoryClick(page, log = globalLog) {
+	try {
+		log(`    ├─ 🔍 <span style="color: #F8BC3B;">Exploratory clicking...</span>`);
+		
+		// Get page dimensions
+		const viewport = page.viewport();
+		
+		// Define content areas to click (avoiding edges and potential UI elements)
+		const contentAreas = [
+			{ x: viewport.width * 0.2, y: viewport.height * 0.3, width: viewport.width * 0.6, height: viewport.height * 0.4 },
+			{ x: viewport.width * 0.1, y: viewport.height * 0.2, width: viewport.width * 0.8, height: viewport.height * 0.6 },
+			{ x: viewport.width * 0.3, y: viewport.height * 0.1, width: viewport.width * 0.4, height: viewport.height * 0.8 }
+		];
+		
+		// Select random content area
+		const area = contentAreas[Math.floor(Math.random() * contentAreas.length)];
+		
+		// Generate 2-4 random clicks in the area
+		const numClicks = Math.floor(Math.random() * 3) + 2; // 2-4 clicks
+		
+		for (let i = 0; i < numClicks; i++) {
+			// Calculate random position within the area with high fuzziness
+			const targetX = area.x + u.rand(-area.width * CLICK_FUZZINESS.EXPLORATORY, area.width * CLICK_FUZZINESS.EXPLORATORY);
+			const targetY = area.y + u.rand(-area.height * CLICK_FUZZINESS.EXPLORATORY, area.height * CLICK_FUZZINESS.EXPLORATORY);
+			
+			// Ensure clicks stay within viewport bounds
+			const boundedX = Math.max(0, Math.min(viewport.width, targetX));
+			const boundedY = Math.max(0, Math.min(viewport.height, targetY));
+			
+			// Natural mouse movement to target
+			await moveMouse(page,
+				u.rand(0, viewport.width),
+				u.rand(0, viewport.height),
+				boundedX,
+				boundedY,
+				log
+			);
+			
+			// Click delay
+			await u.sleep(u.rand(50, 150));
+			
+			// Perform click
+			await page.mouse.click(boundedX, boundedY);
+			
+			log(`    ├─ 🔍 <span style="color: #F8BC3B;">Exploratory click ${i + 1}/${numClicks}</span> at (${Math.round(boundedX)}, ${Math.round(boundedY)})`);
+			
+			// Brief pause between clicks
+			await u.sleep(u.rand(200, 500));
+		}
+		
+		log(`    └─ 🔍 <span style="color: #F8BC3B;">Completed ${numClicks} exploratory clicks</span>`);
+		return true;
+		
+	} catch (error) {
+		log(`    └─ 🚨 <span style="color: #CC332B;">Exploratory click error:</span> ${error.message}`);
 		return false;
 	}
 }
@@ -1647,8 +1767,8 @@ export async function interactWithForms(page, log = globalLog) {
 		}
 
 		// Click into the field
-		const targetX = target.rect.x + (target.rect.width * 0.5) + u.rand(-target.rect.width * 0.2, target.rect.width * 0.2);
-		const targetY = target.rect.y + (target.rect.height * 0.5) + u.rand(-target.rect.height * 0.2, target.rect.height * 0.2);
+		const targetX = target.rect.x + (target.rect.width * 0.5) + u.rand(-target.rect.width * CLICK_FUZZINESS.FORM_FIELD, target.rect.width * CLICK_FUZZINESS.FORM_FIELD);
+		const targetY = target.rect.y + (target.rect.height * 0.5) + u.rand(-target.rect.height * CLICK_FUZZINESS.FORM_FIELD, target.rect.height * CLICK_FUZZINESS.FORM_FIELD);
 
 		await page.mouse.click(targetX, targetY);
 		await u.sleep(u.rand(100, 300));
