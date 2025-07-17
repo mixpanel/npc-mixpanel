@@ -14,44 +14,23 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./agents.json', true);
-import { log as globalLog } from './logger.js';
+// Logger is now injected via dependency injection
 import injectMixpanel from './utils/injectMixpanel.js';
+import {
+	personas,
+	puppeteerArgs,
+	relaxedCSP,
+	primaryButtonSelectors,
+	regularButtonSelectors,
+	navigationSelectors,
+	contentSelectors,
+	formTestData,
+	actionWords,
+	interactiveSelectors
+} from './entities.js';
 
 
 
-const personas = {
-	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1 },
-
-	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.5, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1 },
-
-	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.75, exploratoryClick: 0.2, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.7, exploratoryClick: 0.2, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1 },
-
-	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.7, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.85, exploratoryClick: 0.8, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1 },
-
-	// Mobile-like behavior (even on desktop)
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.75, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1 },
-
-	// Efficient users
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.95, exploratoryClick: 0.2, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1 },
-
-	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.65, exploratoryClick: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1 },
-
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.9, exploratoryClick: 0.6, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1 }, // Optimize every action
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.75, exploratoryClick: 0.3, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1 }, // Immersive experience
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, exploratoryClick: 0.9, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1 }, // Click all the things!
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1 }, // Read everything twice
-
-};
 
 
 const CLICK_FUZZINESS = {
@@ -86,8 +65,9 @@ function boundClickPosition(x, y, viewport) {
  * @param {PARAMS} PARAMS 
  * @param {Function} logFunction - Optional logging function for real-time updates
  */
-export default async function main(PARAMS = {}, logFunction = console.log) {
-	const log = logFunction;
+export default async function main(PARAMS = {}, logFunction = null) {
+	// Guard against missing logger for tests - fallback to console.log
+	const log = logFunction || ((message) => console.log(message));
 	let { url = "https://ak--47.github.io/fixpanel/",
 		users = 10,
 		concurrency = 5,
@@ -111,23 +91,23 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 				try {
 					// Generate unique username for this meeple
 					const usersHandle = u.makeName(3, "-");
-					globalLog(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
+					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
-					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle);
+					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, log);
 
 					if (result && !result.error && !result.timedOut) {
-						globalLog(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
+						log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
 					} else if (result && result.timedOut) {
-						globalLog(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
+						log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
 					} else {
-						globalLog(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
+						log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
 					}
 
 					resolve(result || { error: 'Unknown error', user: i + 1 });
 				}
 				catch (e) {
 					const errorMsg = e.message || 'Unknown error';
-					globalLog(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
+					log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
 					resolve({ error: errorMsg, user: i + 1, crashed: true });
 				}
 			});
@@ -143,14 +123,14 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
-	globalLog(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
+	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
 
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
 			return r.value;
 		} else {
-			globalLog(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
+			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
 			return { error: r.reason?.message || 'Promise rejected', crashed: true };
 		}
 	}).filter(Boolean);
@@ -166,9 +146,9 @@ export default async function main(PARAMS = {}, logFunction = console.log) {
  * @param {boolean} past - Whether to simulate time in past.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null) {
+export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null, logFunction = console.log) {
 	// Create user-specific logger that automatically includes the usersHandle
-	const log = usersHandle ? (message) => globalLog(message, usersHandle) : globalLog;
+	const log = usersHandle ? (message) => logFunction(message, usersHandle) : logFunction;
 
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
@@ -182,39 +162,8 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 	// Define the user session simulation promise
 	const simulationPromise = (async () => {
 		browser = await puppeteer.launch({
-			headless, args: [
-				'--disable-web-security',
-				'--disable-features=VizDisplayCompositor',
-				'--disable-features=IsolateOrigins,site-per-process,TrustedDOMTypes',
-				'--disable-site-isolation-trials',
-				'--disable-blink-features=AutomationControlled',
-				'--disable-client-side-phishing-detection',
-				'--disable-sync',
-				'--disable-background-networking',
-				'--disable-background-timer-throttling',
-				'--disable-renderer-backgrounding',
-				'--disable-backgrounding-occluded-windows',
-				'--disable-ipc-flooding-protection',
-				'--disable-hang-monitor',
-				'--disable-prompt-on-repost',
-				'--disable-domain-reliability',
-				'--disable-component-extensions-with-background-pages',
-				'--disable-default-apps',
-				'--disable-extensions',
-				'--disable-popup-blocking',
-				'--allow-running-insecure-content',
-				'--allow-insecure-localhost',
-				'--ignore-certificate-errors',
-				'--ignore-ssl-errors',
-				'--ignore-certificate-errors-spki-list',
-				'--no-sandbox',
-				'--disable-setuid-sandbox',
-				'--disable-dev-shm-usage',
-				'--disable-accelerated-2d-canvas',
-				'--no-first-run',
-				'--no-zygote',
-				'--disable-gpu'
-			],
+			headless,
+			args: puppeteerArgs,
 			timeout: pageTimeout, // Browser launch timeout
 			waitForInitialPage: true,
 		});
@@ -249,17 +198,8 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			throw new Error(`Navigation failed to ${url}: ${navError.message}`);
 		}
 		log(`  └─ <span style="color: #07B096;">Page loaded successfully</span>`);
-		
-		// Page load click burst - 70% chance for 2-3 immediate exploratory clicks
-		if (Math.random() < 0.7) {
-			const burstClicks = Math.floor(Math.random() * 2) + 2; // 2-3 clicks
-			log(`  ├─ 🎯 <span style="color: #F8BC3B;">Page load click burst (${burstClicks} clicks)...</span>`);
-			for (let i = 0; i < burstClicks; i++) {
-				await exploratoryClick(page, log);
-				await u.sleep(u.rand(300, 800));
-			}
-		}
-		
+
+
 		await u.sleep(u.rand(42, 420)); // Random sleep to simulate human behavior
 		const persona = selectPersona(log);
 		log(`🎭 <span style="color: #7856FF;">Persona assigned:</span> <span style="color: #80E1D9; font-weight: bold;">${persona}</span>`);
@@ -268,7 +208,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		let durationSec;
 		let result;
 		try {
-			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle);
+			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle, logFunction);
 			await browser.close();
 			durationSec = Math.round((Date.now() - startTime) / 1000);
 			log(`⏱️ <span style="color: #7856FF;">User simulation completed in ${durationSec} seconds</span>`);
@@ -321,7 +261,7 @@ async function retry(operation, maxRetries = 3, delay = 1000) {
 /**
 * @param  {import('puppeteer').Page} page
 */
-export async function spoofAgent(page, log = globalLog) {
+export async function spoofAgent(page, log = console.log) {
 	const agent = u.shuffle(agents).slice().pop();
 	const { userAgent, ...headers } = agent;
 	const set = await setUserAgent(page, userAgent, headers, log);
@@ -335,7 +275,7 @@ export async function spoofAgent(page, log = globalLog) {
  * @param  {string} userAgent
  * @param  {Object} additionalHeaders
  */
-export async function setUserAgent(page, userAgent, additionalHeaders = {}, log = globalLog) {
+export async function setUserAgent(page, userAgent, additionalHeaders = {}, log = console.log) {
 	if (!page) throw new Error("Browser not initialized");
 
 	await page.setUserAgent(userAgent);
@@ -348,7 +288,7 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}, log 
 }
 
 // TIME SPOOFING
-export function getRandomTimestampWithinLast5Days(log = globalLog) {
+export function getRandomTimestampWithinLast5Days(log = console.log) {
 	const now = Date.now();
 	const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000); // 5 days ago in milliseconds
 	const timeChosen = Math.floor(Math.random() * (now - fiveDaysAgo)) + fiveDaysAgo;
@@ -357,7 +297,7 @@ export function getRandomTimestampWithinLast5Days(log = globalLog) {
 }
 
 // Function to inject and execute time spoofing
-export async function forceSpoofTimeInBrowser(page, log = globalLog) {
+export async function forceSpoofTimeInBrowser(page, log = console.log) {
 	const spoofedTimestamp = getRandomTimestampWithinLast5Days(log);
 	const spoofTimeFunctionString = spoofTime.toString();
 	log(`	├─ 🕰️ <span style="color: #F8BC3B;">Spoofing time to: ${dayjs(spoofedTimestamp).toISOString()}</span>`);
@@ -413,7 +353,7 @@ function spoofTime(startTimestamp) {
 	return DO_TIME_SPOOF();
 }
 
-async function jamMixpanelIntoBrowser(page, username, log = globalLog) {
+async function jamMixpanelIntoBrowser(page, username, log = console.log) {
 	await retry(async () => {
 		// Enhanced injection with multiple fallback strategies
 		const injectMixpanelString = injectMixpanel.toString();
@@ -475,7 +415,7 @@ async function jamMixpanelIntoBrowser(page, username, log = globalLog) {
 * Fast CSP check and relaxation - no-op if already relaxed
 * @param  {import('puppeteer').Page} page
 */
-async function ensureCSPRelaxed(page, log = globalLog) {
+async function ensureCSPRelaxed(page, log = console.log) {
 	try {
 		// Quick check if CSP is already relaxed
 		const cspStatus = await page.evaluate(() => {
@@ -508,7 +448,7 @@ async function ensureCSPRelaxed(page, log = globalLog) {
  * @param  {import('puppeteer').Page} page
  * @param  {string} username
  */
-async function ensureMixpanelInjected(page, username, log = globalLog) {
+async function ensureMixpanelInjected(page, username, log = console.log) {
 	try {
 		// Quick check if Mixpanel is already injected and working
 		const mixpanelStatus = await page.evaluate(() => {
@@ -542,7 +482,7 @@ async function ensureMixpanelInjected(page, username, log = globalLog) {
  * Comprehensive CSP and security bypass for reliable script injection
  * @param  {import('puppeteer').Page} page
  */
-async function relaxCSP(page, log = globalLog) {
+async function relaxCSP(page, log = console.log) {
 	try {
 		// 1. Enable CSP bypass at the browser level
 		await page.setBypassCSP(true);
@@ -565,7 +505,7 @@ async function relaxCSP(page, log = globalLog) {
 				delete headers['referrer-policy'];
 
 				// Add permissive CSP that allows everything
-				headers['content-security-policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';";
+				headers['content-security-policy'] = relaxedCSP;
 
 				if (!request.isInterceptResolutionHandled()) request.continue({ headers });
 			} catch (e) {
@@ -687,7 +627,7 @@ async function relaxCSP(page, log = globalLog) {
  * @param  {string} username 
  * @param  {boolean} inject - Whether to inject Mixpanel
  */
-async function ensurePageSetup(page, username, inject = true, log = globalLog) {
+async function ensurePageSetup(page, username, inject = true, log = console.log) {
 	try {
 		// Always ensure CSP is relaxed (very fast if already done)
 		await ensureCSPRelaxed(page, log);
@@ -711,14 +651,14 @@ async function ensurePageSetup(page, username, inject = true, log = globalLog) {
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null, usersHandle = null) {
+export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null, usersHandle = null, logFunction = console.log) {
 	// If no handle provided, generate one (for backward compatibility)
 	if (!usersHandle) {
 		usersHandle = u.makeName(4, "-");
 	}
 
 	// Create user-specific logger that automatically includes the usersHandle
-	const log = (message) => globalLog(message, usersHandle);
+	const log = (message) => logFunction(message, usersHandle);
 
 	// Enhanced logging with user context
 	log(`👤 <span style="color: #7856FF; font-weight: bold;">${usersHandle}</span> joined as <span style="color: #80E1D9;">${persona}</span> persona`);
@@ -968,6 +908,16 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 					consecutiveFailures++;
 					log(`    └─ ⚠️ <span style="color: #F8BC3B;">Action ${action} failed:</span> <span style="color: #888;">no result returned (${consecutiveFailures}/${maxConsecutiveFailures})</span>`);
 				}
+				// Page load click burst - 13% chance for 2-3 immediate exploratory clicks
+				if (Math.random() < 0.13) {
+					const burstClicks = Math.floor(Math.random() * 2) + 2; // 2-3 clicks
+					log(`  ├─ 🎯 <span style="color: #F8BC3B;">Click burst of (${burstClicks} clicks)...</span>`);
+					for (let i = 0; i < burstClicks; i++) {
+						await exploratoryClick(page, log);
+						await u.sleep(u.rand(300, 800));
+					}
+				}
+
 			}
 			catch (e) {
 				// Log error but continue with simulation
@@ -996,7 +946,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 		await u.sleep(u.rand(500, 2000));
 	}
 
-	// No cleanup needed - monitoring is now per-action
+
 
 	log(`  └─ ✅ <span style="color: #07B096; font-weight: bold;">${usersHandle}</span> completed session: <span style="color: #888;">${actionResults.length}/${numActions} actions successful</span>`);
 
@@ -1014,7 +964,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 /**
  * Selects a random persona.
  */
-export function selectPersona(log = globalLog) {
+export function selectPersona(log = console.log) {
 	const personaKeys = Object.keys(personas);
 	return personaKeys[Math.floor(Math.random() * personaKeys.length)];
 }
@@ -1025,7 +975,7 @@ export function selectPersona(log = globalLog) {
  * @param {string} suggestedAction - Action suggested by persona weighting
  * @returns {string} - The action to perform (may override suggestion)
  */
-export function getContextAwareAction(actionHistory, suggestedAction, log = globalLog) {
+export function getContextAwareAction(actionHistory, suggestedAction, log = console.log) {
 	if (actionHistory.length === 0) return suggestedAction;
 
 	const lastAction = actionHistory[actionHistory.length - 1];
@@ -1081,7 +1031,7 @@ export function getContextAwareAction(actionHistory, suggestedAction, log = glob
 export function generatePersonaActionSequence(persona, maxActions = null) {
 	const personaWeights = personas[persona];
 	const actionTypes = Object.keys(personaWeights);
-	return generateWeightedRandomActionSequence(actionTypes, personaWeights, maxActions);
+	return generateWeightedRandomActionSequence(actionTypes, personaWeights, persona, maxActions);
 }
 
 /**
@@ -1090,7 +1040,7 @@ export function generatePersonaActionSequence(persona, maxActions = null) {
  * @param {Object} weights - Weighting for each action.
  * @param {number} maxActions - Maximum number of actions (optional).
  */
-export function generateWeightedRandomActionSequence(actionTypes, weights, maxActions = null) {
+export function generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions = null) {
 	const sequence = [];
 	// More comprehensive sessions - users engage deeply with content
 	// Use maxActions if provided, otherwise use default range
@@ -1177,7 +1127,7 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, maxAc
  * Smart click targeting - prioritizes elements users actually click
  * @param  {import('puppeteer').Page} page
  */
-export async function clickStuff(page, hotZones = [], log = globalLog) {
+export async function clickStuff(page, hotZones = [], log = console.log) {
 	try {
 		// If we have hot zones, prefer them (80% chance to use hot zone)
 		if (hotZones.length > 0 && Math.random() < 0.8) {
@@ -1222,25 +1172,11 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 		}
 
 		// Fallback: Get all potentially clickable elements with priority scoring
-		const targetInfo = await page.evaluate(() => {
+		const targetInfo = await page.evaluate((selectors) => {
 			const elements = [];
 
 			// Priority 1: Primary action buttons (highest priority)
-			const primaryButtons = document.querySelectorAll(`
-				button[type="submit"], 
-				input[type="submit"], 
-				[class*="btn-primary"], 
-				[class*="button-primary"],
-				[class*="cta"], 
-				[class*="call-to-action"],
-				[class*="buy"], 
-				[class*="purchase"],
-				[class*="sign-up"], 
-				[class*="signup"],
-				[class*="get-started"], 
-				[class*="start"],
-				[class*="download"]
-			`);
+			const primaryButtons = document.querySelectorAll(selectors.primary);
 			primaryButtons.forEach(el => {
 				const rect = el.getBoundingClientRect();
 				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
@@ -1255,15 +1191,7 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 			});
 
 			// Priority 2: Regular buttons and obvious clickables
-			const buttons = document.querySelectorAll(`
-				button:not([type="submit"]), 
-				[role="button"], 
-				[class*="btn"], 
-				[class*="button"],
-				a[href]:not([href="#"]):not([href=""]),
-				[onclick],
-				input[type="button"]
-			`);
+			const buttons = document.querySelectorAll(selectors.regular);
 			buttons.forEach(el => {
 				const rect = el.getBoundingClientRect();
 				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
@@ -1278,14 +1206,7 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 			});
 
 			// Priority 3: Navigation and menu items
-			const navItems = document.querySelectorAll(`
-				nav a, 
-				[class*="nav"] a, 
-				[class*="menu"] a,
-				[class*="header"] a,
-				[role="menuitem"],
-				[class*="link"]
-			`);
+			const navItems = document.querySelectorAll(selectors.navigation);
 			navItems.forEach(el => {
 				const rect = el.getBoundingClientRect();
 				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
@@ -1300,14 +1221,7 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 			});
 
 			// Priority 4: Content headings and cards (lower priority)
-			const contentElements = document.querySelectorAll(`
-				h1, h2, h3, 
-				[class*="card"], 
-				[class*="item"], 
-				[class*="tile"],
-				[class*="post"],
-				article a
-			`);
+			const contentElements = document.querySelectorAll(selectors.content);
 			contentElements.forEach(el => {
 				const rect = el.getBoundingClientRect();
 				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
@@ -1322,6 +1236,11 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 			});
 
 			return elements;
+		}, {
+			primary: primaryButtonSelectors,
+			regular: regularButtonSelectors,
+			navigation: navigationSelectors,
+			content: contentSelectors
 		});
 
 		if (targetInfo.length === 0) return false;
@@ -1366,15 +1285,15 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
 		// Click multiplier logic - 25% chance to perform additional rapid clicks
 		if (Math.random() < 0.25) {
 			const additionalClicks = Math.floor(Math.random() * 2) + 1; // 1-2 additional clicks
-			
+
 			for (let i = 0; i < additionalClicks; i++) {
 				// Brief pause between rapid clicks
 				await u.sleep(u.rand(100, 300));
-				
+
 				// Nearby click with smaller fuzziness (frustrated clicking behavior)
 				const nearbyX = rect.x + (rect.width * 0.5) + u.rand(-rect.width * 0.15, rect.width * 0.15);
 				const nearbyY = rect.y + (rect.height * 0.5) + u.rand(-rect.height * 0.15, rect.height * 0.15);
-				
+
 				// Ensure click stays within viewport bounds
 				const bounded = boundClickPosition(nearbyX, nearbyY, page.viewport());
 				await page.mouse.click(bounded.x, bounded.y);
@@ -1397,35 +1316,35 @@ export async function clickStuff(page, hotZones = [], log = globalLog) {
  * @param {Function} log - Logging function
  * @returns {Promise<boolean>} - Success status
  */
-async function exploratoryClick(page, log = globalLog) {
+async function exploratoryClick(page, log = console.log) {
 	try {
 		log(`    ├─ 🔍 <span style="color: #F8BC3B;">Exploratory clicking...</span>`);
-		
+
 		// Get page dimensions
 		const viewport = page.viewport();
-		
+
 		// Define content areas to click (avoiding edges and potential UI elements)
 		const contentAreas = [
 			{ x: viewport.width * 0.2, y: viewport.height * 0.3, width: viewport.width * 0.6, height: viewport.height * 0.4 },
 			{ x: viewport.width * 0.1, y: viewport.height * 0.2, width: viewport.width * 0.8, height: viewport.height * 0.6 },
 			{ x: viewport.width * 0.3, y: viewport.height * 0.1, width: viewport.width * 0.4, height: viewport.height * 0.8 }
 		];
-		
+
 		// Select random content area
 		const area = contentAreas[Math.floor(Math.random() * contentAreas.length)];
-		
+
 		// Generate 2-4 random clicks in the area
 		const numClicks = Math.floor(Math.random() * 3) + 2; // 2-4 clicks
-		
+
 		for (let i = 0; i < numClicks; i++) {
 			// Calculate random position within the area with high fuzziness
 			const targetX = area.x + u.rand(-area.width * CLICK_FUZZINESS.EXPLORATORY, area.width * CLICK_FUZZINESS.EXPLORATORY);
 			const targetY = area.y + u.rand(-area.height * CLICK_FUZZINESS.EXPLORATORY, area.height * CLICK_FUZZINESS.EXPLORATORY);
-			
+
 			// Ensure clicks stay within viewport bounds
 			const boundedX = Math.max(0, Math.min(viewport.width, targetX));
 			const boundedY = Math.max(0, Math.min(viewport.height, targetY));
-			
+
 			// Natural mouse movement to target
 			await moveMouse(page,
 				u.rand(0, viewport.width),
@@ -1434,22 +1353,22 @@ async function exploratoryClick(page, log = globalLog) {
 				boundedY,
 				log
 			);
-			
+
 			// Click delay
 			await u.sleep(u.rand(50, 150));
-			
+
 			// Perform click
 			await page.mouse.click(boundedX, boundedY);
-			
+
 			log(`    ├─ 🔍 <span style="color: #F8BC3B;">Exploratory click ${i + 1}/${numClicks}</span> at (${Math.round(boundedX)}, ${Math.round(boundedY)})`);
-			
+
 			// Brief pause between clicks
 			await u.sleep(u.rand(200, 500));
 		}
-		
+
 		log(`    └─ 🔍 <span style="color: #F8BC3B;">Completed ${numClicks} exploratory clicks</span>`);
 		return true;
-		
+
 	} catch (error) {
 		log(`    └─ 🚨 <span style="color: #CC332B;">Exploratory click error:</span> ${error.message}`);
 		return false;
@@ -1459,7 +1378,7 @@ async function exploratoryClick(page, log = globalLog) {
 /**
  * Intelligent scrolling that feels natural and content-aware
  */
-export async function intelligentScroll(page, hotZones = [], log = globalLog) {
+export async function intelligentScroll(page, hotZones = [], log = console.log) {
 	try {
 		const scrollInfo = await page.evaluate(() => {
 			const scrollHeight = document.documentElement.scrollHeight;
@@ -1605,7 +1524,7 @@ async function trackMouseMovement(page, target, log = null) {
 /**
  * Natural mouse movement without clicking - simulates reading/hovering behavior
  */
-export async function naturalMouseMovement(page, hotZones = [], log = globalLog) {
+export async function naturalMouseMovement(page, hotZones = [], log = console.log) {
 	try {
 		let target;
 
@@ -1677,7 +1596,7 @@ export async function naturalMouseMovement(page, hotZones = [], log = globalLog)
 /**
  * Natural pause to simulate realistic user rhythm
  */
-export async function shortPause(log = globalLog) {
+export async function shortPause(log = console.log) {
 	const pauseDuration = u.rand(300, 1500);
 	await u.sleep(pauseDuration);
 	log(`    └─ ⏸️ <span style="color: #888;">Natural pause</span> (${pauseDuration}ms)`);
@@ -1687,7 +1606,7 @@ export async function shortPause(log = globalLog) {
 /**
  * Interact with forms - search boxes, email inputs, etc.
  */
-export async function interactWithForms(page, log = globalLog) {
+export async function interactWithForms(page, log = console.log) {
 	try {
 		// Check if page is still responsive
 		await page.evaluate(() => document.readyState);
@@ -1774,16 +1693,7 @@ export async function interactWithForms(page, log = globalLog) {
 		await u.sleep(u.rand(100, 300));
 
 		// Choose realistic search terms based on input type
-		const searchTerms = {
-			search: ['best products', 'how to', 'reviews', 'price', 'compare', 'tutorial', 'guide', 'tips'],
-			email: ['user@example.com', 'test@gmail.com', 'hello@test.com', 'demo@website.com'],
-			text: ['John Doe', 'test user', 'sample text', 'hello world'],
-			password: ['password123', 'secret456', 'test1234'],
-			url: ['https://example.com', 'https://test.com', 'https://sample.org'],
-			tel: ['555-123-4567', '(555) 987-6543', '555.456.7890'],
-			number: ['42', '100', '2024', '3.14'],
-			select: null // Will be handled differently
-		};
+		const searchTerms = formTestData;
 
 		// Handle select elements differently
 		if (target.type === 'select') {
@@ -1868,7 +1778,7 @@ export async function interactWithForms(page, log = globalLog) {
 /**
  * Hover over elements to trigger dropdowns, tooltips, etc.
  */
-export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = [], log = globalLog) {
+export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = [], log = console.log) {
 	try {
 		let target;
 
@@ -1918,8 +1828,8 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 
 		// Fallback: find regular hover targets
 		if (!target) {
-			const hoverTargets = await page.evaluate(() => {
-				const elements = document.querySelectorAll('a, button, [class*="card"], [class*="item"], img, [role="button"], [class*="menu"], nav a');
+			const hoverTargets = await page.evaluate((selectors) => {
+				const elements = document.querySelectorAll(selectors.join(', '));
 				const targets = [];
 
 				elements.forEach(el => {
@@ -1937,7 +1847,7 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 				});
 
 				return targets.slice(0, 20); // Limit to first 20 for performance
-			});
+			}, interactiveSelectors);
 
 			if (hoverTargets.length === 0) return false;
 			target = hoverTargets[Math.floor(Math.random() * hoverTargets.length)];
@@ -2009,7 +1919,7 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 /**
  * Navigate back using browser back button
  */
-export async function navigateBack(page, log = globalLog) {
+export async function navigateBack(page, log = console.log) {
 	try {
 		const canGoBack = await page.evaluate(() => window.history.length > 1);
 		if (canGoBack && Math.random() < 0.7) { // 70% chance to actually go back if possible
@@ -2027,7 +1937,7 @@ export async function navigateBack(page, log = globalLog) {
 /**
  * Navigate forward using browser forward button
  */
-export async function navigateForward(page, log = globalLog) {
+export async function navigateForward(page, log = console.log) {
 	try {
 		const canGoForward = await page.evaluate(() => window.history.length > 1);
 		if (canGoForward && Math.random() < 0.7) { // 70% chance to actually go forward if possible
@@ -2049,7 +1959,7 @@ export async function navigateForward(page, log = globalLog) {
  */
 export async function identifyHotZones(page) {
 	try {
-		return await page.evaluate(() => {
+		return await page.evaluate((interactiveSelectors) => {
 			const hotZones = [];
 
 			// Performance optimization: cache computed styles
@@ -2125,13 +2035,6 @@ export async function identifyHotZones(page) {
 
 				// 5. Content analysis for marketing CTAs
 				const text = element.textContent?.trim().toLowerCase() || '';
-				const actionWords = [
-					'buy', 'shop', 'get', 'start', 'try', 'demo', 'download',
-					'signup', 'sign up', 'register', 'join', 'save', 'claim',
-					'book', 'schedule', 'contact', 'call', 'learn', 'discover',
-					'free', 'trial', 'now', 'today', 'limited', 'offer'
-				];
-
 				const matchedWords = actionWords.filter(word => text.includes(word));
 				score += matchedWords.length * 2;
 
@@ -2171,37 +2074,6 @@ export async function identifyHotZones(page) {
 			}
 
 			// Enhanced selector list incorporating ARIA and modern patterns
-			const interactiveSelectors = [
-				// High-priority marketing elements
-				'button[class*="cta"], button[class*="CTA"], button[class*="btn-primary"]',
-				'a[class*="button"], a[class*="btn"], a[class*="cta"]',
-				'[role="button"][class*="primary"], [role="button"][class*="cta"]',
-				'button[type="submit"], input[type="submit"]',
-				'[data-action*="buy"], [data-action*="purchase"], [data-action*="checkout"]',
-				'[data-action*="signup"], [data-action*="register"], [data-action*="start"]',
-
-				// ARIA-enhanced interactive elements
-				'[role="button"]:not([aria-hidden="true"])',
-				'[role="link"]:not([aria-hidden="true"])',
-				'[role="menuitem"], [role="tab"], [role="option"]',
-				'[aria-expanded], [aria-haspopup], [aria-controls]',
-
-				// Standard interactive elements
-				'button:not([aria-hidden="true"]):not(.close):not(.dismiss)',
-				'a[href]:not([href="#"]):not([href=""]):not([aria-hidden="true"])',
-				'input[type="button"], input[type="submit"], input[type="image"]',
-				'[onclick]:not([aria-hidden="true"])',
-				'[tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])',
-
-				// Marketing-specific patterns
-				'[class*="hero"] button, [class*="hero"] a[class*="btn"]',
-				'[class*="banner"] button, [class*="banner"] a[class*="btn"]',
-				'[class*="pricing"] button, [class*="plan"] button',
-				'[class*="testimonial"] a[class*="btn"], [class*="review"] button',
-				'[class*="countdown"] button, [class*="timer"] button',
-				'form button:not([type="reset"]), form input[type="submit"]'
-			];
-
 			// Analyze elements with batching for performance
 			const allElements = [];
 			interactiveSelectors.forEach(selector => {
@@ -2292,7 +2164,7 @@ export async function identifyHotZones(page) {
 				ariaRole: zone.ariaRole,
 				ariaLabel: zone.ariaLabel
 			}));
-		});
+		}, interactiveSelectors);
 	} catch (error) {
 		console.error('Hot zone detection failed:', error);
 		return [];
@@ -2539,7 +2411,7 @@ function calculateHoverDuration(target, persona) {
 	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
 }
 
-export async function randomMouse(page, log = globalLog) {
+export async function randomMouse(page, log = console.log) {
 	const startX = u.rand(0, page.viewport().width);
 	const startY = u.rand(0, page.viewport().height);
 	const endX = u.rand(0, page.viewport().width);
@@ -2554,7 +2426,7 @@ export async function randomMouse(page, log = globalLog) {
  * @param  {number} endX
  * @param  {number} endY
  */
-export async function moveMouse(page, startX, startY, endX, endY, log = globalLog) {
+export async function moveMouse(page, startX, startY, endX, endY, log = console.log) {
 	try {
 		// More natural number of steps based on distance - faster movement
 		const distance = Math.hypot(endX - startX, endY - startY);
@@ -2658,7 +2530,7 @@ export function generateHumanizedPath(startX, startY, endX, endY, steps) {
 /**
  * @param  {import('puppeteer').Page} page
  */
-export async function randomScroll(page, log = globalLog) {
+export async function randomScroll(page, log = console.log) {
 	try {
 		const scrollable = await page.evaluate(() => {
 			return document.documentElement.scrollHeight > window.innerHeight;

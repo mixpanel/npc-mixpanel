@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { uid } from 'ak-tools';
 import main from './headless.js';
-import { log, setActiveSocket } from './logger.js';
+import { log } from './logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { cloudLog, logger } from './utils/cloudLogger.js';
@@ -14,8 +14,6 @@ const __dirname = path.dirname(__filename);
 
 const { NODE_ENV = "production" } = process.env;
 let io = null;
-let activeSocket = null;
-let activeJob = null;
 
 const app = express();
 const httpServer = createServer(app);
@@ -55,66 +53,34 @@ io = new Server(httpServer, {
 
 io.on('connection', (socket) => {
 	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id });
-	activeSocket = socket;
-	setActiveSocket(socket);
 	var startTime = Date.now();
-
-
-	// If there's an active job, associate the reconnected client with it
-	if (activeJob) {
-		activeJob.socketId = socket.id;
-		activeSocket = socket;
-		setActiveSocket(socket);
-		socket.emit('job_update', `Resuming updates for job: ${activeJob.jobId}`);
-	}
 
 	socket.on('start_job', async (data) => {
 		try {
-			// If there's already an active job, prevent starting a new one
-			if (activeJob) {
-				activeJob.socketId = socket.id;
-				activeSocket = socket;
-				setActiveSocket(socket);
-				socket.emit('job_update', `Resuming updates for job: ${activeJob.jobId}`);
-				return;
-			}
-
 			const jobId = uid(4);
 			const coercedData = coerceTypes(data);
-
-			// Track the active job and its associated socket
-			activeJob = {
-				jobId,
-				socketId: socket.id,
-				data: coercedData,
-			};
 
 			socket.emit('job_update', `🚀 Starting simulation job: ${jobId}`);
 			socket.emit('job_update', `look in the console tabs for meeple updates`);
 			logger.notice(`/SIMULATE START`, coercedData);
-			const result = await main(coercedData, log);
+			
+			// Create job-specific logger that sends to this socket
+			const jobLogger = (message, meepleId) => log(message, meepleId, socket);
+			const result = await main(coercedData, jobLogger);
 			const endTime = Date.now();
 			const duration = (endTime - startTime) / 1000;
 			logger.notice(`/SIMULATE END in ${duration} seconds`, { ...coercedData, duration });
 			socket.emit('job_update', `✅ Job completed: ${jobId}`);
 			socket.emit('job_complete', result);
 
-			// Clear the active job
-			activeJob = null;
-			activeSocket = null;
-
 		} catch (error) {
 			socket.emit('error', `❌ Job failed: ${error.message}`);
-			activeJob = null;
-			activeSocket = null;
 		}
 	});
 
 	socket.on('disconnect', () => {
 		logger.info(`SOCKET DISCONNECTED: ${socket.id}`, { socketId: socket.id });
-		activeSocket = null;
-		setActiveSocket(null);
-		// Don't clear activeJob here - job may still be running
+		// Jobs continue running even if client disconnects
 	});
 });
 
