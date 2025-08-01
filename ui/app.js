@@ -9,6 +9,7 @@ const overview = document.getElementById('overview');
 const overviewText = overview.textContent?.toString();
 const formLine1 = document.getElementById('form-description-line1');
 const formLine2 = document.getElementById('form-description-line2');
+const formLine3 = document.getElementById('form-description-line3');
 const possibleUrls = [
 	"https://reddit.com",
 	"https://youtube.com",
@@ -106,6 +107,31 @@ injectCheckbox.addEventListener('change', updateTokenFieldState);
 // Initialize the state
 updateTokenFieldState();
 
+// Masking toggle management
+const maskingCheckbox = document.getElementById('masking');
+const maskingLabel = document.getElementById('masking-label');
+
+function updateMaskingState() {
+	if (injectCheckbox.checked) {
+		maskingCheckbox.disabled = false;
+		document.getElementById('masking-container').style.opacity = '1';
+	} else {
+		maskingCheckbox.disabled = true;
+		maskingCheckbox.checked = false;
+		document.getElementById('masking-container').style.opacity = '0.5';
+		maskingLabel.textContent = 'no masking';
+	}
+}
+
+function updateMaskingLabel() {
+	maskingLabel.textContent = maskingCheckbox.checked ? 'default masking' : 'no masking';
+}
+
+injectCheckbox.addEventListener('change', updateMaskingState);
+maskingCheckbox.addEventListener('change', updateMaskingLabel);
+// Initialize the state
+updateMaskingState();
+
 // Tab management system
 let meepleTabsData = {};
 let activeTabId = null;
@@ -130,36 +156,36 @@ function addTerminalLine(content, message, meepleId = null) {
 
 function createMeepleTab(meepleId) {
 	if (meepleTabsData[meepleId]) return; // Tab already exists
-	
+
 	const tabContainer = document.getElementById('terminal-tabs');
 	const tabHeader = document.createElement('div');
 	tabHeader.className = 'terminal-tab';
 	tabHeader.dataset.meepleId = meepleId;
 	tabHeader.innerHTML = `<span>${meepleId}</span>`;
-	
+
 	// Make tab clickable
 	tabHeader.addEventListener('click', () => {
 		switchToTab(meepleId);
 	});
-	
+
 	const tabContent = document.createElement('div');
 	tabContent.className = 'terminal-tab-content';
 	tabContent.dataset.meepleId = meepleId;
-	
+
 	tabContainer.appendChild(tabHeader);
 	document.getElementById('terminal-content').appendChild(tabContent);
-	
+
 	meepleTabsData[meepleId] = {
 		header: tabHeader,
 		content: tabContent,
 		active: false
 	};
-	
+
 	// If this is the first tab, make it active
 	if (!activeTabId) {
 		switchToTab(meepleId);
 	}
-	
+
 	updateTabNavigation();
 }
 
@@ -170,7 +196,7 @@ function switchToTab(meepleId) {
 		tab.content.classList.remove('active');
 		tab.active = false;
 	});
-	
+
 	// Show selected tab
 	if (meepleTabsData[meepleId]) {
 		meepleTabsData[meepleId].header.classList.add('active');
@@ -178,19 +204,19 @@ function switchToTab(meepleId) {
 		meepleTabsData[meepleId].active = true;
 		activeTabId = meepleId;
 	}
-	
+
 	updateTabNavigation();
 	scrollActiveTabIntoView();
 }
 
 function closeMeepleTab(meepleId) {
 	if (!meepleTabsData[meepleId]) return;
-	
+
 	const tab = meepleTabsData[meepleId];
 	tab.header.remove();
 	tab.content.remove();
 	delete meepleTabsData[meepleId];
-	
+
 	// If this was the active tab, switch to another
 	if (activeTabId === meepleId) {
 		const remainingTabs = Object.keys(meepleTabsData);
@@ -200,7 +226,7 @@ function closeMeepleTab(meepleId) {
 			activeTabId = null;
 		}
 	}
-	
+
 	updateTabNavigation();
 }
 
@@ -209,14 +235,14 @@ function updateTabNavigation() {
 	const rightArrow = document.getElementById('tab-nav-right');
 	const tabsContainer = document.getElementById('terminal-tabs');
 	const tabsCount = Object.keys(meepleTabsData).length;
-	
+
 	if (tabsCount <= 1) {
 		leftArrow.style.display = 'none';
 		rightArrow.style.display = 'none';
 	} else {
 		leftArrow.style.display = 'block';
 		rightArrow.style.display = 'block';
-		
+
 		// Scroll active tab into view if it's not visible
 		scrollActiveTabIntoView();
 	}
@@ -225,12 +251,12 @@ function updateTabNavigation() {
 function scrollActiveTabIntoView() {
 	const tabsContainer = document.getElementById('terminal-tabs');
 	const activeTab = document.querySelector('.terminal-tab.active');
-	
+
 	if (!activeTab || !tabsContainer) return;
-	
+
 	const containerRect = tabsContainer.getBoundingClientRect();
 	const activeTabRect = activeTab.getBoundingClientRect();
-	
+
 	// Check if active tab is out of view
 	if (activeTabRect.left < containerRect.left) {
 		// Tab is too far left, scroll left
@@ -244,14 +270,14 @@ function scrollActiveTabIntoView() {
 function navigateTab(direction) {
 	const tabIds = Object.keys(meepleTabsData);
 	const currentIndex = tabIds.indexOf(activeTabId);
-	
+
 	let newIndex;
 	if (direction === 'left') {
 		newIndex = currentIndex > 0 ? currentIndex - 1 : tabIds.length - 1;
 	} else {
 		newIndex = currentIndex < tabIds.length - 1 ? currentIndex + 1 : 0;
 	}
-	
+
 	switchToTab(tabIds[newIndex]);
 }
 
@@ -260,19 +286,19 @@ function addTerminalLineToTab(meepleId, message) {
 	if (!meepleId) {
 		meepleId = 'general';
 	}
-	
+
 	// Only create tab if it's the general tab or if meeple tab doesn't exist yet
 	// This prevents accidental recreation of existing tabs
 	if (!meepleTabsData[meepleId]) {
 		// Only create new tab - never recreate existing ones
 		createMeepleTab(meepleId);
 	}
-	
+
 	// Always append to existing tab if it exists
 	const tab = meepleTabsData[meepleId];
 	if (tab && tab.content) {
 		addTerminalLine(tab.content, message, meepleId);
-		
+
 		// Check if this message indicates meeple completion/failure
 		// ONLY close on the final "simulation complete." message, not intermediate "completed" messages
 		if (message.includes('simulation complete.')) {
@@ -290,6 +316,15 @@ function clearTerminal(content) {
 
 form.addEventListener('submit', async (e) => {
 	e.preventDefault();
+
+	// this links to the default project where meeples are injected
+	const defaultProjectHTML = `
+	<a href="https://mixpanel.com/project/3769788/view/4266856/app/events"
+					target="_blank"
+					style="float: right; margin-left: auto; ">default project</a>
+					`;
+
+
 
 	// Validate token field only if inject is checked
 	const injectCheckbox = form.querySelector('#inject');
@@ -312,6 +347,7 @@ form.addEventListener('submit', async (e) => {
 	data.inject = form.querySelector('#inject').checked;
 	data.headless = form.querySelector('#headless').checked;
 	data.past = form.querySelector('#past').checked;
+	data.masking = form.querySelector('#masking').checked;
 
 	// Show terminal with animation
 	const terminal = document.getElementById('terminal');
@@ -351,7 +387,7 @@ form.addEventListener('submit', async (e) => {
 			message = data.message;
 			meepleId = data.meepleId;
 		}
-		
+
 		// Handle multiple lines in a single message
 		const lines = message.split('\n').filter(line => line.trim());
 		lines.forEach(line => {
@@ -383,6 +419,7 @@ form.addEventListener('submit', async (e) => {
 			overview.textContent = overviewText;
 			formLine1.innerHTML = 'meeples want <em>URL</em>';
 			formLine2.innerHTML = 'meeples need <em>project token</em>';
+			formLine3.innerHTML = defaultProjectHTML;
 
 			// Show all form inputs again
 			const formInputs = form.querySelectorAll('input, button, label, output, a');
@@ -408,9 +445,11 @@ form.addEventListener('submit', async (e) => {
 	overview.textContent = 'Meeples are meepling...';
 	formLine1.textContent = 'replays in replayin\'';
 	formLine2.textContent = 'see the actions on the right!';
+	formLine3.innerHTML = defaultProjectHTML;
+
 
 	// Hide form inputs but keep the description text visible
-	const formInputs = form.querySelectorAll('input, button, label, output, a');
+	const formInputs = form.querySelectorAll('input, button, label, output');
 	formInputs.forEach(input => input.style.display = 'none');
 
 	// Show loading indicator as backup
@@ -476,7 +515,7 @@ document.addEventListener('keydown', (e) => {
 	// Only handle arrow keys when terminal is visible
 	const terminal = document.getElementById('terminal');
 	if (terminal.classList.contains('hidden')) return;
-	
+
 	if (e.key === 'ArrowLeft') {
 		e.preventDefault();
 		navigateTab('left');
@@ -505,7 +544,7 @@ function scrollTabsRight() {
 document.addEventListener('DOMContentLoaded', () => {
 	const leftArrow = document.getElementById('tab-nav-left');
 	const rightArrow = document.getElementById('tab-nav-right');
-	
+
 	if (leftArrow) {
 		leftArrow.addEventListener('click', () => {
 			// First try keyboard navigation, then manual scrolling
@@ -516,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 		});
 	}
-	
+
 	if (rightArrow) {
 		rightArrow.addEventListener('click', () => {
 			// First try keyboard navigation, then manual scrolling

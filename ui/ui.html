@@ -233,9 +233,11 @@
 					value="7127e52d6d61ee30a4d7fb4555277f87"
 					id="token"
 					name="token">
-				<a href="https://mixpanel.com/project/3769788/view/4266856/app/events"
-					target="_blank"
-					style="float: right; margin-left: auto; ">default project</a>
+				<p id="form-description-line3">
+					<a href="https://mixpanel.com/project/3769788/view/4266856/app/events"
+						target="_blank"
+						style="float: right; margin-left: auto; ">default project</a>
+				</p>
 
 				<label for="users">Number of Meeples (1-25):</label>
 				<input type="range"
@@ -247,12 +249,24 @@
 				<output for="users"
 					id="usersOutput">3 meeples</output>
 
-				<label>
-					<input type="checkbox"
-						id="inject"
-						name="inject"
-						checked> Inject Mixpanel in Site
-				</label>
+				<div style="display: flex; align-items: center; gap: 20px;">
+					<label>
+						<input type="checkbox"
+							id="inject"
+							name="inject"
+							checked> Inject Mixpanel in Site
+					</label>
+					<div id="masking-container">
+						<label>
+							<span>masking</span>
+							<input type="checkbox"
+								id="masking"
+								name="masking"
+								disabled>
+							<span id="masking-label">no masking</span>
+						</label>
+					</div>
+				</div>
 
 				<label>
 					<input type="checkbox"
@@ -270,7 +284,10 @@
 				<button type="submit">nom nom!</button>
 			</form>
 			<div class="loading">Simulating...</div>
-			<div class="success"><br />Your meeples are doing your bidding!<br />Check out your project!</div>
+			<div class="success"><br />Your meeples are doing your bidding!<br />Check out your project! <a
+					href="https://mixpanel.com/project/3769788/view/4266856/app/events"
+					target="_blank"
+					style="float: right; margin-left: auto; ">default project</a></div>
 		</div>
 
 		<!-- TERMINAL -->
@@ -282,9 +299,11 @@
 					<button id="close-terminal">−</button>
 				</div>
 				<div id="terminal-tab-controls">
-					<button id="tab-nav-left" class="tab-nav-arrow">←</button>
+					<button id="tab-nav-left"
+						class="tab-nav-arrow">←</button>
 					<div id="terminal-tabs"></div>
-					<button id="tab-nav-right" class="tab-nav-arrow">→</button>
+					<button id="tab-nav-right"
+						class="tab-nav-arrow">→</button>
 				</div>
 				<div id="terminal-content"></div>
 				<button id="scroll-to-bottom">↓ Scroll</button>

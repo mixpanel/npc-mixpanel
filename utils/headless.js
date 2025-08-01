@@ -13,9 +13,9 @@ let { MIXPANEL_TOKEN = "" } = process.env;
 if (!NODE_ENV) throw new Error("NODE_ENV is required");
 let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
 TEMP_DIR = path.resolve(TEMP_DIR);
-const agents = await u.load('./agents.json', true);
+const agents = await u.load('./utils/agents.json', true);
 // Logger is now injected via dependency injection
-import injectMixpanel from './utils/injectMixpanel.js';
+import injectMixpanel from './injectMixpanel.js';
 import {
 	personas,
 	puppeteerArgs,
@@ -54,6 +54,7 @@ function boundClickPosition(x, y, viewport) {
  * @property {number} users Number of users to simulate
  * @property {number} concurrency Number of users to simulate concurrently
  * @property {boolean} headless Whether to run headless or not
+ * @property {boolean} masking Whether to mask sensitive data in Mixpanel
  * @property {boolean} inject Whether to inject mixpanel or not
  * @property {boolean} past Whether to simulate time in past
  * @property {string} token Mixpanel token
@@ -75,7 +76,8 @@ export default async function main(PARAMS = {}, logFunction = null) {
 		inject = true,
 		past = false,
 		token = "",
-		maxActions = null
+		maxActions = null,
+		masking = false
 	} = PARAMS;
 	if (url === "fixpanel") url = `https://ak--47.github.io/fixpanel/`;
 	const limit = pLimit(concurrency);
@@ -93,7 +95,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 					const usersHandle = u.makeName(3, "-");
 					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
-					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, log);
+					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, { masking }, log);
 
 					if (result && !result.error && !result.timedOut) {
 						log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
@@ -146,9 +148,42 @@ export default async function main(PARAMS = {}, logFunction = null) {
  * @param {boolean} past - Whether to simulate time in past.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null, logFunction = console.log) {
+export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null, opts = {}, logFunction = console.log) {
 	// Create user-specific logger that automatically includes the usersHandle
 	const log = usersHandle ? (message) => logFunction(message, usersHandle) : logFunction;
+
+	// Generate a unique location for this meeple
+	function generateLocation() {
+		const cities = [
+			[40.7128, -74.0060], // New York
+			[51.5074, -0.1278],  // London
+			[35.6762, 139.6503], // Tokyo
+			[48.8566, 2.3522],   // Paris
+			[34.0522, -118.2437], // Los Angeles
+			[-33.8688, 151.2093], // Sydney
+			[55.7558, 37.6173],  // Moscow
+			[39.9042, 116.4074], // Beijing
+			[19.0760, 72.8777],  // Mumbai
+			[-23.5505, -46.6333] // São Paulo
+		];
+
+		const city = cities[Math.floor(Math.random() * cities.length)];
+		const radius = 2; // degrees (~200km)
+
+		const lat = city[0] + (Math.random() - 0.5) * radius;
+		const lon = city[1] + (Math.random() - 0.5) * radius;
+
+		return {
+			lat: parseFloat(lat.toFixed(6)),
+			lon: parseFloat(lon.toFixed(6))
+		};
+	}
+
+	const meepleLocation = generateLocation();
+	log(`🌍 <span style="color: #80E1D9;">${usersHandle}</span> location: ${meepleLocation.lat}, ${meepleLocation.lon}`);
+
+	// Add location to opts for this meeple
+	const meepleOpts = { ...opts, location: meepleLocation };
 
 	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
 	const pageTimeout = 60 * 1000; // 1 minutes
@@ -208,7 +243,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		let durationSec;
 		let result;
 		try {
-			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle, logFunction);
+			const actions = await simulateUserSession(browser, page, persona, inject, maxActions, usersHandle, meepleOpts, logFunction);
 			await browser.close();
 			durationSec = Math.round((Date.now() - startTime) / 1000);
 			log(`⏱️ <span style="color: #7856FF;">User simulation completed in ${durationSec} seconds</span>`);
@@ -353,16 +388,16 @@ function spoofTime(startTimestamp) {
 	return DO_TIME_SPOOF();
 }
 
-async function jamMixpanelIntoBrowser(page, username, log = console.log) {
+async function jamMixpanelIntoBrowser(page, username, opts = {}, log = console.log) {
 	await retry(async () => {
 		// Enhanced injection with multiple fallback strategies
 		const injectMixpanelString = injectMixpanel.toString();
 
-		await page.evaluate((MIXPANEL_TOKEN, userId, injectMixpanelFn) => {
+		await page.evaluate((MIXPANEL_TOKEN, userId, opts, injectMixpanelFn) => {
 			try {
 				// Strategy 1: Direct function injection
 				const injectedFunction = new Function(`return (${injectMixpanelFn})`)();
-				injectedFunction(MIXPANEL_TOKEN, userId);
+				injectedFunction(MIXPANEL_TOKEN, userId, opts);
 
 				// Strategy 2: Force override any existing CSP violations
 				if (window.console && window.console.error) {
@@ -386,7 +421,7 @@ async function jamMixpanelIntoBrowser(page, username, log = console.log) {
 						console.log('[NPC] Retrying Mixpanel injection...');
 						try {
 							const retryFunction = new Function(`return (${injectMixpanelFn})`)();
-							retryFunction(MIXPANEL_TOKEN, userId);
+							retryFunction(MIXPANEL_TOKEN, userId, opts);
 						} catch (retryError) {
 							console.warn('[NPC] Retry injection failed:', retryError);
 						}
@@ -399,13 +434,13 @@ async function jamMixpanelIntoBrowser(page, username, log = console.log) {
 				// Strategy 4: Fallback injection using createElement
 				try {
 					const script = document.createElement('script');
-					script.textContent = `(${injectMixpanelFn})('${MIXPANEL_TOKEN}', '${userId}');`;
+					script.textContent = `(${injectMixpanelFn})('${MIXPANEL_TOKEN}', '${userId}', ${JSON.stringify(opts)});`;
 					(document.head || document.documentElement).appendChild(script);
 				} catch (fallbackError) {
 					console.error('[NPC] Fallback injection failed:', fallbackError);
 				}
 			}
-		}, MIXPANEL_TOKEN, username, injectMixpanelString);
+		}, MIXPANEL_TOKEN, username, opts, injectMixpanelString);
 	}, 3, 1000); // Retry up to 3 times with 1 second delay
 
 	return true;
@@ -448,7 +483,7 @@ async function ensureCSPRelaxed(page, log = console.log) {
  * @param  {import('puppeteer').Page} page
  * @param  {string} username
  */
-async function ensureMixpanelInjected(page, username, log = console.log) {
+async function ensureMixpanelInjected(page, username, opts = {}, log = console.log) {
 	try {
 		// Quick check if Mixpanel is already injected and working
 		const mixpanelStatus = await page.evaluate(() => {
@@ -466,7 +501,7 @@ async function ensureMixpanelInjected(page, username, log = console.log) {
 
 		// Log when we actually need to inject/re-inject Mixpanel
 		log(`    ├─ 💉 <span style="color: #F8BC3B;">Mixpanel needs injection - applying...</span>`);
-		const result = await jamMixpanelIntoBrowser(page, username, log);
+		const result = await jamMixpanelIntoBrowser(page, username, opts, log);
 		if (result) {
 			log(`    │  └─ ✅ <span style="color: #07B096;">Mixpanel injected successfully</span>`);
 		}
@@ -627,14 +662,14 @@ async function relaxCSP(page, log = console.log) {
  * @param  {string} username 
  * @param  {boolean} inject - Whether to inject Mixpanel
  */
-async function ensurePageSetup(page, username, inject = true, log = console.log) {
+async function ensurePageSetup(page, username, inject = true, opts = {}, log = console.log) {
 	try {
 		// Always ensure CSP is relaxed (very fast if already done)
 		await ensureCSPRelaxed(page, log);
 
 		// Only inject Mixpanel if requested (very fast if already done)
 		if (inject) {
-			await ensureMixpanelInjected(page, username, log);
+			await ensureMixpanelInjected(page, username, opts, log);
 		}
 
 		return true;
@@ -651,7 +686,7 @@ async function ensurePageSetup(page, username, inject = true, log = console.log)
  * @param {boolean} inject - Whether to inject Mixpanel into the page.
  * @param {number} maxActions - Maximum number of actions to perform (optional).
  */
-export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null, usersHandle = null, logFunction = console.log) {
+export async function simulateUserSession(browser, page, persona, inject = true, maxActions = null, usersHandle = null, opts = {}, logFunction = console.log) {
 	// If no handle provided, generate one (for backward compatibility)
 	if (!usersHandle) {
 		usersHandle = u.makeName(4, "-");
@@ -665,7 +700,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 	// Initial page setup - CSP relaxation and Mixpanel injection
 	log(`  └─ 🛠️ Setting up page environment...`);
-	await ensurePageSetup(page, usersHandle, inject, log);
+	await ensurePageSetup(page, usersHandle, inject, opts, log);
 
 	if (inject) {
 		// Verify injection was successful
@@ -868,7 +903,7 @@ export async function simulateUserSession(browser, page, persona, inject = true,
 
 		if (funcToPerform) {
 			// Ensure page setup before each action (fast no-op if already done)
-			await ensurePageSetup(page, usersHandle, inject, log);
+			await ensurePageSetup(page, usersHandle, inject, opts, log);
 
 			// Check for domain navigation and handle if needed
 			const previousUrl = await page.url();
