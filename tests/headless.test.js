@@ -30,9 +30,9 @@ import {
   weightedRandom,
   coinFlip,
   extractTopLevelDomain
-} from '../headless.js';
+} from '../utils/headless.js';
 
-import mainFunction from '../headless.js';
+import mainFunction from '../utils/headless.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -200,7 +200,7 @@ describe('Headless.js - Comprehensive Test Suite', () => {
     if (testPage && !testPage.isClosed()) {
       await testPage.close();
     }
-  });
+  }, 10000); // Increased timeout for cleanup
 
   describe('Main Function and Integration Tests', () => {
     test.skip('should run complete user simulation with all features', async () => {
@@ -297,6 +297,21 @@ describe('Headless.js - Comprehensive Test Suite', () => {
       expect(typeof mainFunction).toBe('function');
       expect(mainFunction).toBeDefined();
     });
+
+    test('should accept masking parameter in options', () => {
+      // Test that masking parameter is accepted and doesn't cause errors
+      expect(() => {
+        const opts = { masking: true };
+        expect(opts).toHaveProperty('masking');
+        expect(typeof opts.masking).toBe('boolean');
+      }).not.toThrow();
+      
+      const opts = { masking: false, location: { lat: 40.7128, lon: -74.0060 } };
+      expect(opts).toHaveProperty('masking', false);
+      expect(opts).toHaveProperty('location');
+      expect(opts.location).toHaveProperty('lat');
+      expect(opts.location).toHaveProperty('lon');
+    });
   });
 
   describe('User Agent and Spoofing Functions', () => {
@@ -357,9 +372,29 @@ describe('Headless.js - Comprehensive Test Suite', () => {
   describe('Persona and Action Generation', () => {
     test('selectPersona should return valid persona names', () => {
       const validPersonas = [
-        'powerUser', 'taskFocused', 'shopper', 'comparison',
-        'reader', 'skimmer', 'explorer', 'discoverer',
-        'mobileHabits', 'decisive', 'researcher', 'methodical',
+        // Power users
+        'powerUser', 'taskFocused', 'digitalNative',
+        // Shopping/conversion oriented
+        'shopper', 'comparison', 'conversionOptimized',
+        // Content consumption
+        'reader', 'skimmer', 'bingeWatcher',
+        // Exploration patterns
+        'explorer', 'discoverer', 'curiosityDriven',
+        // Device-specific patterns
+        'mobileHabits', 'mobileFirst', 'tabletUser',
+        // Efficiency patterns
+        'decisive', 'minimalist',
+        // Deep engagement patterns
+        'researcher', 'methodical', 'analytical',
+        // Accessibility and inclusive patterns
+        'accessibilityUser', 'keyboardNavigator',
+        // Age/generation patterns
+        'genZ', 'millennial', 'genX', 'boomer',
+        // Emotional/behavioral patterns
+        'anxiousUser', 'confidentUser', 'cautiousUser',
+        // International/cultural patterns
+        'international', 'rtlUser',
+        // Gaming-inspired patterns
         'minMaxer', 'rolePlayer', 'murderHobo', 'ruleSlawyer'
       ];
       
