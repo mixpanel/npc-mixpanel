@@ -230,6 +230,8 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 
 		} catch (navError) {
 			// Provide more specific error information
+			log(`🚨 <span style="color: #CC332B;">Navigation error:</span> ${navError.message}`);
+			log(`${usersHandle} simulation complete.`);
 			throw new Error(`Navigation failed to ${url}: ${navError.message}`);
 		}
 		log(`  └─ <span style="color: #07B096;">Page loaded successfully</span>`);
