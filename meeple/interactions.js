@@ -160,8 +160,10 @@ export async function moveMouse(page, startX, startY, endX, endY, log = null) {
 			const delay = Math.random() * 10 + 5; // 5-15ms
 			await new Promise(resolve => setTimeout(resolve, delay));
 		}
+		return true;
 	} catch (error) {
 		if (log) log(`⚠️ Mouse movement error: ${error.message}`);
+		return false;
 	}
 }
 
