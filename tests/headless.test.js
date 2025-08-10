@@ -5,34 +5,13 @@
  * Tests all exported functions and new CSP/domain monitoring features
  */
 
-import {
-  spoofAgent,
-  setUserAgent,
-  getRandomTimestampWithinLast5Days,
-  forceSpoofTimeInBrowser,
-  selectPersona,
-  getContextAwareAction,
-  generatePersonaActionSequence,
-  generateWeightedRandomActionSequence,
-  clickStuff,
-  intelligentScroll,
-  naturalMouseMovement,
-  shortPause,
-  interactWithForms,
-  hoverOverElements,
-  navigateBack,
-  identifyHotZones,
-  randomMouse,
-  moveMouse,
-  generateHumanizedPath,
-  randomScroll,
-  bezierPoint,
-  weightedRandom,
-  coinFlip,
-  extractTopLevelDomain
-} from '../utils/headless.js';
-
-import mainFunction from '../utils/headless.js';
+// Import from new modular structure
+import { getRandomTimestampWithinLast5Days, extractTopLevelDomain } from '../meeple/analytics.js';
+import { selectPersona, getContextAwareAction, generatePersonaActionSequence, generateWeightedRandomActionSequence, weightedRandom } from '../meeple/personas.js';
+import { generateHumanizedPath, bezierPoint, exploratoryClick, wait, coinFlip, moveMouse } from '../meeple/interactions.js';
+import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from '../meeple/browser.js';
+import { randomBetween, sleep, clamp } from '../meeple/utils.js';
+import mainFunction from '../meeple/headless.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';

@@ -2,7 +2,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { uid } from 'ak-tools';
-import main from './utils/headless.js';
+import main from './meeple/headless.js';
 import { log } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
