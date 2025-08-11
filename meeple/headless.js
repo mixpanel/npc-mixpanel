@@ -157,7 +157,8 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		try {
 			browser = await launchBrowser(headless, log);
 			const page = await createPage(browser, log);
-			
+			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN
+
 			// Set up page environment
 			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
 

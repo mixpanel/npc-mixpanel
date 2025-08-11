@@ -28,40 +28,45 @@ export async function retry(operation, maxRetries = 3, delay = 1000) {
  * @param {Function} log - Logging function
  */
 export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = console.log) {
+	const { MIXPANEL_TOKEN = process.env.MIXPANEL_TOKEN } = page;
 	await retry(async () => {
 		try {
 			// Primary injection method using function injection
 			const injectionResult = await page.evaluate(
-				(injectMixpanelCode, username, opts) => {
+				(injectMixpanelCode, username, opts, MIXPANEL_TOKEN) => {
 					try {
 						// Create a function from the string and execute it
 						const injectFunction = new Function('return ' + injectMixpanelCode)();
-						return injectFunction(username, opts);
+						return injectFunction(MIXPANEL_TOKEN, username, opts);
 					} catch (error) {
 						return { success: false, error: error.message };
 					}
 				},
 				injectMixpanel.toString(),
 				username,
-				opts
+				opts,
+				MIXPANEL_TOKEN
 			);
 
 			if (injectionResult && injectionResult.success) {
 				log(`✅ Mixpanel injected successfully for ${username}`);
 				return true;
 			}
+			if (injectionResult && !injectionResult.success) {
+				log(`⚠️ Primary injection failed for ${username}: ${injectionResult.error}`);
+			}
 
 			// Fallback method using createElement if direct injection fails
-			log(`⚠️ Primary injection failed for ${username}, trying fallback...`);
-			
+			log(`⚠️ Primary injection failed for ${username} trying fallback...`);
+
 			const fallbackResult = await page.evaluate(
-				(injectMixpanelCode, username, opts) => {
+				(injectMixpanelCode, username, opts, MIXPANEL_TOKEN) => {
 					try {
 						// Suppress CSP violation errors during injection
 						const originalConsoleError = console.error;
-						console.error = function(...args) {
+						console.error = function (...args) {
 							const message = args.join(' ');
-							if (message.includes('Content Security Policy') || 
+							if (message.includes('Content Security Policy') ||
 								message.includes('CSP') ||
 								message.includes('eval')) {
 								return; // Suppress CSP-related errors
@@ -71,9 +76,9 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 
 						// Try createElement approach
 						const script = document.createElement('script');
-						script.textContent = `(${injectMixpanelCode})('${username}', ${JSON.stringify(opts)});`;
+						script.textContent = `(${injectMixpanelCode})('${MIXPANEL_TOKEN}', '${username}', ${JSON.stringify(opts)})`;
 						document.head.appendChild(script);
-						
+
 						// Restore original console.error after a delay
 						setTimeout(() => {
 							console.error = originalConsoleError;
@@ -86,7 +91,8 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 				},
 				injectMixpanel.toString(),
 				username,
-				opts
+				opts,
+				MIXPANEL_TOKEN
 			);
 
 			if (fallbackResult && fallbackResult.success) {
@@ -161,7 +167,7 @@ export async function relaxCSP(page, log = console.log) {
 
 		// Request interception to modify security headers
 		await page.setRequestInterception(true);
-		
+
 		page.on('request', (request) => {
 			request.continue();
 		});
@@ -184,7 +190,7 @@ export async function relaxCSP(page, log = console.log) {
 		await page.evaluateOnNewDocument(() => {
 			// Mark page as CSP relaxed for future checks
 			window.CSP_RELAXED = true;
-			
+
 			// Override CSP-related functions if they exist
 			if (window.eval) {
 				window.originalEval = window.eval;
@@ -223,12 +229,12 @@ export async function ensurePageSetup(page, username, inject = true, opts = {}, 
 	try {
 		// Always ensure CSP is relaxed first
 		await ensureCSPRelaxed(page, log);
-		
+
 		// Only inject Mixpanel if requested
 		if (inject) {
 			await ensureMixpanelInjected(page, username, opts, log);
 		}
-		
+
 		log(`✅ Page setup complete for ${username} (inject: ${inject})`);
 	} catch (error) {
 		log(`⚠️ Page setup error for ${username}: ${error.message}`);

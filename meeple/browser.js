@@ -35,7 +35,7 @@ export async function launchBrowser(headless = true, log = console.log) {
 				isLandscape: true
 			}
 		});
-		
+
 		log(`🚀 Browser launched (headless: ${headless})`);
 		return browser;
 	} catch (error) {
@@ -53,13 +53,13 @@ export async function launchBrowser(headless = true, log = console.log) {
 export async function createPage(browser, log = console.log) {
 	try {
 		const page = await browser.newPage();
-		
+
 		// Set random realistic user agent
 		const randomAgent = agents[Math.floor(Math.random() * agents.length)];
-		await page.setUserAgent(randomAgent);
-		
-		// Set additional headers for realism
-		await page.setExtraHTTPHeaders({
+		const { userAgent, ...headers } = randomAgent;
+		await page.setUserAgent(userAgent);
+
+		const realisticHeaders = {
 			'Accept-Language': 'en-US,en;q=0.9',
 			'Accept-Encoding': 'gzip, deflate, br',
 			'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -69,23 +69,28 @@ export async function createPage(browser, log = console.log) {
 			'Sec-Fetch-Mode': 'navigate',
 			'Sec-Fetch-Site': 'none',
 			'Sec-Fetch-User': '?1',
-			'Upgrade-Insecure-Requests': '1'
-		});
-		
+			'Upgrade-Insecure-Requests': '1',
+			...headers
+		};
+
+
+		// Set additional headers for realism
+		await page.setExtraHTTPHeaders(realisticHeaders);
+
 		// Set viewport with slight randomization
 		const viewport = {
 			width: 1366 + Math.floor(Math.random() * 200),
 			height: 768 + Math.floor(Math.random() * 100)
 		};
 		await page.setViewport(viewport);
-		
+
 		// Initialize mouse position tracking
 		await page.evaluateOnNewDocument(() => {
 			window.mouseX = 0;
 			window.mouseY = 0;
 		});
-		
-		log(`📄 New page created with agent: ${randomAgent.substring(0, 50)}...`);
+
+		log(`📄 New page created with agent: ${userAgent.substring(0, 50)}...`);
 		return page;
 	} catch (error) {
 		log(`❌ Page creation failed: ${error.message}`);
@@ -103,18 +108,18 @@ export async function createPage(browser, log = console.log) {
 export async function navigateToUrl(page, url, log = console.log) {
 	try {
 		log(`🌐 Navigating to: ${url}`);
-		
+
 		const response = await page.goto(url, {
 			waitUntil: 'networkidle2',
 			timeout: 60000 // 1 minute timeout
 		});
-		
+
 		if (!response.ok()) {
 			log(`⚠️ HTTP ${response.status()}: ${response.statusText()}`);
 		} else {
 			log(`✅ Page loaded successfully`);
 		}
-		
+
 		return response;
 	} catch (error) {
 		log(`❌ Navigation failed: ${error.message}`);
@@ -133,13 +138,13 @@ export async function getPageInfo(page, log = console.log) {
 		const title = await page.title();
 		const url = page.url();
 		const viewport = page.viewport();
-		
+
 		const info = {
 			title: title || 'Untitled',
 			url,
 			viewport
 		};
-		
+
 		log(`📋 Page info: "${info.title}" at ${url}`);
 		return info;
 	} catch (error) {
