@@ -605,3 +605,595 @@ export async function trackHoverDwellEvent(page, target, hoverDuration, persona,
 		if (log) log(`⚠️ Hover dwell tracking error: ${error.message}`);
 	}
 }
+
+/**
+ * Smart click targeting - prioritizes elements users actually click
+ * @param  {import('puppeteer').Page} page
+ */
+export async function clickStuff(page, hotZones = [], log = console.log) {
+	try {
+		// If we have hot zones, prefer them (80% chance to use hot zone)
+		if (hotZones.length > 0 && Math.random() < 0.8) {
+			// Select from hot zones with weighted probability based on priority
+			const weightedHotZones = [];
+			hotZones.forEach(zone => {
+				for (let i = 0; i < zone.priority; i++) {
+					weightedHotZones.push(zone);
+				}
+			});
+
+			const selectedZone = weightedHotZones[Math.floor(Math.random() * weightedHotZones.length)];
+
+			// More natural click positioning within the hot zone
+			const targetX = selectedZone.x + (Math.random() - 0.5) * 2 * selectedZone.width * CLICK_FUZZINESS.HOT_ZONE;
+			const targetY = selectedZone.y + (Math.random() - 0.5) * 2 * selectedZone.height * CLICK_FUZZINESS.HOT_ZONE;
+
+			// Slower, more realistic mouse movement to target
+			await moveMouse(page,
+				Math.random() * page.viewport().width,
+				Math.random() * page.viewport().height,
+				targetX,
+				targetY,
+				selectedZone.width,
+				selectedZone.height,
+				log
+			);
+
+			// More realistic pause before clicking (humans don't click immediately)
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 200)); // 200-800ms
+
+			// Natural click with slight delay
+			await page.mouse.click(targetX, targetY, {
+				delay: Math.random() * 100 + 50, // 50-150ms
+				count: 1,
+				button: 'left'
+			});
+
+			log(`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
+
+			// Pause after click to see results
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 300)); // 300-1000ms
+			return true;
+		}
+
+		// Fallback: Get all potentially clickable elements with priority scoring
+		const targetInfo = await page.evaluate((selectors) => {
+			const elements = [];
+
+			// Priority 1: Primary action buttons (highest priority)
+			const primaryButtons = document.querySelectorAll(selectors.primary);
+			primaryButtons.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+					elements.push({
+						priority: 10,
+						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+						text: el.textContent?.trim().substring(0, 50) || '',
+						tag: el.tagName.toLowerCase()
+					});
+				}
+			});
+
+			// Priority 2: Regular buttons and obvious clickables
+			const buttons = document.querySelectorAll(selectors.regular);
+			buttons.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+					elements.push({
+						priority: 7,
+						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+						text: el.textContent?.trim().substring(0, 50) || '',
+						tag: el.tagName.toLowerCase()
+					});
+				}
+			});
+
+			// Priority 3: Navigation and menu items
+			const navItems = document.querySelectorAll(selectors.navigation);
+			navItems.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+					elements.push({
+						priority: 5,
+						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+						text: el.textContent?.trim().substring(0, 50) || '',
+						tag: el.tagName.toLowerCase()
+					});
+				}
+			});
+
+			// Priority 4: Content headings and cards (lower priority)
+			const contentElements = document.querySelectorAll(selectors.content);
+			contentElements.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+					elements.push({
+						priority: 2,
+						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+						text: el.textContent?.trim().substring(0, 50) || '',
+						tag: el.tagName.toLowerCase()
+					});
+				}
+			});
+
+			return elements;
+		}, {
+			primary: primaryButtonSelectors,
+			regular: regularButtonSelectors,
+			navigation: navigationSelectors,
+			content: contentSelectors
+		});
+
+		if (targetInfo.length === 0) return false;
+
+		// Weight selection by priority (higher priority = more likely to be selected)
+		const weightedElements = [];
+		targetInfo.forEach(info => {
+			// Add element multiple times based on priority for weighted selection
+			for (let i = 0; i < info.priority; i++) {
+				weightedElements.push(info);
+			}
+		});
+
+		const selectedInfo = weightedElements[Math.floor(Math.random() * weightedElements.length)];
+		const rect = selectedInfo.rect;
+
+		// More natural click positioning within the element
+		const targetX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * 2 * rect.width * CLICK_FUZZINESS.REGULAR_ELEMENT;
+		const targetY = rect.y + (rect.height * 0.5) + (Math.random() - 0.5) * 2 * rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT;
+
+		// Natural mouse movement to target
+		await moveMouse(page,
+			Math.random() * page.viewport().width,
+			Math.random() * page.viewport().height,
+			targetX,
+			targetY,
+			rect.width,
+			rect.height,
+			log
+		);
+
+		// More realistic pause before clicking (humans take time to aim)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 200)); // 200-800ms
+
+		// Natural click with more realistic timing
+		await page.mouse.click(targetX, targetY, {
+			delay: Math.random() * 100 + 50, // 50-150ms
+			count: 1,
+			button: 'left'
+		});
+
+		log(`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
+
+		// Click multiplier logic - 25% chance to perform additional rapid clicks
+		if (Math.random() < 0.25) {
+			const additionalClicks = Math.floor(Math.random() * 2) + 1; // 1-2 additional clicks
+
+			for (let i = 0; i < additionalClicks; i++) {
+				// Brief pause between rapid clicks
+				await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100)); // 100-300ms
+
+				// Nearby click with smaller fuzziness (frustrated clicking behavior)
+				const nearbyX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * rect.width * 0.3;
+				const nearbyY = rect.y + (rect.height * 0.5) + (Math.random() - 0.5) * rect.height * 0.3;
+
+				// Ensure click stays within viewport bounds
+				const bounded = boundClickPosition(nearbyX, nearbyY, page.viewport());
+				await page.mouse.click(bounded.x, bounded.y);
+				log(`    ├─ 👆 <span style="color: #DA6B16;">Rapid click ${i + 1}/${additionalClicks}</span> near target (frustrated/double-tap behavior)`);
+			}
+		}
+
+		// Pause after click to see results (more realistic)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 300)); // 300-1000ms
+
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Intelligent scrolling that feels natural and content-aware
+ */
+export async function intelligentScroll(page, hotZones = [], log = console.log) {
+	try {
+		const scrollInfo = await page.evaluate(() => {
+			const scrollHeight = document.documentElement.scrollHeight;
+			const viewportHeight = window.innerHeight;
+			const currentScroll = window.pageYOffset;
+			const maxScroll = scrollHeight - viewportHeight;
+
+			// Check if we can scroll
+			if (scrollHeight <= viewportHeight) return null;
+
+			// Find scroll targets (content sections)
+			const sections = document.querySelectorAll('article, section, .content, main, [class*="post"], [class*="card"]');
+			const targets = [];
+
+			sections.forEach(section => {
+				const rect = section.getBoundingClientRect();
+				if (rect.height > 100) { // Only substantial content
+					targets.push({
+						top: section.offsetTop,
+						height: rect.height
+					});
+				}
+			});
+
+			return {
+				scrollHeight,
+				viewportHeight,
+				currentScroll,
+				maxScroll,
+				targets: targets.slice(0, 5) // Limit to first 5 sections
+			};
+		});
+
+		if (!scrollInfo) return false;
+
+		let targetScroll;
+
+		// If we have hot zones, prefer scrolling towards them (70% chance)
+		if (hotZones.length > 0 && Math.random() < 0.7) {
+			// Find hot zones that are not currently visible
+			const currentViewportTop = scrollInfo.currentScroll;
+			const currentViewportBottom = scrollInfo.currentScroll + scrollInfo.viewportHeight;
+
+			const targetZones = hotZones.filter(zone => {
+				return zone.y < currentViewportTop - 100 || zone.y > currentViewportBottom + 100;
+			});
+
+			if (targetZones.length > 0) {
+				// Scroll towards a high-priority hot zone
+				const sortedZones = targetZones.sort((a, b) => b.priority - a.priority);
+				const targetZone = sortedZones[Math.floor(Math.random() * Math.min(3, sortedZones.length))]; // Pick from top 3
+				targetScroll = targetZone.y - (scrollInfo.viewportHeight * 0.3); // Center zone in viewport
+				log(`    └─ 📜 <span style="color: #F8BC3B;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`);
+			} else {
+				// All hot zones visible, do regular content scroll
+				if (scrollInfo.targets.length > 0) {
+					const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
+					targetScroll = target.top - (scrollInfo.viewportHeight * 0.1);
+				} else {
+					const scrollDirection = Math.random() < 0.8 ? 1 : -1;
+					const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7);
+					targetScroll = scrollInfo.currentScroll + (scrollDistance * scrollDirection);
+				}
+			}
+		} else if (scrollInfo.targets.length > 0 && Math.random() < 0.7) {
+			// 70% chance to scroll to content section
+			const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
+			targetScroll = target.top - (scrollInfo.viewportHeight * 0.1); // Leave some margin
+		} else {
+			// Random scroll
+			const scrollDirection = Math.random() < 0.8 ? 1 : -1; // 80% down, 20% up
+			const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7); // 30-100% of viewport
+			targetScroll = scrollInfo.currentScroll + (scrollDistance * scrollDirection);
+		}
+
+		// Clamp to valid range
+		targetScroll = Math.max(0, Math.min(scrollInfo.maxScroll, targetScroll));
+
+		// Smooth scroll
+		await page.evaluate((target) => {
+			window.scrollTo({
+				top: target,
+				behavior: 'smooth'
+			});
+		}, targetScroll);
+
+		// Wait for scroll to complete (more realistic timing)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 800)); // 800-1500ms
+
+		log(`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`);
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Natural mouse movement without clicking - simulates reading/hovering behavior
+ */
+export async function naturalMouseMovement(page, hotZones = [], log = console.log) {
+	try {
+		let target;
+
+		// 60% chance to move near hot zones for more realistic mouse tracking
+		if (hotZones.length > 0 && Math.random() < 0.6) {
+			// Select a hot zone but don't actually interact with it - just move near it
+			const zone = hotZones[Math.floor(Math.random() * hotZones.length)];
+			target = {
+				x: zone.x + (Math.random() - 0.5) * 160, // Move near but not exactly on the hot zone
+				y: zone.y + (Math.random() - 0.5) * 120,
+				source: 'near hot zone'
+			};
+		} else {
+			// Move to readable content areas
+			const contentInfo = await page.evaluate(() => {
+				const elements = document.querySelectorAll('p, h1, h2, h3, article, [class*="content"], [class*="text"]');
+				const targets = [];
+
+				elements.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 100 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+						targets.push({
+							x: rect.x + rect.width * 0.5,
+							y: rect.y + rect.height * 0.5,
+							width: rect.width,
+							height: rect.height
+						});
+					}
+				});
+
+				return targets.slice(0, 10); // Limit to first 10 elements
+			});
+
+			if (contentInfo.length === 0) return false;
+
+			const contentTarget = contentInfo[Math.floor(Math.random() * contentInfo.length)];
+			target = {
+				x: contentTarget.x + (Math.random() - 0.5) * contentTarget.width * 0.6,
+				y: contentTarget.y + (Math.random() - 0.5) * contentTarget.height * 0.6,
+				source: 'content area'
+			};
+		}
+
+		// Ensure target is within viewport
+		target.x = Math.max(50, Math.min(page.viewport().width - 50, target.x));
+		target.y = Math.max(50, Math.min(page.viewport().height - 50, target.y));
+
+		await moveMouse(page,
+			Math.random() * page.viewport().width,
+			Math.random() * page.viewport().height,
+			target.x,
+			target.y,
+			100,
+			30,
+			log
+		);
+
+		// Longer, more realistic pause (users move mouse then pause to read/think)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 1200 + 800)); // 800-2000ms
+
+		// Track mouse movement for heatmap data
+		await trackMouseMovement(page, target, log);
+
+		log(`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span> - <span style="color: #4ECDC4;">heatmap tracked</span>`);
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Hover over elements to trigger dropdowns, tooltips, etc.
+ */
+export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = [], log = console.log) {
+	try {
+		let target;
+
+		// Return visit behavior - sometimes revisit previously hovered elements
+		if (hoverHistory.length > 0 && Math.random() < 0.25) { // 25% chance to return to previous element
+			const recentElements = hoverHistory.slice(-5); // Consider last 5 hovered elements
+			const revisitTarget = recentElements[Math.floor(Math.random() * recentElements.length)];
+
+			// Check if the previous element is still valid and visible
+			const isValidForRevisit = await page.evaluate((prevTarget) => {
+				const element = document.querySelector(prevTarget.selector);
+				if (!element) return false;
+
+				const rect = element.getBoundingClientRect();
+				return rect.width > 30 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0;
+			}, revisitTarget);
+
+			if (isValidForRevisit) {
+				target = {
+					...revisitTarget,
+					isRevisit: true
+				};
+				log(`    └─ 🔄 <span style="color: #7856FF;">Revisiting element</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(return visit)</span> - <span style="color: #4ECDC4;">realistic heatmap pattern</span>`);
+			}
+		}
+
+		// If we have hot zones, prefer them (75% chance to use hot zone)
+		if (hotZones.length > 0 && Math.random() < 0.75) {
+			// Filter to currently visible hot zones
+			const visibleZones = hotZones.filter(zone => {
+				return zone.y > 0 && zone.y < page.viewport().height;
+			});
+
+			if (visibleZones.length > 0) {
+				// Weight by priority for selection
+				const weightedZones = [];
+				visibleZones.forEach(zone => {
+					for (let i = 0; i < zone.priority; i++) {
+						weightedZones.push(zone);
+					}
+				});
+
+				target = weightedZones[Math.floor(Math.random() * weightedZones.length)];
+				log(`    └─ 🎯 <span style="color: #F8BC3B;">Hovering hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`);
+			}
+		}
+
+		// Fallback: find regular hover targets
+		if (!target) {
+			const hoverTargets = await page.evaluate((selectors) => {
+				const elements = document.querySelectorAll(selectors.join(', '));
+				const targets = [];
+
+				elements.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+						targets.push({
+							x: rect.x + rect.width / 2,
+							y: rect.y + rect.height / 2,
+							width: rect.width,
+							height: rect.height,
+							text: el.textContent?.trim().substring(0, 30) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
+
+				return targets.slice(0, 20); // Limit to first 20 for performance
+			}, interactiveSelectors);
+
+			if (hoverTargets.length === 0) return false;
+			target = hoverTargets[Math.floor(Math.random() * hoverTargets.length)];
+		}
+
+		// Move to element
+		await moveMouse(page,
+			Math.random() * page.viewport().width,
+			Math.random() * page.viewport().height,
+			target.x + (Math.random() - 0.5) * 20,
+			target.y + (Math.random() - 0.5) * 20,
+			target.width || 100,
+			target.height || 30,
+			log
+		);
+
+		// Calculate realistic hover duration based on content type and persona
+		const hoverDuration = calculateHoverDuration(target, persona);
+
+		// Enhanced logging for heatmap data generation
+		const durationSeconds = (hoverDuration / 1000).toFixed(1);
+		const dwellCategory = hoverDuration < 2000 ? 'quick' :
+			hoverDuration < 5000 ? 'medium' :
+				hoverDuration < 10000 ? 'long' : 'very_long';
+
+		log(`    ├─ 🔥 <span style="color: #FF6B6B;">Dwelling for ${durationSeconds}s</span> (${dwellCategory} dwell) - <span style="color: #4ECDC4;">generating heatmap data</span>`);
+
+		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
+		await simulateReadingMovements(page, target, hoverDuration, persona, log);
+
+		// Track explicit hover dwell event with Mixpanel
+		await trackHoverDwellEvent(page, target, hoverDuration, persona, log);
+
+		if (!target.priority) {
+			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
+		} else {
+			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms, priority: ${target.priority})</span>`);
+		}
+
+		// Add to hover history if not a revisit (to prevent infinite loops)
+		if (!target.isRevisit) {
+			const historyEntry = {
+				x: target.x,
+				y: target.y,
+				width: target.width,
+				height: target.height,
+				text: target.text,
+				tag: target.tag,
+				priority: target.priority,
+				selector: target.selector || `${target.tag}:contains("${target.text?.substring(0, 20)}")`,
+				timestamp: Date.now(),
+				hoverDuration: hoverDuration
+			};
+
+			hoverHistory.push(historyEntry);
+
+			// Keep only the last 10 entries to prevent memory issues
+			if (hoverHistory.length > 10) {
+				hoverHistory.shift();
+			}
+
+			log(`      └─ 📊 <span style="color: #4ECDC4;">Heatmap data captured:</span> dwell event + movement tracking + history (${hoverHistory.length}/10 entries)`);
+		}
+
+		return true;
+	} catch (error) {
+		return false;
+	}
+}
+
+/**
+ * Calculate realistic hover duration based on content type and persona
+ */
+function calculateHoverDuration(target, persona) {
+	// Base durations by content type (in milliseconds)
+	const contentTypeDurations = {
+		// Reading content - longer hover times
+		text: { min: 3000, max: 8000 },
+		paragraph: { min: 4000, max: 12000 },
+		article: { min: 5000, max: 15000 },
+
+		// Interactive elements - moderate hover times
+		button: { min: 2000, max: 6000 },
+		link: { min: 1500, max: 5000 },
+		form: { min: 3000, max: 7000 },
+
+		// Media content - variable hover times
+		image: { min: 2000, max: 8000 },
+		video: { min: 3000, max: 10000 },
+
+		// Navigation - shorter hover times
+		nav: { min: 1000, max: 3000 },
+		menu: { min: 1500, max: 4000 },
+
+		// Default for unknown content
+		default: { min: 2000, max: 6000 }
+	};
+
+	// Determine content type based on target properties
+	let contentType = 'default';
+	if (target.text && target.text.length > 100) contentType = 'paragraph';
+	else if (target.text && target.text.length > 50) contentType = 'text';
+	else if (target.tag === 'button' || target.text?.toLowerCase().includes('button')) contentType = 'button';
+	else if (target.tag === 'a') contentType = 'link';
+	else if (target.tag === 'img') contentType = 'image';
+	else if (target.tag === 'video') contentType = 'video';
+	else if (target.tag === 'form' || target.tag === 'input' || target.tag === 'textarea') contentType = 'form';
+	else if (target.tag === 'nav' || target.text?.toLowerCase().includes('nav')) contentType = 'nav';
+
+	// Get base duration range
+	const baseDuration = contentTypeDurations[contentType];
+
+	// Persona-based modifiers
+	const personaModifiers = {
+		// High engagement personas - longer hover times
+		researcher: 1.5,
+		ruleSlawyer: 1.4,
+		discoverer: 1.3,
+		comparison: 1.2,
+		rolePlayer: 1.2,
+
+		// Medium engagement personas
+		shopper: 1.1,
+		explorer: 1.0,
+		methodical: 1.1,
+		reader: 1.3,
+
+		// Low engagement personas - shorter hover times
+		powerUser: 0.7,
+		taskFocused: 0.6,
+		decisive: 0.5,
+		mobileHabits: 0.4,
+		murderHobo: 0.3,
+
+		// Variable engagement
+		skimmer: 0.8,
+		minMaxer: 0.9
+	};
+
+	// Apply persona modifier
+	const modifier = personaModifiers[persona] || 1.0;
+	const adjustedMin = Math.round(baseDuration.min * modifier);
+	const adjustedMax = Math.round(baseDuration.max * modifier);
+
+	// Add some randomness for naturalism
+	const baseHoverTime = Math.random() * (adjustedMax - adjustedMin) + adjustedMin;
+
+	// Add micro-variations (±10%) for more realistic timing
+	const variation = baseHoverTime * 0.1;
+	const finalDuration = baseHoverTime + (Math.random() - 0.5) * 2 * variation;
+
+	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
+}

@@ -1,12 +1,8 @@
 import puppeteer from 'puppeteer';
 import u from 'ak-tools';
-import path from 'path';
-import { tmpdir } from 'os';
 import { puppeteerArgs } from './entities.js';
 
 const { NODE_ENV = "" } = process.env;
-let TEMP_DIR = NODE_ENV === 'dev' ? './tmp' : tmpdir();
-TEMP_DIR = path.resolve(TEMP_DIR);
 
 const agents = await u.load('./meeple/agents.json', true);
 
@@ -25,7 +21,7 @@ export async function launchBrowser(headless = true, log = console.log) {
 		const browser = await puppeteer.launch({
 			headless: headless ? 'new' : false,
 			args: puppeteerArgs,
-			userDataDir: path.join(TEMP_DIR, `meeple-profile-${u.uid(8)}`),
+			// No userDataDir - don't persist data for cloud functions
 			defaultViewport: {
 				width: 1366 + Math.floor(Math.random() * 200),
 				height: 768 + Math.floor(Math.random() * 100),

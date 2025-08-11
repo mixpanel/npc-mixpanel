@@ -6,7 +6,10 @@ import u from 'ak-tools';
 // Import from new modular structure
 import { ensurePageSetup, retry, relaxCSP } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, rageClick, CLICK_FUZZINESS } from './interactions.js';
+import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, CLICK_FUZZINESS } from './interactions.js';
+import { interactWithForms } from './forms.js';
+import { navigateBack, navigateForward } from './navigation.js';
+import { identifyHotZones } from './hotzones.js';
 import { getRandomTimestampWithinLast5Days } from './analytics.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
 import { randomBetween, sleep, clamp } from './utils.js';
@@ -175,6 +178,10 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			const pageInfo = await getPageInfo(page, log);
 			log(`📄 Page loaded: "${pageInfo.title}"`);
 
+			// Identify hot zones for intelligent targeting
+			const hotZones = await identifyHotZones(page, log);
+			log(`🎯 <span style="color: #7856FF;">Hot zones identified:</span> ${hotZones.length} priority elements`);
+			
 			// Select persona and generate action sequence
 			const persona = selectPersona(log);
 			const actionSequence = generatePersonaActionSequence(persona, maxActions);
@@ -182,7 +189,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona}, ${actionSequence.length} actions planned`);
 
 			const startTime = Date.now();
-			const actionResults = await simulateUserSession(page, actionSequence, usersHandle, meepleOpts, log);
+			const actionResults = await simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, meepleOpts, log);
 			
 			await closeBrowser(browser);
 			
@@ -228,17 +235,20 @@ export async function simulateUser(url, headless = true, inject = true, past = f
  * @param {Object} opts - Options object
  * @param {Function} log - Logging function
  */
-async function simulateUserSession(page, actionSequence, usersHandle, opts, log) {
+async function simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, opts, log) {
 	const actionResults = [];
 	const actionHistory = [];
+	const hoverHistory = []; // Track hover interactions for return visit behavior
 	let consecutiveFailures = 0;
 	const maxConsecutiveFailures = 5;
+	let currentUrl = page.url(); // Track URL changes for hot zone re-detection
 
 	const actionEmojis = {
 		click: '🖱️',
 		exploratoryClick: '🎯',
 		rageClick: '😡',
 		scroll: '📜',
+		mouse: '🖱️',
 		hover: '👁️',
 		wait: '⏸️',
 		form: '📝',
@@ -255,19 +265,42 @@ async function simulateUserSession(page, actionSequence, usersHandle, opts, log)
 		log(`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${actionSequence.length}</span>: ${action}${contextNote}`);
 
 		let funcToPerform;
+		// Check for URL changes and re-identify hot zones if needed
+		const newUrl = page.url();
+		if (newUrl !== currentUrl) {
+			log(`🔄 URL changed, re-identifying hot zones...`);
+			hotZones.length = 0; // Clear existing hot zones
+			const newHotZones = await identifyHotZones(page, log);
+			hotZones.push(...newHotZones);
+			currentUrl = newUrl;
+			log(`🎯 Updated: ${hotZones.length} hot zones identified`);
+		}
+
 		switch (action) {
 			case "click":
 			case "exploratoryClick":
-				funcToPerform = () => exploratoryClick(page, log);
+				funcToPerform = () => clickStuff(page, hotZones, log);
 				break;
 			case "rageClick":
 				funcToPerform = () => rageClick(page, log);
 				break;
 			case "scroll":
-				funcToPerform = () => performScroll(page, log);
+				funcToPerform = () => intelligentScroll(page, hotZones, log);
+				break;
+			case "mouse":
+				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
 				break;
 			case "hover":
-				funcToPerform = () => performHover(page, log);
+				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
+				break;
+			case "form":
+				funcToPerform = () => interactWithForms(page, log);
+				break;
+			case "back":
+				funcToPerform = () => navigateBack(page, log);
+				break;
+			case "forward":
+				funcToPerform = () => navigateForward(page, log);
 				break;
 			case "wait":
 				funcToPerform = () => wait();
@@ -343,31 +376,4 @@ async function performScroll(page, log) {
 	}
 }
 
-/**
- * Perform hover action
- * @param {Object} page - Puppeteer page object
- * @param {Function} log - Logging function
- */
-async function performHover(page, log) {
-	try {
-		const elements = await page.$$('a, button, [onclick], .btn, input');
-		
-		if (elements.length === 0) {
-			log(`👁️ No hoverable elements found`);
-			return;
-		}
-		
-		const element = elements[Math.floor(Math.random() * elements.length)];
-		const box = await element.boundingBox();
-		
-		if (box) {
-			await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-			const hoverDuration = randomBetween(500, 2000);
-			await sleep(hoverDuration);
-			log(`👁️ Hovered for ${hoverDuration}ms`);
-		}
-	} catch (error) {
-		log(`⚠️ Hover error: ${error.message}`);
-		throw error;
-	}
-}
+// Simple functions moved to interactions.js - now using sophisticated versions

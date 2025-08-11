@@ -195,9 +195,24 @@ export async function relaxCSP(page, log = console.log) {
 		await page.evaluateOnNewDocument(() => {
 			// Mark page as CSP relaxed for future checks
 			window.CSP_RELAXED = true;
+			window.CSP_WAS_RELAXED = true;
+			window.CSP_RELAXED_TIMESTAMP = Date.now();
+			window.CSP_EVAL_WORKING = true;
 
 			// Override CSP-related functions if they exist
 			if (window.eval) {
+				window.originalEval = window.eval;
+			}
+		});
+
+		// Also set flags in current page context if page is already loaded
+		await page.evaluate(() => {
+			window.CSP_RELAXED = true;
+			window.CSP_WAS_RELAXED = true;
+			window.CSP_RELAXED_TIMESTAMP = Date.now();
+			window.CSP_EVAL_WORKING = true;
+
+			if (window.eval && !window.originalEval) {
 				window.originalEval = window.eval;
 			}
 		});
@@ -232,11 +247,29 @@ export async function relaxCSP(page, log = console.log) {
  */
 export async function ensurePageSetup(page, username, inject = true, opts = {}, log = console.log) {
 	try {
-		// Always ensure CSP is relaxed first
-		await ensureCSPRelaxed(page, log);
+		// Check if CSP is already relaxed
+		const cspStatus = await page.evaluate(() => {
+			return {
+				relaxed: window.CSP_WAS_RELAXED || false,
+				timestamp: window.CSP_RELAXED_TIMESTAMP || 0
+			};
+		});
 
-		// Only inject Mixpanel if requested
-		if (inject) {
+		// Only relax CSP if not already done
+		if (!cspStatus.relaxed) {
+			await ensureCSPRelaxed(page, log);
+		}
+
+		// Check if Mixpanel is already injected
+		const mixpanelStatus = inject ? await page.evaluate(() => {
+			return {
+				injected: window.MIXPANEL_WAS_INJECTED || false,
+				available: typeof window.mixpanel !== 'undefined' && window.mixpanel.track
+			};
+		}) : { injected: true, available: false };
+
+		// Only inject Mixpanel if requested and not already done
+		if (inject && !mixpanelStatus.injected && !mixpanelStatus.available) {
 			await ensureMixpanelInjected(page, username, opts, log);
 		}
 
