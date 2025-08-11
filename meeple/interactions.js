@@ -242,7 +242,7 @@ export async function exploratoryClick(page, log = console.log) {
 		const viewport = await page.viewport();
 		
 		// Try to find content areas first
-		const contentElements = await page.$$(contentSelectors.join(', '));
+		const contentElements = await page.$$(contentSelectors);
 		
 		let targetX, targetY;
 		
@@ -358,9 +358,9 @@ export async function rageClick(page, log = console.log) {
 		const boundedPos = boundClickPosition(targetX, targetY, viewport);
 		
 		// Get current mouse position
-		const currentPos = await page.evaluate(() => {
-			return { x: window.mouseX || viewport.width / 2, y: window.mouseY || viewport.height / 2 };
-		});
+		const currentPos = await page.evaluate((vp) => {
+			return { x: window.mouseX || vp.width / 2, y: window.mouseY || vp.height / 2 };
+		}, viewport);
 		
 		// Frustrated/aggressive movement to target (faster, less smooth)
 		const frustratedPath = generateFrustratedMousePath(

@@ -159,8 +159,6 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			const page = await createPage(browser, log);
 			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN
 
-			// Set up page environment
-			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
 
 			// Validate and navigate to URL
 			try {
@@ -170,6 +168,8 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			}
 
 			await navigateToUrl(page, url, log);
+			// Set up page environment
+			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
 			await sleep(randomBetween(100, 500)); // Random sleep to simulate human behavior
 
 			const pageInfo = await getPageInfo(page, log);

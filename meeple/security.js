@@ -166,25 +166,30 @@ export async function relaxCSP(page, log = console.log) {
 		await page.setBypassCSP(true);
 
 		// Request interception to modify security headers
-		await page.setRequestInterception(true);
+		// await page.setRequestInterception(true);
 
-		page.on('request', (request) => {
-			request.continue();
-		});
+		// page.on('request', (request) => {
+		// 	try {
+		// 		request.continue();
+		// 	}
+		// 	catch (error) {
+		// 		// Ignore request processing errors
+		// 	}
+		// });
 
-		page.on('response', async (response) => {
-			try {
-				if (response.request().resourceType() === 'document') {
-					// Note: We can't modify headers after response, but we can log for debugging
-					const headers = response.headers();
-					if (headers['content-security-policy']) {
-						// CSP is present but we've bypassed it at browser level
-					}
-				}
-			} catch (error) {
-				// Ignore response processing errors
-			}
-		});
+		// page.on('response', async (response) => {
+		// 	try {
+		// 		if (response.request().resourceType() === 'document') {
+		// 			// Note: We can't modify headers after response, but we can log for debugging
+		// 			const headers = response.headers();
+		// 			if (headers['content-security-policy']) {
+		// 				// CSP is present but we've bypassed it at browser level
+		// 			}
+		// 		}
+		// 	} catch (error) {
+		// 		// Ignore response processing errors
+		// 	}
+		// });
 
 		// Page context CSP bypass injection
 		await page.evaluateOnNewDocument(() => {
