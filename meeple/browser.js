@@ -11,6 +11,10 @@ TEMP_DIR = path.resolve(TEMP_DIR);
 const agents = await u.load('./meeple/agents.json', true);
 
 /**
+ * @typedef {import('puppeteer').Browser} Browser
+ */
+
+/**
  * Launch a new browser instance with proper configuration
  * @param {boolean} headless - Whether to run in headless mode
  * @param {Function} log - Logging function
@@ -42,7 +46,7 @@ export async function launchBrowser(headless = true, log = console.log) {
 
 /**
  * Create a new page with realistic user agent and configuration
- * @param {Object} browser - Browser instance
+ * @param {Browser} browser - Browser instance
  * @param {Function} log - Logging function
  * @returns {Object} - Page instance
  */

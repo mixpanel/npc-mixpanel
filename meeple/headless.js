@@ -6,7 +6,7 @@ import u from 'ak-tools';
 // Import from new modular structure
 import { ensurePageSetup, retry, relaxCSP } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, CLICK_FUZZINESS } from './interactions.js';
+import { wait, exploratoryClick, rageClick, CLICK_FUZZINESS } from './interactions.js';
 import { getRandomTimestampWithinLast5Days } from './analytics.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
 import { randomBetween, sleep, clamp } from './utils.js';
@@ -236,6 +236,7 @@ async function simulateUserSession(page, actionSequence, usersHandle, opts, log)
 	const actionEmojis = {
 		click: '🖱️',
 		exploratoryClick: '🎯',
+		rageClick: '😡',
 		scroll: '📜',
 		hover: '👁️',
 		wait: '⏸️',
@@ -257,6 +258,9 @@ async function simulateUserSession(page, actionSequence, usersHandle, opts, log)
 			case "click":
 			case "exploratoryClick":
 				funcToPerform = () => exploratoryClick(page, log);
+				break;
+			case "rageClick":
+				funcToPerform = () => rageClick(page, log);
 				break;
 			case "scroll":
 				funcToPerform = () => performScroll(page, log);
