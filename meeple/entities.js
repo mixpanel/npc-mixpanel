@@ -6,63 +6,63 @@
 // User behavior personas with action probabilities - Enhanced with modern user diversity
 export const personas = {
 	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1 },
-	digitalNative: { scroll: 0.25, mouse: 0.05, click: 0.92, exploratoryClick: 0.35, wait: 0.05, hover: 0.15, form: 0.45, back: 0.1, forward: 0.05 },
+	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1, rageClick: 0.15 },
+	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1, rageClick: 0.2 },
+	digitalNative: { scroll: 0.25, mouse: 0.05, click: 0.92, exploratoryClick: 0.35, wait: 0.05, hover: 0.15, form: 0.45, back: 0.1, forward: 0.05, rageClick: 0.08 },
 
 	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.5, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1 },
-	conversionOptimized: { scroll: 0.35, mouse: 0.25, click: 0.88, exploratoryClick: 0.45, wait: 0.25, hover: 0.35, form: 0.6, back: 0.2, forward: 0.05 },
+	shopper: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.5, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1, rageClick: 0.12 },
+	comparison: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1, rageClick: 0.25 },
+	conversionOptimized: { scroll: 0.35, mouse: 0.25, click: 0.88, exploratoryClick: 0.45, wait: 0.25, hover: 0.35, form: 0.6, back: 0.2, forward: 0.05, rageClick: 0.18 },
 
 	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.75, exploratoryClick: 0.2, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.7, exploratoryClick: 0.2, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1 },
-	bingeWatcher: { scroll: 0.8, mouse: 0.15, click: 0.72, exploratoryClick: 0.25, wait: 0.4, hover: 0.25, form: 0.15, back: 0.15, forward: 0.05 },
+	reader: { scroll: 0.6, mouse: 0.2, click: 0.75, exploratoryClick: 0.2, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1, rageClick: 0.05 },
+	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.7, exploratoryClick: 0.2, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1, rageClick: 0.1 },
+	bingeWatcher: { scroll: 0.8, mouse: 0.15, click: 0.72, exploratoryClick: 0.25, wait: 0.4, hover: 0.25, form: 0.15, back: 0.15, forward: 0.05, rageClick: 0.08 },
 
 	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.7, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.85, exploratoryClick: 0.8, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1 },
-	curiosityDriven: { scroll: 0.45, mouse: 0.35, click: 0.82, exploratoryClick: 0.75, wait: 0.25, hover: 0.5, form: 0.35, back: 0.15, forward: 0.08 },
+	explorer: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.7, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.15 },
+	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.85, exploratoryClick: 0.8, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.12 },
+	curiosityDriven: { scroll: 0.45, mouse: 0.35, click: 0.82, exploratoryClick: 0.75, wait: 0.25, hover: 0.5, form: 0.35, back: 0.15, forward: 0.08, rageClick: 0.1 },
 
 	// Device-specific patterns
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.75, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1 },
-	mobileFirst: { scroll: 0.85, mouse: 0.05, click: 0.78, exploratoryClick: 0.32, wait: 0.15, hover: 0.08, form: 0.35, back: 0.25, forward: 0.12 },
-	tabletUser: { scroll: 0.65, mouse: 0.2, click: 0.8, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1 },
+	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.75, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.22 },
+	mobileFirst: { scroll: 0.85, mouse: 0.05, click: 0.78, exploratoryClick: 0.32, wait: 0.15, hover: 0.08, form: 0.35, back: 0.25, forward: 0.12, rageClick: 0.25 },
+	tabletUser: { scroll: 0.65, mouse: 0.2, click: 0.8, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1, rageClick: 0.18 },
 
 	// Efficiency patterns
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.95, exploratoryClick: 0.2, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1 },
-	minimalist: { scroll: 0.25, mouse: 0.12, click: 0.93, exploratoryClick: 0.18, wait: 0.12, hover: 0.12, form: 0.42, back: 0.08, forward: 0.08 },
+	decisive: { scroll: 0.2, mouse: 0.1, click: 0.95, exploratoryClick: 0.2, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.3 },
+	minimalist: { scroll: 0.25, mouse: 0.12, click: 0.93, exploratoryClick: 0.18, wait: 0.12, hover: 0.12, form: 0.42, back: 0.08, forward: 0.08, rageClick: 0.28 },
 
 	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.65, exploratoryClick: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1 },
-	analytical: { scroll: 0.6, mouse: 0.45, click: 0.68, exploratoryClick: 0.42, wait: 0.55, hover: 0.48, form: 0.45, back: 0.15, forward: 0.12 },
+	researcher: { scroll: 0.7, mouse: 0.4, click: 0.65, exploratoryClick: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.05 },
+	methodical: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1, rageClick: 0.08 },
+	analytical: { scroll: 0.6, mouse: 0.45, click: 0.68, exploratoryClick: 0.42, wait: 0.55, hover: 0.48, form: 0.45, back: 0.15, forward: 0.12, rageClick: 0.06 },
 
 	// Accessibility and inclusive patterns
-	accessibilityUser: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.3, wait: 0.8, hover: 0.6, form: 0.5, back: 0.25, forward: 0.15 },
-	keyboardNavigator: { scroll: 0.3, mouse: 0.05, click: 0.9, exploratoryClick: 0.25, wait: 0.4, hover: 0.1, form: 0.6, back: 0.2, forward: 0.2 },
+	accessibilityUser: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.3, wait: 0.8, hover: 0.6, form: 0.5, back: 0.25, forward: 0.15, rageClick: 0.4 },
+	keyboardNavigator: { scroll: 0.3, mouse: 0.05, click: 0.9, exploratoryClick: 0.25, wait: 0.4, hover: 0.1, form: 0.6, back: 0.2, forward: 0.2, rageClick: 0.35 },
 
 	// Age/generation patterns
-	genZ: { scroll: 0.9, mouse: 0.05, click: 0.8, exploratoryClick: 0.6, wait: 0.1, hover: 0.05, form: 0.25, back: 0.1, forward: 0.05 },
-	millennial: { scroll: 0.5, mouse: 0.2, click: 0.85, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1 },
-	genX: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.3, wait: 0.4, hover: 0.4, form: 0.5, back: 0.3, forward: 0.15 },
-	boomer: { scroll: 0.3, mouse: 0.5, click: 0.7, exploratoryClick: 0.2, wait: 0.7, hover: 0.6, form: 0.6, back: 0.4, forward: 0.2 },
+	genZ: { scroll: 0.9, mouse: 0.05, click: 0.8, exploratoryClick: 0.6, wait: 0.1, hover: 0.05, form: 0.25, back: 0.1, forward: 0.05, rageClick: 0.2 },
+	millennial: { scroll: 0.5, mouse: 0.2, click: 0.85, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1, rageClick: 0.15 },
+	genX: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.3, wait: 0.4, hover: 0.4, form: 0.5, back: 0.3, forward: 0.15, rageClick: 0.12 },
+	boomer: { scroll: 0.3, mouse: 0.5, click: 0.7, exploratoryClick: 0.2, wait: 0.7, hover: 0.6, form: 0.6, back: 0.4, forward: 0.2, rageClick: 0.45 },
 
 	// Emotional/behavioral patterns
-	anxiousUser: { scroll: 0.6, mouse: 0.4, click: 0.7, exploratoryClick: 0.2, wait: 0.6, hover: 0.5, form: 0.3, back: 0.5, forward: 0.1 },
-	confidentUser: { scroll: 0.3, mouse: 0.15, click: 0.9, exploratoryClick: 0.5, wait: 0.2, hover: 0.2, form: 0.5, back: 0.15, forward: 0.1 },
-	cautiousUser: { scroll: 0.5, mouse: 0.35, click: 0.65, exploratoryClick: 0.15, wait: 0.8, hover: 0.7, form: 0.4, back: 0.4, forward: 0.05 },
+	anxiousUser: { scroll: 0.6, mouse: 0.4, click: 0.7, exploratoryClick: 0.2, wait: 0.6, hover: 0.5, form: 0.3, back: 0.5, forward: 0.1, rageClick: 0.5 },
+	confidentUser: { scroll: 0.3, mouse: 0.15, click: 0.9, exploratoryClick: 0.5, wait: 0.2, hover: 0.2, form: 0.5, back: 0.15, forward: 0.1, rageClick: 0.1 },
+	cautiousUser: { scroll: 0.5, mouse: 0.35, click: 0.65, exploratoryClick: 0.15, wait: 0.8, hover: 0.7, form: 0.4, back: 0.4, forward: 0.05, rageClick: 0.08 },
 
 	// International/cultural patterns
-	international: { scroll: 0.45, mouse: 0.3, click: 0.75, exploratoryClick: 0.35, wait: 0.5, hover: 0.4, form: 0.45, back: 0.3, forward: 0.15 },
-	rtlUser: { scroll: 0.5, mouse: 0.25, click: 0.8, exploratoryClick: 0.4, wait: 0.4, hover: 0.35, form: 0.4, back: 0.25, forward: 0.1 },
+	international: { scroll: 0.45, mouse: 0.3, click: 0.75, exploratoryClick: 0.35, wait: 0.5, hover: 0.4, form: 0.45, back: 0.3, forward: 0.15, rageClick: 0.2 },
+	rtlUser: { scroll: 0.5, mouse: 0.25, click: 0.8, exploratoryClick: 0.4, wait: 0.4, hover: 0.35, form: 0.4, back: 0.25, forward: 0.1, rageClick: 0.15 },
 
 	// Gaming-inspired patterns (original)
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.9, exploratoryClick: 0.6, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1 },
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.75, exploratoryClick: 0.3, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1 },
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, exploratoryClick: 0.9, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1 },
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1 },
+	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.9, exploratoryClick: 0.6, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1, rageClick: 0.7 },
+	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.75, exploratoryClick: 0.3, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.1 },
+	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, exploratoryClick: 0.9, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1, rageClick: 0.95 },
+	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1, rageClick: 0.05 },
 };
 
 // Puppeteer launch arguments for enhanced stealth and modern browser simulation
