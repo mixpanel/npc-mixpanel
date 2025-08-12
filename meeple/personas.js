@@ -112,8 +112,8 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, perso
 	const totalActions = maxActions || u.rand(25, 100); // Default session length
 	const actionHistory = [];
 
-	// Ensure minimum engagement - at least 40% of actions should be clicks
-	const minClicks = Math.floor(totalActions * 0.4);
+	// Ensure minimum engagement - at least 80% of actions should be clicks (doubled for better heatmap data)
+	const minClicks = Math.floor(totalActions * 0.8);
 	let clickCount = 0;
 
 	// Prevent excessive consecutive same actions

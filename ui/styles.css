@@ -696,6 +696,33 @@ button[type="submit"]:active {
     min-width: 80px;
     text-align: center;
     color: var(--text-secondary);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tab-close-btn {
+    background: rgba(204, 51, 43, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.tab-close-btn:hover {
+    background: rgba(204, 51, 43, 1);
+    transform: scale(1.1);
 }
 
 .terminal-tab:hover {

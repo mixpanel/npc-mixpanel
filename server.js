@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
 					const spawnNumber = message.match(/\((\d+)\/\d+\)/)?.[1];
 					if (spawnNumber) {
 						socket.emit('job_update', { 
-							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: ${meepleId}`, 
+							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: <span style="color: #FF7557;">${meepleId}</span>`, 
 							meepleId: null 
 						});
 					}

@@ -457,10 +457,22 @@ function addTerminalLineToTab(meepleId, message) {
 		// Check if this message indicates meeple completion/failure
 		// ONLY close on the final "simulation complete." message, not intermediate "completed" messages
 		if (message.includes('simulation complete.')) {
-			// Close the tab after a longer delay to let users see the final message
-			setTimeout(() => {
-				closeMeepleTab(meepleId);
-			}, 20000); // 20 second delay
+			// Add a close button to the tab header
+			const tab = meepleTabsData[meepleId];
+			if (tab && tab.header) {
+				// Check if close button already exists
+				if (!tab.header.querySelector('.tab-close-btn')) {
+					const closeBtn = document.createElement('button');
+					closeBtn.className = 'tab-close-btn';
+					closeBtn.innerHTML = '×';
+					closeBtn.title = 'Close this meeple tab';
+					closeBtn.addEventListener('click', (e) => {
+						e.stopPropagation(); // Prevent tab switching
+						closeMeepleTab(meepleId);
+					});
+					tab.header.appendChild(closeBtn);
+				}
+			}
 		}
 	}
 }

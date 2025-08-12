@@ -63,16 +63,20 @@ export default async function main(PARAMS = {}, logFunction = null) {
 
 					if (result && !result.error && !result.timedOut) {
 						log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					} else if (result && result.timedOut) {
 						log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					} else {
 						log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					}
 
 					resolve(result || { error: 'Unknown error', user: i + 1 });
 				} catch (e) {
 					const errorMsg = e.message || 'Unknown error';
 					log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
+					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					resolve({ error: errorMsg, user: i + 1, crashed: true });
 				}
 			});
