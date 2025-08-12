@@ -88,17 +88,41 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
+	// Enhanced simulation summary for general tab
 	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
 
+	// Calculate total actions performed
+	let totalActions = 0;
+	let totalSuccessfulActions = 0;
+	
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
-			return r.value;
+			const result = r.value;
+			if (result && result.actions) {
+				totalActions += result.actions.length;
+				totalSuccessfulActions += result.actions.filter(action => action.success !== false).length;
+			}
+			return result;
 		} else {
 			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
 			return { error: r.reason?.message || 'Promise rejected', crashed: true };
 		}
 	}).filter(Boolean);
+
+	// Send detailed summary to general tab (null meepleId)
+	log(``, null); // Empty line
+	log(`🎯 <span style="color: #07B096;">Mission Accomplished!</span>`, null);
+	log(`📈 Total Actions Performed: ${totalActions}`, null);
+	log(`✅ Successful Actions: ${totalSuccessfulActions}`, null);
+	log(`📊 Action Success Rate: ${totalActions > 0 ? ((totalSuccessfulActions / totalActions) * 100).toFixed(1) : 0}%`, null);
+	log(`🤖 Meeple Performance:`, null);
+	log(`  ├─ ✅ Completed successfully: ${successful}`, null);
+	if (timedOut > 0) log(`  ├─ ⏰ Timed out: ${timedOut}`, null);
+	if (crashed > 0) log(`  ├─ 💥 Crashed: ${crashed}`, null);
+	if (failed > 0) log(`  └─ ❌ Failed to start: ${failed}`, null);
+	log(``, null); // Empty line
+	log(`🎉 All meeples have completed their digital adventures!`, null);
 
 	return finalResults;
 }

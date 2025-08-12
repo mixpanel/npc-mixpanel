@@ -60,17 +60,80 @@ io.on('connection', (socket) => {
 			const jobId = uid(4);
 			const coercedData = coerceTypes(data);
 
-			socket.emit('job_update', `🚀 Starting simulation job: ${jobId}`);
-			socket.emit('job_update', `look in the console tabs for meeple updates`);
+			// Send initial status to general tab (no meepleId)
+			socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
+			socket.emit('job_update', { message: `📋 Configuration: ${coercedData.users} meeples, concurrency: ${Math.min(coercedData.users, coercedData.concurrency || 10)}, headless: ${coercedData.headless}`, meepleId: null });
+			socket.emit('job_update', { message: `🎯 Target: ${coercedData.url}`, meepleId: null });
+			socket.emit('job_update', { message: `💉 Mixpanel injection: ${coercedData.inject ? 'enabled' : 'disabled'}`, meepleId: null });
+			socket.emit('job_update', { message: `⏰ Job started at ${new Date().toLocaleTimeString()}`, meepleId: null });
+			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
+			socket.emit('job_update', { message: `👀 Watch individual meeple progress in their dedicated tabs`, meepleId: null });
+			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
+			
 			logger.notice(`/SIMULATE START`, coercedData);
 			
-			// Create job-specific logger that sends to this socket
-			const jobLogger = (message, meepleId) => log(message, meepleId, socket);
+			// Enhanced job logger with periodic progress updates
+			let jobStartTime = Date.now();
+			let completedMeeples = 0;
+			let totalMeeples = coercedData.users;
+			
+			const jobLogger = (message, meepleId) => {
+				// Send all messages through the existing log function
+				log(message, meepleId, socket);
+				
+				// Track meeple completions for general tab progress updates
+				if (meepleId && (message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))) {
+					completedMeeples++;
+					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
+					const progress = ((completedMeeples / totalMeeples) * 100).toFixed(1);
+					
+					socket.emit('job_update', { 
+						message: `📈 Progress: ${completedMeeples}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`, 
+						meepleId: null 
+					});
+					
+					if (completedMeeples === totalMeeples) {
+						socket.emit('job_update', { message: ``, meepleId: null });
+						socket.emit('job_update', { message: `🎯 All meeples have finished their missions!`, meepleId: null });
+					}
+				}
+				
+				// Track meeple spawns for general tab
+				if (meepleId && message.includes('Spawning')) {
+					const spawnNumber = message.match(/\((\d+)\/\d+\)/)?.[1];
+					if (spawnNumber) {
+						socket.emit('job_update', { 
+							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: ${meepleId}`, 
+							meepleId: null 
+						});
+					}
+				}
+			};
+			
+			// Send periodic time updates
+			const progressInterval = setInterval(() => {
+				const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
+				socket.emit('job_update', { 
+					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples}`, 
+					meepleId: null 
+				});
+			}, 30000); // Every 30 seconds
+			
 			const result = await main(coercedData, jobLogger);
+			
+			// Clear the progress interval
+			clearInterval(progressInterval);
+			
 			const endTime = Date.now();
 			const duration = (endTime - startTime) / 1000;
 			logger.notice(`/SIMULATE END in ${duration} seconds`, { ...coercedData, duration });
-			socket.emit('job_update', `✅ Job completed: ${jobId}`);
+			
+			// Enhanced completion summary for general tab
+			socket.emit('job_update', { message: ``, meepleId: null });
+			socket.emit('job_update', { message: `🏁 Simulation Complete!`, meepleId: null });
+			socket.emit('job_update', { message: `⏱️ Total duration: ${duration.toFixed(2)} seconds`, meepleId: null });
+			socket.emit('job_update', { message: `📊 Check the detailed summary below for results`, meepleId: null });
+			socket.emit('job_update', { message: `✅ Job completed: ${jobId}`, meepleId: null });
 			socket.emit('job_complete', result);
 
 		} catch (error) {

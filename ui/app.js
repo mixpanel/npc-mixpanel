@@ -520,14 +520,14 @@ form.addEventListener('submit', async (e) => {
 	// Show terminal and hide open button
 	terminal.classList.remove('hidden');
 	openTerminalButton.classList.add('hidden');
-	addTerminalLine(terminalContent, '🔌 Connecting to server...');
+	addTerminalLineToTab('general', '🔌 Connecting to server...');
 
 	// Connect to WebSocket (same server for Cloud Run)
 	const socket = io({ reconnection: true });
 
 	socket.on('connect', () => {
 		startTime = Date.now();
-		addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
+		addTerminalLineToTab('general', '✅ Connected to server. Sending data...');
 		socket.emit('start_job', data);
 		loading.style.display = 'none';
 	});
