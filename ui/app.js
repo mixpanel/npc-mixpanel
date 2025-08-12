@@ -534,8 +534,17 @@ form.addEventListener('submit', async (e) => {
 	openTerminalButton.classList.add('hidden');
 	addTerminalLineToTab('general', '🔌 Connecting to server...');
 
-	// Connect to WebSocket (same server for Cloud Run)
-	const socket = io({ reconnection: true });
+	// Get user from cookie for server-side analytics (parse IAP format: accounts.google.com:user@example.com)
+	const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
+	const user = userCookie ? decodeURIComponent(userCookie.split('=')[1]).split(":").pop() : null;
+	
+	// Connect to WebSocket (same server for Cloud Run) with user info
+	const socket = io({ 
+		reconnection: true,
+		auth: {
+			user: user
+		}
+	});
 
 	socket.on('connect', () => {
 		startTime = Date.now();

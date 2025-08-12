@@ -8,15 +8,26 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { cloudLog, logger } from './utils/cloudLogger.js';
 import cookieParser from 'cookie-parser';
+import * as Mixpanel from 'mixpanel';
+import { Diagnostics } from 'ak-diagnostic';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { NODE_ENV = "production" } = process.env;
+const {
+	NODE_ENV = "production",
+	MIXPANEL_TRACKING_TOKEN = "6c3bc01ddc1f16d01e4fda11d3a4d166"
+} = process.env;
 let io = null;
 
 const app = express();
 const httpServer = createServer(app);
+const mp = Mixpanel.init(MIXPANEL_TRACKING_TOKEN, {
+	debug: NODE_ENV === 'dev',
+	geolocate: false,
+	keepAlive: false
+});
 
 // Parse JSON bodies
 app.use(express.json());
@@ -52,13 +63,19 @@ io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id });
+	// Extract user from socket auth (passed from client)
+	const user = socket.handshake.auth?.user || 'anonymous';
+	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
 	var startTime = Date.now();
 
 	socket.on('start_job', async (data) => {
+		const diagnostics = new Diagnostics({
+			name: 'npc-mixpanel-server',
+		});
 		try {
 			const jobId = uid(4);
 			const coercedData = coerceTypes(data);
+
 
 			// Send initial status to general tab (no meepleId)
 			socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
@@ -69,65 +86,104 @@ io.on('connection', (socket) => {
 			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
 			socket.emit('job_update', { message: `👀 Watch individual meeple progress in their dedicated tabs`, meepleId: null });
 			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
-			
-			logger.notice(`/SIMULATE START`, coercedData);
-			
+
+			// Server-side analytics: Track job start
+			logger.notice(`/SIMULATE START`, { ...coercedData, user, jobId });
+			diagnostics.start();
+
+			// Mixpanel server-side tracking
+			const userId = user || 'unauthenticated';
+			mp.track('server: job start', {
+				distinct_id: userId,
+				jobId,
+				url: coercedData.url,
+				users: coercedData.users,
+				concurrency: coercedData.concurrency,
+				headless: coercedData.headless,
+				inject: coercedData.inject
+			});
+
 			// Enhanced job logger with periodic progress updates
 			let jobStartTime = Date.now();
 			let completedMeeples = 0;
 			let totalMeeples = coercedData.users;
-			
+
 			const jobLogger = (message, meepleId) => {
 				// Send all messages through the existing log function
 				log(message, meepleId, socket);
-				
+
 				// Track meeple completions for general tab progress updates
 				if (meepleId && (message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))) {
 					completedMeeples++;
 					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
 					const progress = ((completedMeeples / totalMeeples) * 100).toFixed(1);
-					
-					socket.emit('job_update', { 
-						message: `📈 Progress: ${completedMeeples}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`, 
-						meepleId: null 
+
+					socket.emit('job_update', {
+						message: `📈 Progress: ${completedMeeples}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`,
+						meepleId: null
 					});
-					
+
 					if (completedMeeples === totalMeeples) {
 						socket.emit('job_update', { message: ``, meepleId: null });
 						socket.emit('job_update', { message: `🎯 All meeples have finished their missions!`, meepleId: null });
 					}
 				}
-				
+
 				// Track meeple spawns for general tab
 				if (meepleId && message.includes('Spawning')) {
 					const spawnNumber = message.match(/\((\d+)\/\d+\)/)?.[1];
 					if (spawnNumber) {
-						socket.emit('job_update', { 
-							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: <span style="color: #FF7557;">${meepleId}</span>`, 
-							meepleId: null 
+						socket.emit('job_update', {
+							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: <span style="color: #FF7557;">${meepleId}</span>`,
+							meepleId: null
 						});
 					}
 				}
 			};
-			
+
 			// Send periodic time updates
 			const progressInterval = setInterval(() => {
 				const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
-				socket.emit('job_update', { 
-					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples}`, 
-					meepleId: null 
+				socket.emit('job_update', {
+					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples}`,
+					meepleId: null
 				});
 			}, 30000); // Every 30 seconds
-			
+
 			const result = await main(coercedData, jobLogger);
-			
+
 			// Clear the progress interval
 			clearInterval(progressInterval);
-			
+
 			const endTime = Date.now();
 			const duration = (endTime - startTime) / 1000;
-			logger.notice(`/SIMULATE END in ${duration} seconds`, { ...coercedData, duration });
-			
+			diagnostics.stop();
+			const report = diagnostics.report();
+
+			// Server-side analytics: Track job completion
+			logger.notice(`/SIMULATE END in ${duration} seconds`, {
+				...coercedData,
+				user,
+				jobId,
+				duration,
+				completedMeeples,
+				totalMeeples,
+				report
+			});
+
+
+			// Mixpanel server-side tracking
+			mp.track('server: job finish', {
+				distinct_id: userId,
+				jobId,
+				duration,
+				completedMeeples,
+				totalMeeples,
+				url: coercedData.url,
+				users: coercedData.users,
+				diagnostics: report
+			});
+
 			// Enhanced completion summary for general tab
 			socket.emit('job_update', { message: ``, meepleId: null });
 			socket.emit('job_update', { message: `🏁 Simulation Complete!`, meepleId: null });
@@ -137,6 +193,27 @@ io.on('connection', (socket) => {
 			socket.emit('job_complete', result);
 
 		} catch (error) {
+			// Server-side analytics: Track job error
+			logger.error(`/SIMULATE ERROR`, {
+				user,
+				error: error.message,
+				stack: error.stack,
+				data: coercedData
+			});
+
+			// Mixpanel server-side tracking
+			const userId = user || 'unauthenticated';
+			diagnostics.stop();
+			const report = diagnostics.report();
+			mp.track('server: job error', {
+				distinct_id: userId,
+				jobId: coercedData.jobId,
+				error: error.message,
+				url: coercedData.url,
+				users: coercedData.users,
+				diagnostics: report
+			});
+
 			socket.emit('error', `❌ Job failed: ${error.message}`);
 		}
 	});
@@ -186,6 +263,9 @@ app.get('/', (req, res) => {
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
 	const runId = uid();
+	// Extract user from IAP header and parse same as client-side
+	const rawUser = req.headers["x-goog-authenticated-user-email"];
+	const user = rawUser ? rawUser.split(":").pop() : 'anonymous';
 
 	try {
 		const mergedParams = {
@@ -194,20 +274,61 @@ app.post('/simulate', async (req, res) => {
 			runId
 		};
 		const startTime = Date.now();
-		logger.notice(`/SIMULATE START`, mergedParams);
+
+		// Server-side analytics: Track API job start
+		logger.notice(`/SIMULATE START`, { ...mergedParams, user });
+
+		// Mixpanel server-side tracking
+		const userId = user || 'unauthenticated';
+		mp.track('server: job start', {
+			distinct_id: userId,
+			runId,
+			url: mergedParams.url,
+			users: mergedParams.users,
+			source: 'api'
+		});
+
 		const result = await main(mergedParams, log);
 		const endTime = Date.now();
 		const duration = (endTime - startTime) / 1000;
-		logger.notice(`/SIMULATE END in ${duration} seconds`, { ...mergedParams, duration });
+
+		// Server-side analytics: Track API job completion
+		logger.notice(`/SIMULATE END in ${duration} seconds`, {
+			...mergedParams,
+			user,
+			duration
+		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: job finish', {
+			distinct_id: userId,
+			runId,
+			duration,
+			url: mergedParams.url,
+			users: mergedParams.users,
+			source: 'api'
+		});
+
 		res.status(200).json(result);
 
 	} catch (error) {
+		// Server-side analytics: Track API job error
 		logger.error(`ERROR: ${req.path}`, {
 			path: req.path,
+			user,
 			error: error.message,
 			stack: error.stack,
 			runId
 		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: job error', {
+			distinct_id: userId,
+			runId,
+			error: error.message,
+			source: 'api'
+		});
+
 		res.status(500).json({ error: error.message });
 	}
 });

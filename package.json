@@ -24,12 +24,14 @@
 	"description": "puppeteer in the cloud!",
 	"dependencies": {
 		"@google-cloud/storage": "^7.12.0",
+		"ak-diagnostic": "^1.0.0",
 		"ak-fetch": "^1.0.6",
 		"ak-tools": "^1.0.66",
 		"cookie-parser": "^1.4.7",
 		"dayjs": "^1.11.10",
 		"dotenv": "^16.4.5",
 		"express": "^4.18.2",
+		"mixpanel": "^0.18.1",
 		"p-limit": "^6.1.0",
 		"puppeteer": "^23.6.1",
 		"socket.io": "^4.8.1"
