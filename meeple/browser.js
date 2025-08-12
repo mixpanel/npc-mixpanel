@@ -7,14 +7,47 @@ const { NODE_ENV = "" } = process.env;
 const agents = await u.load('./meeple/agents.json', true);
 
 /**
- * @typedef {import('puppeteer').Browser} Browser
+ * Set user agent with random selection from agents.json
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @returns {Promise<Object>} - User agent and headers object
  */
+export async function spoofAgent(page, log = console.log) {
+	const agent = u.shuffle(agents).slice().pop();
+	const { userAgent, ...headers } = agent;
+	const set = await setUserAgent(page, userAgent, headers, log);
+	log(`    │  └─ 🥸 User agent: ${userAgent}`);
+	return set;
+}
+
+/**
+ * Set the user agent and additional headers for the page
+ * @param {Page} page - Puppeteer page object
+ * @param {string} userAgent - User agent string
+ * @param {Object} additionalHeaders - Additional headers to set
+ * @param {Function} log - Logging function
+ * @returns {Promise<Object>} - User agent and headers object
+ */
+export async function setUserAgent(page, userAgent, additionalHeaders = {}, log = console.log) {
+	if (!page) throw new Error("Browser not initialized");
+
+	await page.setUserAgent(userAgent);
+
+	if (Object.keys(additionalHeaders).length > 0) {
+		await page.setExtraHTTPHeaders(additionalHeaders);
+	}
+
+	return { userAgent, additionalHeaders };
+}
+
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
 
 /**
  * Launch a new browser instance with proper configuration
  * @param {boolean} headless - Whether to run in headless mode
  * @param {Function} log - Logging function
- * @returns {Object} - Browser instance
+ * @returns {Promise<Browser>} - Browser instance
  */
 export async function launchBrowser(headless = true, log = console.log) {
 	try {
@@ -44,7 +77,7 @@ export async function launchBrowser(headless = true, log = console.log) {
  * Create a new page with realistic user agent and configuration
  * @param {Browser} browser - Browser instance
  * @param {Function} log - Logging function
- * @returns {Object} - Page instance
+ * @returns {Promise<Page>} - Page instance
  */
 export async function createPage(browser, log = console.log) {
 	try {
@@ -96,10 +129,10 @@ export async function createPage(browser, log = console.log) {
 
 /**
  * Navigate to a URL with timeout and error handling
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {string} url - URL to navigate to
  * @param {Function} log - Logging function
- * @returns {Object} - Navigation response
+ * @returns {Promise<any>} - Navigation response
  */
 export async function navigateToUrl(page, url, log = console.log) {
 	try {
@@ -110,7 +143,7 @@ export async function navigateToUrl(page, url, log = console.log) {
 			timeout: 60000 // 1 minute timeout
 		});
 
-		if (!response.ok()) {
+		if (response && !response.ok()) {
 			log(`⚠️ HTTP ${response.status()}: ${response.statusText()}`);
 		} else {
 			log(`✅ Page loaded successfully`);
@@ -125,9 +158,9 @@ export async function navigateToUrl(page, url, log = console.log) {
 
 /**
  * Get page title and basic information
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
- * @returns {Object} - Page information
+ * @returns {Promise<Object>} - Page information
  */
 export async function getPageInfo(page, log = console.log) {
 	try {
@@ -155,7 +188,7 @@ export async function getPageInfo(page, log = console.log) {
 
 /**
  * Close browser instance safely
- * @param {Object} browser - Browser instance to close
+ * @param {Browser} browser - Browser instance to close
  * @param {Function} log - Logging function
  */
 export async function closeBrowser(browser, log = console.log) {

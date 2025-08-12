@@ -1,3 +1,6 @@
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 import { formTestData } from './entities.js';
 import u from 'ak-tools';
 

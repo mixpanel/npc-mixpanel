@@ -1,3 +1,6 @@
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 import {
 	primaryButtonSelectors,
 	regularButtonSelectors,
@@ -6,7 +9,7 @@ import {
 	formTestData,
 	actionWords,
 	interactiveSelectors
-} from './entities.js';
+} from './entities.js';\nimport { randomBetween } from './utils.js';
 
 // Click fuzziness configuration for different interaction types
 export const CLICK_FUZZINESS = {
@@ -197,7 +200,7 @@ export function generateHumanizedPath(startX, startY, endX, endY, targetWidth = 
 
 /**
  * Ultra-realistic mouse movement with advanced timing
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {number} startX - Starting X coordinate
  * @param {number} startY - Starting Y coordinate
  * @param {number} endX - Ending X coordinate
@@ -234,7 +237,7 @@ export async function moveMouse(page, startX, startY, endX, endY, targetWidth = 
 
 /**
  * Perform exploratory clicking in content areas
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
  */
 export async function exploratoryClick(page, log = console.log) {
@@ -308,7 +311,7 @@ export async function exploratoryClick(page, log = console.log) {
 
 /**
  * Perform rage clicking - multiple rapid clicks when frustrated
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
  */
 export async function rageClick(page, log = console.log) {
@@ -498,7 +501,7 @@ function generateFrustratedMousePath(startX, startY, endX, endY, targetWidth = 5
 
 /**
  * Track mouse movement for heatmap data
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Object} target - Target element information
  * @param {Function} log - Logging function
  */
@@ -526,7 +529,7 @@ export async function trackMouseMovement(page, target, log = null) {
 
 /**
  * Simulate reading movements during hover
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Object} target - Target element information
  * @param {number} hoverDuration - Duration of hover in milliseconds
  * @param {string} persona - User persona affecting reading behavior
@@ -569,7 +572,7 @@ export async function simulateReadingMovements(page, target, hoverDuration, pers
 
 /**
  * Track hover dwell event with comprehensive data
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Object} target - Target element information
  * @param {number} hoverDuration - Duration of hover in milliseconds
  * @param {string} persona - User persona
@@ -1196,4 +1199,58 @@ function calculateHoverDuration(target, persona) {
 	const finalDuration = baseHoverTime + (Math.random() - 0.5) * 2 * variation;
 
 	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
+}
+
+/**
+ * Simple pause function for timing delays
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} - Always returns true
+ */
+export async function shortPause(log = console.log) {
+	const delay = randomBetween(1000, 3000);
+	log(`⏸️ Short pause: ${delay}ms`);
+	await new Promise(resolve => setTimeout(resolve, delay));
+	return true;
+}
+
+/**
+ * Perform random mouse movement
+ * @param {Page} page - Puppeteer page object  
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function randomMouse(page, log = console.log) {
+	try {
+		const viewport = await page.viewport();
+		const startX = Math.random() * viewport.width;
+		const startY = Math.random() * viewport.height;
+		const endX = Math.random() * viewport.width;
+		const endY = Math.random() * viewport.height;
+		
+		await moveMouse(page, startX, startY, endX, endY, 50, 50, log);
+		return true;
+	} catch (error) {
+		log(`⚠️ Random mouse error: ${error.message}`);
+		return false;
+	}
+}
+
+/**
+ * Perform random scrolling on the page
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function  
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function randomScroll(page, log = console.log) {
+	try {
+		const scrollDistance = randomBetween(-500, 500);
+		await page.evaluate((distance) => {
+			window.scrollBy(0, distance);
+		}, scrollDistance);
+		log(`📜 Random scroll: ${scrollDistance}px`);
+		return true;
+	} catch (error) {
+		log(`⚠️ Random scroll error: ${error.message}`);
+		return false;
+	}
 }

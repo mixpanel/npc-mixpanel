@@ -1,3 +1,6 @@
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
+
 import u from 'ak-tools';
 import injectMixpanel from '../utils/injectMixpanel.js';
 import { relaxedCSP } from './entities.js';
@@ -22,7 +25,7 @@ export async function retry(operation, maxRetries = 3, delay = 1000) {
 
 /**
  * Inject Mixpanel into the browser page with multiple fallback strategies
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {string} username - Username for tracking
  * @param {Object} opts - Options object with masking settings
  * @param {Function} log - Logging function
@@ -111,7 +114,7 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 
 /**
  * Fast CSP check and relaxation - only applies if needed (no-op if already relaxed)
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
  */
 export async function ensureCSPRelaxed(page, log = console.log) {
@@ -133,7 +136,7 @@ export async function ensureCSPRelaxed(page, log = console.log) {
 
 /**
  * Fast Mixpanel check and injection - only injects if needed (no-op if already working)
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {string} username - Username for tracking
  * @param {Object} opts - Options object with masking settings
  * @param {Function} log - Logging function
@@ -157,7 +160,7 @@ export async function ensureMixpanelInjected(page, username, opts = {}, log = co
 
 /**
  * Comprehensive CSP and security bypass
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
  */
 export async function relaxCSP(page, log = console.log) {
@@ -239,7 +242,7 @@ export async function relaxCSP(page, log = console.log) {
 
 /**
  * Combined function to ensure both CSP relaxation and Mixpanel injection
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {string} username - Username for tracking
  * @param {boolean} inject - Whether to inject Mixpanel
  * @param {Object} opts - Options object with masking settings

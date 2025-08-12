@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
+import { retry } from './utils.js';
 dayjs.extend(utc);
 
 /**
@@ -67,4 +68,65 @@ export function extractTopLevelDomain(hostname) {
 	} catch (error) {
 		return hostname;
 	}
+}
+
+/**
+ * Force spoof time in browser by injecting time manipulation code
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ */
+export async function forceSpoofTimeInBrowser(page, log = console.log) {
+	const spoofedTimestamp = getRandomTimestampWithinLast5Days(log);
+	const spoofTimeFunctionString = spoofTime.toString();
+	log(`	├─ 🕰️ Spoofing time to: ${dayjs(spoofedTimestamp).toISOString()}`);
+
+	await retry(async () => {
+		await page.evaluateOnNewDocument((timestamp, spoofTimeFn) => {
+			const injectedFunction = new Function(`return (${spoofTimeFn})`)();
+			injectedFunction(timestamp);
+		}, spoofedTimestamp, spoofTimeFunctionString);
+	});
+}
+
+// The time spoofing function that will be serialized and injected
+function spoofTime(startTimestamp) {
+	function DO_TIME_SPOOF() {
+		const actualDate = Date;
+		const actualNow = Date.now;
+		const actualPerformanceNow = performance.now;
+
+		// Calculate the offset
+		const offset = actualNow() - startTimestamp;
+
+		// Override Date constructor
+		function FakeDate(...args) {
+			if (args.length === 0) {
+				return new actualDate(actualNow() - offset);
+			}
+			return new actualDate(...args);
+		}
+
+		// Copy static methods
+		FakeDate.now = () => actualNow() - offset;
+		FakeDate.parse = actualDate.parse;
+		FakeDate.UTC = actualDate.UTC;
+
+		// Override instance methods
+		FakeDate.prototype = actualDate.prototype;
+
+		// Override Date.now
+		Date.now = () => actualNow() - offset;
+
+		// Override performance.now
+		performance.now = function () {
+			const timeSincePageLoad = actualPerformanceNow.call(performance);
+			return (actualNow() - offset) - (Date.now() - timeSincePageLoad);
+		};
+
+		// Replace window Date
+		window.Date = FakeDate;
+
+		return { spoof: true };
+	}
+	return DO_TIME_SPOOF();
 }

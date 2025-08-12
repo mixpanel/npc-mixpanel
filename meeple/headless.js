@@ -3,6 +3,10 @@ dotenv.config();
 import pLimit from 'p-limit';
 import u from 'ak-tools';
 
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 // Import from new modular structure
 import { ensurePageSetup, retry, relaxCSP } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
@@ -23,6 +27,7 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
  * Main function to simulate user behavior.
  * @param {Object} PARAMS - Configuration parameters
  * @param {Function} logFunction - Optional logging function for real-time updates
+ * @returns {Promise<Array>} Array of simulation results
  */
 export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
@@ -229,11 +234,14 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 
 /**
  * Execute the main user session with action sequence
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Array} actionSequence - Array of actions to perform
+ * @param {Array} hotZones - Array of identified hot zones
+ * @param {string} persona - Selected persona type
  * @param {string} usersHandle - User identifier
  * @param {Object} opts - Options object
  * @param {Function} log - Logging function
+ * @returns {Promise<Array>} Array of completed actions
  */
 async function simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, opts, log) {
 	const actionResults = [];
@@ -356,8 +364,9 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 
 /**
  * Perform scroll action
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
+ * @returns {Promise<void>}
  */
 async function performScroll(page, log) {
 	try {
