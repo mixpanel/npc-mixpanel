@@ -9,7 +9,8 @@ import {
 	formTestData,
 	actionWords,
 	interactiveSelectors
-} from './entities.js';\nimport { randomBetween } from './utils.js';
+} from './entities.js';
+import { randomBetween } from './utils.js';
 
 // Click fuzziness configuration for different interaction types
 export const CLICK_FUZZINESS = {
@@ -51,13 +52,13 @@ export async function wait() {
 	
 	if (waitType < 0.6) {
 		// Quick pause (60% of the time)
-		delay = Math.random() * 800 + 200; // 200-1000ms
+		delay = Math.random() * 400 + 100; // 100-500ms (was 200-1000ms)
 	} else if (waitType < 0.9) {
 		// Medium pause (30% of the time)
-		delay = Math.random() * 2000 + 1000; // 1-3 seconds
+		delay = Math.random() * 1000 + 500; // 500-1500ms (was 1-3 seconds)
 	} else {
 		// Longer pause (10% of the time)
-		delay = Math.random() * 4000 + 2000; // 2-6 seconds
+		delay = Math.random() * 2000 + 1000; // 1-3 seconds (was 2-6 seconds)
 	}
 	
 	await new Promise(resolve => setTimeout(resolve, delay));
@@ -404,9 +405,9 @@ export async function rageClick(page, log = console.log) {
 				delay: Math.random() * 30 + 10 // 10-40ms click duration (shorter than normal)
 			});
 			
-			// Variable delay between rage clicks (50-200ms)
+			// Variable delay between rage clicks (25-100ms, was 50-200ms)
 			if (i < clickCount - 1) {
-				const interClickDelay = 50 + Math.random() * 150;
+				const interClickDelay = 25 + Math.random() * 75;
 				await new Promise(resolve => setTimeout(resolve, interClickDelay));
 			}
 		}
@@ -418,7 +419,7 @@ export async function rageClick(page, log = console.log) {
 		}, boundedPos.x, boundedPos.y);
 		
 		// Brief pause after rage clicking (frustration/recovery time)
-		const recoveryTime = 500 + Math.random() * 1000; // 0.5-1.5s
+		const recoveryTime = 250 + Math.random() * 500; // 0.25-0.75s (was 0.5-1.5s)
 		await new Promise(resolve => setTimeout(resolve, recoveryTime));
 		
 	} catch (error) {
@@ -643,11 +644,11 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			);
 
 			// More realistic pause before clicking (humans don't click immediately)
-			await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 200)); // 200-800ms
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 100)); // 100-400ms (was 200-800ms)
 
 			// Natural click with slight delay
 			await page.mouse.click(targetX, targetY, {
-				delay: Math.random() * 100 + 50, // 50-150ms
+				delay: Math.random() * 50 + 25, // 25-75ms (was 50-150ms)
 				count: 1,
 				button: 'left'
 			});
@@ -655,7 +656,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			log(`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
 
 			// Pause after click to see results
-			await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 300)); // 300-1000ms
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 150)); // 150-500ms (was 300-1000ms)
 			return true;
 		}
 
@@ -761,11 +762,11 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		);
 
 		// More realistic pause before clicking (humans take time to aim)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 200)); // 200-800ms
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 100)); // 100-400ms (was 200-800ms)
 
 		// Natural click with more realistic timing
 		await page.mouse.click(targetX, targetY, {
-			delay: Math.random() * 100 + 50, // 50-150ms
+			delay: Math.random() * 50 + 25, // 25-75ms (was 50-150ms)
 			count: 1,
 			button: 'left'
 		});
@@ -778,7 +779,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 
 			for (let i = 0; i < additionalClicks; i++) {
 				// Brief pause between rapid clicks
-				await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100)); // 100-300ms
+				await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50)); // 50-150ms (was 100-300ms)
 
 				// Nearby click with smaller fuzziness (frustrated clicking behavior)
 				const nearbyX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * rect.width * 0.3;
@@ -792,7 +793,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		}
 
 		// Pause after click to see results (more realistic)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 300)); // 300-1000ms
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 150)); // 150-500ms (was 300-1000ms)
 
 		return true;
 	} catch (error) {
@@ -891,7 +892,7 @@ export async function intelligentScroll(page, hotZones = [], log = console.log) 
 		}, targetScroll);
 
 		// Wait for scroll to complete (more realistic timing)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 700 + 800)); // 800-1500ms
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 400)); // 400-750ms (was 800-1500ms)
 
 		log(`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`);
 		return true;
@@ -962,7 +963,7 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 		);
 
 		// Longer, more realistic pause (users move mouse then pause to read/think)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 1200 + 800)); // 800-2000ms
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 400)); // 400-1000ms (was 800-2000ms)
 
 		// Track mouse movement for heatmap data
 		await trackMouseMovement(page, target, log);
@@ -1121,28 +1122,28 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
  * Calculate realistic hover duration based on content type and persona
  */
 function calculateHoverDuration(target, persona) {
-	// Base durations by content type (in milliseconds)
+	// Base durations by content type (in milliseconds) - reduced by ~50%
 	const contentTypeDurations = {
 		// Reading content - longer hover times
-		text: { min: 3000, max: 8000 },
-		paragraph: { min: 4000, max: 12000 },
-		article: { min: 5000, max: 15000 },
+		text: { min: 1500, max: 4000 },
+		paragraph: { min: 2000, max: 6000 },
+		article: { min: 2500, max: 7500 },
 
 		// Interactive elements - moderate hover times
-		button: { min: 2000, max: 6000 },
-		link: { min: 1500, max: 5000 },
-		form: { min: 3000, max: 7000 },
+		button: { min: 1000, max: 3000 },
+		link: { min: 750, max: 2500 },
+		form: { min: 1500, max: 3500 },
 
 		// Media content - variable hover times
-		image: { min: 2000, max: 8000 },
-		video: { min: 3000, max: 10000 },
+		image: { min: 1000, max: 4000 },
+		video: { min: 1500, max: 5000 },
 
 		// Navigation - shorter hover times
-		nav: { min: 1000, max: 3000 },
-		menu: { min: 1500, max: 4000 },
+		nav: { min: 500, max: 1500 },
+		menu: { min: 750, max: 2000 },
 
 		// Default for unknown content
-		default: { min: 2000, max: 6000 }
+		default: { min: 1000, max: 3000 }
 	};
 
 	// Determine content type based on target properties
@@ -1198,7 +1199,7 @@ function calculateHoverDuration(target, persona) {
 	const variation = baseHoverTime * 0.1;
 	const finalDuration = baseHoverTime + (Math.random() - 0.5) * 2 * variation;
 
-	return Math.max(800, Math.round(finalDuration)); // Minimum 800ms hover
+	return Math.max(400, Math.round(finalDuration)); // Minimum 400ms hover (was 800ms)
 }
 
 /**

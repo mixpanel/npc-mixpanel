@@ -1,0 +1,9 @@
+{
+	"cSpell.words": [
+		"meeple",
+		"meeples"
+	],
+	"jest.runMode": "on-demand",
+	"jest.jestCommandLine": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",
+	"jest.rootPath": "/Users/ak/code/npc-mixpanel"
+}

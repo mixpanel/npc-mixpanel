@@ -721,6 +721,35 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 		});
 	}
+
+	// Handle headless checkbox state based on current URL
+	const headlessCheckbox = document.getElementById('headless');
+	const headlessLabel = headlessCheckbox.closest('label');
+	const isLocalhost = window.location.hostname === 'localhost' || 
+					   window.location.hostname === '127.0.0.1' || 
+					   window.location.hostname.startsWith('192.168.') ||
+					   window.location.hostname.startsWith('10.') ||
+					   window.location.hostname.includes('.local');
+
+	if (!isLocalhost) {
+		// When not on localhost, disable the checkbox and check it
+		headlessCheckbox.disabled = true;
+		headlessCheckbox.checked = true;
+		
+		// Add visual styling to show it's disabled
+		headlessLabel.style.opacity = '0.6';
+		headlessLabel.style.cursor = 'not-allowed';
+		headlessLabel.title = 'Headless mode is required when running on cloud/remote servers';
+		
+		// Add disabled styling to the checkbox
+		headlessCheckbox.style.cursor = 'not-allowed';
+	} else {
+		// On localhost, ensure it's enabled and can be toggled
+		headlessCheckbox.disabled = false;
+		headlessLabel.style.opacity = '1';
+		headlessLabel.style.cursor = 'pointer';
+		headlessLabel.title = 'Toggle headless mode (only available when running locally)';
+	}
 });
 
 // analytics

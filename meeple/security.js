@@ -24,7 +24,7 @@ export async function retry(operation, maxRetries = 3, delay = 1000) {
 }
 
 /**
- * Inject Mixpanel into the browser page with multiple fallback strategies
+ * Inject Mixpanel into the browser page with multiple fallback strategies including Trusted Types support
  * @param {Page} page - Puppeteer page object
  * @param {string} username - Username for tracking
  * @param {Object} opts - Options object with masking settings
@@ -34,11 +34,40 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 	const { MIXPANEL_TOKEN = process.env.MIXPANEL_TOKEN } = page;
 	await retry(async () => {
 		try {
-			// Primary injection method using function injection
+			// Primary injection method using function injection with Trusted Types support
 			const injectionResult = await page.evaluate(
 				(injectMixpanelCode, username, opts, MIXPANEL_TOKEN) => {
 					try {
-						// Create a function from the string and execute it
+						// Check if Trusted Types are enabled
+						if (window.trustedTypes && window.trustedTypes.createPolicy) {
+							// Create a Trusted Types policy for script injection
+							let policy;
+							try {
+								policy = window.trustedTypes.createPolicy('mixpanel-injection', {
+									createScript: (input) => input,
+									createScriptURL: (input) => input
+								});
+							} catch (e) {
+								// Policy might already exist, try to get it
+								try {
+									policy = window.trustedTypes.getPolicy('mixpanel-injection');
+								} catch (e2) {
+									// Fallback to default policy if available
+									policy = window.trustedTypes.defaultPolicy;
+								}
+							}
+
+							if (policy) {
+								// Use Trusted Types policy to create script
+								const script = document.createElement('script');
+								const trustedScript = policy.createScript(`(${injectMixpanelCode})('${MIXPANEL_TOKEN}', '${username}', ${JSON.stringify(opts)})`);
+								script.textContent = trustedScript;
+								document.head.appendChild(script);
+								return { success: true, method: 'trustedTypes' };
+							}
+						}
+
+						// Fallback to function creation if Trusted Types not available or failed
 						const injectFunction = new Function('return ' + injectMixpanelCode)();
 						return injectFunction(MIXPANEL_TOKEN, username, opts);
 					} catch (error) {
@@ -52,17 +81,17 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 			);
 
 			if (injectionResult && injectionResult.success) {
-				log(`✅ Mixpanel injected successfully for ${username}`);
+				log(`✅ Mixpanel injected successfully for ${username} (method: ${injectionResult.method || 'function'})`);
 				return true;
 			}
 			if (injectionResult && !injectionResult.success) {
 				log(`⚠️ Primary injection failed for ${username}: ${injectionResult.error}`);
 			}
 
-			// Fallback method using createElement if direct injection fails
-			log(`⚠️ Primary injection failed for ${username} trying fallback...`);
+			// Fallback method using direct eval with Trusted Types bypass
+			log(`⚠️ Primary injection failed for ${username} trying Trusted Types bypass...`);
 
-			const fallbackResult = await page.evaluate(
+			const trustedTypesResult = await page.evaluate(
 				(injectMixpanelCode, username, opts, MIXPANEL_TOKEN) => {
 					try {
 						// Suppress CSP violation errors during injection
@@ -71,23 +100,141 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 							const message = args.join(' ');
 							if (message.includes('Content Security Policy') ||
 								message.includes('CSP') ||
+								message.includes('TrustedScript') ||
+								message.includes('TrustedScriptURL') ||
 								message.includes('eval')) {
-								return; // Suppress CSP-related errors
+								return; // Suppress security-related errors
 							}
 							originalConsoleError.apply(console, args);
 						};
 
-						// Try createElement approach
-						const script = document.createElement('script');
-						script.textContent = `(${injectMixpanelCode})('${MIXPANEL_TOKEN}', '${username}', ${JSON.stringify(opts)})`;
-						document.head.appendChild(script);
+						// Try multiple Trusted Types bypass strategies
+						let policy = null;
+						
+						// Strategy 1: Create permissive policy
+						if (window.trustedTypes && window.trustedTypes.createPolicy) {
+							try {
+								policy = window.trustedTypes.createPolicy('mixpanel-bypass-' + Date.now(), {
+									createScript: (input) => input,
+									createScriptURL: (input) => input,
+									createHTML: (input) => input
+								});
+							} catch (e) {
+								// Policy creation failed, try other strategies
+							}
+						}
 
-						// Restore original console.error after a delay
+						// Strategy 2: Use existing permissive policies
+						if (!policy && window.trustedTypes && window.trustedTypes.getPolicyNames) {
+							const policies = window.trustedTypes.getPolicyNames();
+							for (const policyName of policies) {
+								try {
+									const existingPolicy = window.trustedTypes.getPolicy(policyName);
+									if (existingPolicy && existingPolicy.createScript) {
+										policy = existingPolicy;
+										break;
+									}
+								} catch (e) {
+									// Continue trying other policies
+								}
+							}
+						}
+
+						// Strategy 3: Create script with policy if available
+						if (policy) {
+							try {
+								const script = document.createElement('script');
+								const scriptContent = `(${injectMixpanelCode})('${MIXPANEL_TOKEN}', '${username}', ${JSON.stringify(opts)})`;
+								script.textContent = policy.createScript(scriptContent);
+								document.head.appendChild(script);
+								
+								// Restore original console.error after a delay
+								setTimeout(() => {
+									console.error = originalConsoleError;
+								}, 1000);
+								
+								return { success: true, method: 'trustedTypesPolicy' };
+							} catch (e) {
+								// Policy approach failed, try direct approach
+							}
+						}
+
+						// Strategy 4: Direct injection via iframe context (bypass Trusted Types)
+						try {
+							const iframe = document.createElement('iframe');
+							iframe.style.display = 'none';
+							document.body.appendChild(iframe);
+							
+							const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+							const iframeScript = iframeDoc.createElement('script');
+							iframeScript.textContent = `
+								parent.window.MIXPANEL_INJECTION_CODE = \`${injectMixpanelCode}\`;
+								try {
+									(${injectMixpanelCode})('${MIXPANEL_TOKEN}', '${username}', ${JSON.stringify(opts)});
+									parent.window.MIXPANEL_INJECTION_SUCCESS = true;
+								} catch (e) {
+									parent.window.MIXPANEL_INJECTION_ERROR = e.message;
+								}
+							`;
+							iframeDoc.head.appendChild(iframeScript);
+							
+							// Clean up iframe
+							setTimeout(() => {
+								if (iframe.parentNode) {
+									iframe.parentNode.removeChild(iframe);
+								}
+							}, 100);
+							
+							// Check if injection succeeded
+							setTimeout(() => {
+								if (window.MIXPANEL_INJECTION_SUCCESS) {
+									return { success: true, method: 'iframe' };
+								}
+							}, 50);
+							
+						} catch (e) {
+							// Iframe approach failed
+						}
+
+						// Strategy 5: Function constructor bypass with Promises
+						try {
+							const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+							const asyncInject = new AsyncFunction('injectCode', 'token', 'username', 'opts', `
+								return new Promise((resolve, reject) => {
+									try {
+										const fn = new Function('return ' + injectCode)();
+										const result = fn(token, username, opts);
+										resolve(result);
+									} catch (e) {
+										reject(e);
+									}
+								});
+							`);
+							
+							// Use .then() instead of await since we're in browser context
+							return asyncInject(injectMixpanelCode, MIXPANEL_TOKEN, username, opts)
+								.then(result => {
+									// Restore original console.error after a delay
+									setTimeout(() => {
+										console.error = originalConsoleError;
+									}, 1000);
+									
+									return result || { success: true, method: 'asyncFunction' };
+								})
+								.catch(e => {
+									// Function constructor failed, continue to next strategy
+									throw e;
+								});
+						} catch (e) {
+							// Function constructor failed
+						}
+
+						// Restore original console.error
 						setTimeout(() => {
 							console.error = originalConsoleError;
 						}, 1000);
 
-						return { success: true, method: 'createElement' };
+						return { success: false, error: 'All Trusted Types bypass strategies failed' };
 					} catch (error) {
 						return { success: false, error: error.message };
 					}
@@ -98,12 +245,51 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 				MIXPANEL_TOKEN
 			);
 
-			if (fallbackResult && fallbackResult.success) {
-				log(`✅ Mixpanel injected via fallback method for ${username}`);
+			if (trustedTypesResult && trustedTypesResult.success) {
+				log(`✅ Mixpanel injected via Trusted Types bypass for ${username} (method: ${trustedTypesResult.method})`);
 				return true;
 			}
 
-			throw new Error(`Both injection methods failed: ${JSON.stringify(fallbackResult)}`);
+			// Final fallback: Try page.addScriptTag with external URL
+			log(`⚠️ Trusted Types bypass failed for ${username}, trying external script injection...`);
+			
+			try {
+				await page.addScriptTag({ 
+					url: 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js'
+				});
+				
+				// Initialize Mixpanel after external script loads
+				const externalResult = await page.evaluate(
+					(username, opts, MIXPANEL_TOKEN) => {
+						try {
+							if (window.mixpanel && window.mixpanel.init) {
+								window.mixpanel.init(MIXPANEL_TOKEN, {
+									loaded: function(mp) {
+										if (username) mp.identify(username);
+										mp.start_session_recording();
+									}
+								});
+								return { success: true, method: 'external' };
+							}
+							return { success: false, error: 'Mixpanel not available after external load' };
+						} catch (error) {
+							return { success: false, error: error.message };
+						}
+					},
+					username,
+					opts,
+					MIXPANEL_TOKEN
+				);
+				
+				if (externalResult && externalResult.success) {
+					log(`✅ Mixpanel injected via external script for ${username}`);
+					return true;
+				}
+			} catch (externalError) {
+				// External injection failed too
+			}
+
+			throw new Error(`All injection methods failed: ${JSON.stringify(trustedTypesResult)}`);
 
 		} catch (error) {
 			log(`❌ Mixpanel injection error for ${username}: ${error.message}`);
@@ -194,7 +380,7 @@ export async function relaxCSP(page, log = console.log) {
 		// 	}
 		// });
 
-		// Page context CSP bypass injection
+		// Page context CSP bypass injection with Trusted Types support
 		await page.evaluateOnNewDocument(() => {
 			// Mark page as CSP relaxed for future checks
 			window.CSP_RELAXED = true;
@@ -206,6 +392,22 @@ export async function relaxCSP(page, log = console.log) {
 			if (window.eval) {
 				window.originalEval = window.eval;
 			}
+
+			// Create permissive Trusted Types policy early
+			if (window.trustedTypes && window.trustedTypes.createPolicy) {
+				try {
+					window.trustedTypes.createPolicy('mixpanel-global-bypass', {
+						createScript: (input) => input,
+						createScriptURL: (input) => input,
+						createHTML: (input) => input
+					});
+				} catch (e) {
+					// Policy might already exist or creation might be restricted
+				}
+			}
+
+			// Store reference to bypass Trusted Types enforcement
+			window.TRUSTED_TYPES_BYPASS = true;
 		});
 
 		// Also set flags in current page context if page is already loaded
@@ -218,6 +420,21 @@ export async function relaxCSP(page, log = console.log) {
 			if (window.eval && !window.originalEval) {
 				window.originalEval = window.eval;
 			}
+
+			// Create permissive Trusted Types policy in current context too
+			if (window.trustedTypes && window.trustedTypes.createPolicy) {
+				try {
+					window.trustedTypes.createPolicy('mixpanel-current-bypass', {
+						createScript: (input) => input,
+						createScriptURL: (input) => input,
+						createHTML: (input) => input
+					});
+				} catch (e) {
+					// Policy might already exist or creation might be restricted
+				}
+			}
+
+			window.TRUSTED_TYPES_BYPASS = true;
 		});
 
 		// Inject the relaxed CSP script

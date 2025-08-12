@@ -178,7 +178,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			await navigateToUrl(page, url, log);
 			// Set up page environment
 			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
-			await sleep(randomBetween(100, 500)); // Random sleep to simulate human behavior
+			await sleep(randomBetween(50, 250)); // Random sleep to simulate human behavior (was 100-500ms)
 
 			const pageInfo = await getPageInfo(page, log);
 			log(`📄 Page loaded: "${pageInfo.title}"`);

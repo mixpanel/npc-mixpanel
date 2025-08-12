@@ -1,40 +1,69 @@
 :root {
-    /* Brand Color Palette */
-    --lava-200: #5b0237;
-    --lava-150: #cc332b;
-    --lava-100: #ff7557;
-    --lava-40: #ffb0a3;
-    --lava-20: #ffe1d6;
+    /* Mixpanel-inspired Dark Mode Colors */
+    --bg-primary: #0D1116;
+    --bg-secondary: #161B22;
+    --bg-tertiary: #21262D;
+    --bg-card: #161B22;
+    --bg-elevated: #1C2128;
+    
+    --text-primary: #F0F6FC;
+    --text-secondary: #8B949E;
+    --text-muted: #6E7681;
+    --text-accent: #FFFFFF;
+    
+    --border-primary: #30363D;
+    --border-secondary: #21262D;
+    --border-focus: #8B5CF6;
+    
+    /* Mixpanel Core Purple */
+    --accent-purple: #8B5CF6;
+    --accent-purple-hover: #7C3AED;
+    --accent-purple-light: #A78BFA;
+    --accent-purple-dark: #6D28D9;
+    
+    /* Mixpanel Brand Colors */
+    --mixpanel-purple: #7856FF;
+    --mixpanel-purple-light: #9B7EFF;
+    --mixpanel-purple-dark: #5B3FD6;
+    
+    /* Status Colors */
+    --success: #238636;
+    --success-light: #2DA44E;
+    --warning: #D1742F;
+    --warning-light: #F85149;
+    --error: #DA3633;
+    --error-light: #FF6B6B;
+    
+    /* Chart Colors - Mixpanel Inspired */
+    --chart-color-1: #8B5CF6;
+    --chart-color-2: #06B6D4;
+    --chart-color-3: #10B981;
+    --chart-color-4: #F59E0B;
+    --chart-color-5: #EF4444;
+    --chart-color-6: #8B5A2B;
+    --chart-color-7: #EC4899;
+    --chart-color-8: #84CC16;
+    
+    /* Effects */
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.6);
+    --glow-purple: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    
+    --font-mono: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    --font-sans: "Apercu Pro", "Helvetica Neue", Helvetica, Tahoma, Geneva, Arial, sans-serif;
+}
 
-    --mint-200: #122e29;
-    --mint-150: #07b096;
-    --mint-100: #80e1d9;
-    --mint-40: #bcf0f0;
-    --mint-20: #e0fafa;
-
-    --mustard-200: #a33b16;
-    --mustard-150: #da6b16;
-    --mustard-100: #f8bc3b;
-    --mustard-40: #fede9b;
-    --mustard-20: #ffefdb;
-
-    /* UI Theme Variables */
-    --bg-color: var(--mint-200);
-    --text-color: var(--mint-20);
-    --primary-color: #7856ff;
-    --secondary-color: var(--lava-200);
-    --accent-color: var(--lava-100);
-    --highlight-color: var(--mint-100);
-    --terminal-color: #7856ff;
-    --input-bg: #1a2f2a;
-    --input-border: var(--mint-150);
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-        "Helvetica Neue", sans-serif;
-    background: linear-gradient(135deg, #0a1b18 0%, #2d0d1a 50%, #1a0f2e 100%);
-    color: var(--text-color);
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     line-height: 1.5;
     margin: 0;
     padding: 0;
@@ -48,11 +77,10 @@ body {
     align-items: center;
     gap: 10vh;
     padding: 30px 50px;
-    background: rgba(18, 46, 41, 0.9);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(128, 225, 217, 0.2);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
     max-width: 1000px;
     margin: 1rem auto 1rem auto;
 }
@@ -141,33 +169,19 @@ body {
 .title {
     font-size: 3rem;
     font-weight: 700;
-    background: linear-gradient(45deg, var(--primary-color), var(--lava-100), var(--mint-100), var(--mustard-100));
-    background-size: 300% 300%;
+    background: linear-gradient(135deg, var(--mixpanel-purple), var(--accent-purple-light));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: gradientShift 4s ease infinite;
     margin: 0;
-    letter-spacing: -0.5px;
-}
-
-@keyframes gradientShift {
-    0% {
-        background-position: 0% 50%;
-    }
-    50% {
-        background-position: 100% 50%;
-    }
-    100% {
-        background-position: 0% 50%;
-    }
+    letter-spacing: -0.02em;
 }
 
 .subtitle {
-    font-size: 1.2rem;
-    color: var(--mint-40);
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    font-weight: 400;
     margin: 5px 0 0 0;
-    font-weight: 500;
 }
 
 .title-text {
@@ -178,7 +192,7 @@ body {
     position: absolute;
     width: 110px;
     height: 110px;
-    border: 3px solid var(--mint-100);
+    border: 3px solid var(--accent-purple-light);
     border-radius: 50%;
     opacity: 0.6;
     animation: pulse 2s ease-in-out infinite;
@@ -216,7 +230,7 @@ body {
     position: absolute;
     width: 4px;
     height: 4px;
-    background: var(--mustard-100);
+    background: var(--chart-color-4);
     border-radius: 50%;
     animation: sparkle 2s ease-in-out infinite;
 }
@@ -255,15 +269,15 @@ body {
 }
 
 a {
-    color: var(--accent-color);
+    color: var(--accent-purple-light);
 }
 
 a:hover {
-    color: var(--highlight-color);
+    color: var(--text-primary);
 }
 
 a:visited {
-    color: var(--lava-40);
+    color: var(--text-muted);
 }
 
 .container {
@@ -275,15 +289,22 @@ a:visited {
 }
 
 .form-container {
-    background-color: var(--mint-200);
-    border: 2px solid var(--mint-150);
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
     border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(120, 86, 255, 0.1);
+    box-shadow: var(--shadow-card);
     padding: 1.5rem;
     width: 100%;
     max-width: 600px;
     flex-shrink: 0;
     margin-top: 0vh;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.form-container:hover {
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
 }
 
 h1 {
@@ -291,7 +312,7 @@ h1 {
     font-weight: 600;
     margin-bottom: 1.5rem;
     text-align: center;
-    color: var(--primary-color);
+    color: var(--mixpanel-purple-light);
 }
 
 form {
@@ -304,24 +325,41 @@ label {
     font-weight: 500;
     margin-bottom: 0.25rem;
     font-size: 1.1rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 input[type="text"],
 input[type="range"] {
     width: 100%;
     padding: 0.75rem;
-    background-color: var(--input-bg);
-    border: 1px solid var(--input-border);
-    border-radius: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
     font-size: 1.1rem;
-    color: var(--text-color);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--glow-purple);
+    background: var(--bg-primary);
+}
+
+input[type="text"]::placeholder {
+    color: var(--text-muted);
 }
 
 input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
     height: 12px;
-    background: var(--input-border);
+    background: var(--border-primary);
     outline: none;
     opacity: 0.7;
     transition: opacity 0.2s;
@@ -336,7 +374,7 @@ input[type="range"]::-webkit-slider-thumb {
     appearance: none;
     width: 24px;
     height: 24px;
-    background: var(--primary-color);
+    background: var(--mixpanel-purple);
     cursor: pointer;
     border-radius: 50%;
 }
@@ -344,25 +382,95 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-moz-range-thumb {
     width: 24px;
     height: 24px;
-    background: var(--primary-color);
+    background: var(--mixpanel-purple);
     cursor: pointer;
     border-radius: 50%;
 }
 
+/* Style the checkboxes to look more modern */
+input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: var(--bg-elevated);
+    margin: 0;
+    font: inherit;
+    color: currentColor;
+    width: 1.15em;
+    height: 1.15em;
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    transform: translateY(-0.075em);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="checkbox"]::before {
+    content: "";
+    width: 0.65em;
+    height: 0.65em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em var(--mixpanel-purple);
+    background-color: var(--mixpanel-purple);
+    transform-origin: bottom left;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+input[type="checkbox"]:checked::before {
+    transform: scale(1.2);
+}
+
+input[type="checkbox"]:checked {
+    border-color: var(--mixpanel-purple);
+    background: rgba(139, 92, 246, 0.1);
+}
+
 button {
-    background-color: var(--primary-color);
-    color: var(--text-color);
+    background: var(--mixpanel-purple);
+    color: var(--text-accent);
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 0.75rem 1rem;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
+    font-family: var(--font-sans);
 }
 
 button:hover {
-    background-color: var(--secondary-color);
+    background: var(--mixpanel-purple-dark);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button[type="submit"] {
+    background: linear-gradient(135deg, var(--mixpanel-purple), var(--accent-purple-light));
+    color: var(--text-accent);
+    border: none;
+    border-radius: 8px;
+    padding: 0.9rem 1.2rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-card);
+}
+
+button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    filter: brightness(1.1);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-card);
 }
 
 .loading,
@@ -371,6 +479,7 @@ button:hover {
     text-align: center;
     font-size: 1.25rem;
     font-weight: 500;
+    color: var(--text-primary);
 }
 
 .loading::after {
@@ -378,7 +487,7 @@ button:hover {
     display: inline-block;
     width: 1em;
     height: 1em;
-    border: 2px solid var(--primary-color);
+    border: 2px solid var(--mixpanel-purple);
     border-top: 2px solid transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -390,7 +499,6 @@ button:hover {
     0% {
         transform: rotate(0deg);
     }
-
     100% {
         transform: rotate(360deg);
     }
@@ -398,27 +506,25 @@ button:hover {
 
 /* Terminal Styles */
 #terminal {
-    background-color: #000;
-    color: var(--terminal-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     padding: 0;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(120, 86, 255, 0.3);
+    box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
-    border: 3px solid var(--terminal-color);
+    border: 1px solid var(--border-primary);
     flex-grow: 1;
     height: calc(100vh - 280px);
     max-height: calc(100vh - 280px);
     animation: slideInRight 0.3s ease-out;
 }
 
-/* Remove resize handle styles since we're removing resize functionality */
 #terminal-resize-handle {
     display: none;
 }
 
-/* Terminal content area */
 #terminal-body {
     flex: 1;
     padding: 20px;
@@ -432,7 +538,6 @@ button:hover {
         transform: translateX(100%);
         opacity: 0;
     }
-
     to {
         transform: translateX(0);
         opacity: 1;
@@ -444,29 +549,28 @@ button:hover {
 }
 
 #terminal h3 {
-    color: #fff;
+    color: var(--text-primary);
     margin-top: 0;
     margin-bottom: 15px;
     flex-shrink: 0;
-    font-family: "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 16px;
-    text-shadow: 0 0 8px var(--terminal-color);
     position: relative;
 }
 
 #terminal-content {
-    font-family: "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     line-height: 1.4;
     white-space: pre-wrap;
     flex-grow: 1;
     overflow-y: auto;
-    background-color: #000;
+    background: var(--bg-primary);
     padding: 10px;
-    border: 1px solid var(--terminal-color);
-    border-radius: 4px;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
     scrollbar-width: thin;
-    scrollbar-color: var(--terminal-color) #000;
+    scrollbar-color: var(--accent-purple) var(--bg-primary);
     height: 0;
     min-height: 0;
 }
@@ -476,62 +580,62 @@ button:hover {
 }
 
 #terminal-content::-webkit-scrollbar-track {
-    background: #000;
+    background: var(--bg-primary);
 }
 
 #terminal-content::-webkit-scrollbar-thumb {
-    background: var(--terminal-color);
+    background: var(--accent-purple);
     border-radius: 4px;
 }
 
 #terminal-content::-webkit-scrollbar-thumb:hover {
-    background: #9d7bff;
+    background: var(--accent-purple-hover);
 }
 
 #close-terminal {
     position: absolute;
     top: 14px;
     right: 15px;
-    background-color: var(--lava-150);
-    color: white;
+    background: var(--error);
+    color: var(--text-accent);
     border: none;
     padding: 8px 12px;
     cursor: pointer;
     flex-shrink: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: bold;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     z-index: 10;
 }
 
 #close-terminal:hover {
-    background-color: var(--lava-200);
+    background: var(--error-light);
+    transform: translateY(-1px);
 }
 
 #scroll-to-bottom {
     position: absolute;
     bottom: 20px;
     right: 20px;
-    background-color: var(--primary-color);
-    color: white;
+    background: var(--mixpanel-purple);
+    color: var(--text-accent);
     border: none;
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 12px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(157, 92, 255, 0.3);
+    box-shadow: var(--shadow-card);
     transition: all 0.3s ease;
     animation: bounce 6s infinite;
     z-index: 10;
 }
 
 #scroll-to-bottom:hover {
-    background-color: var(--secondary-color);
+    background: var(--mixpanel-purple-dark);
     transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
-
-/* Scroll to bottom button is now always visible */
 
 @keyframes bounce {
     0%,
@@ -541,11 +645,9 @@ button:hover {
     100% {
         transform: translateY(0);
     }
-
     40% {
         transform: translateY(-5px);
     }
-
     60% {
         transform: translateY(-3px);
     }
@@ -582,50 +684,51 @@ button:hover {
 }
 
 .terminal-tab {
-    background-color: rgba(120, 86, 255, 0.2);
-    border: 1px solid rgba(120, 86, 255, 0.3);
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.25);
     border-radius: 8px 8px 0 0;
     padding: 8px 16px;
     cursor: pointer;
-    font-family: "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     white-space: nowrap;
     transition: all 0.3s ease;
     min-width: 80px;
     text-align: center;
-    color: #ccc;
+    color: var(--text-secondary);
 }
 
 .terminal-tab:hover {
-    background-color: rgba(120, 86, 255, 0.3);
-    border-color: rgba(120, 86, 255, 0.5);
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: var(--text-primary);
 }
 
 .terminal-tab.active {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
+    background: var(--mixpanel-purple);
+    border-color: var(--mixpanel-purple);
+    color: var(--text-accent);
     font-weight: bold;
-    box-shadow: 0 0 8px rgba(120, 86, 255, 0.5);
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
 }
 
 .tab-nav-arrow {
-    background-color: rgba(120, 86, 255, 0.2);
-    border: 1px solid rgba(120, 86, 255, 0.3);
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.25);
     border-radius: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    font-family: "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
-    color: #ccc;
+    color: var(--text-secondary);
     transition: all 0.3s ease;
     flex-shrink: 0;
 }
 
 .tab-nav-arrow:hover {
-    background-color: rgba(120, 86, 255, 0.4);
-    border-color: rgba(120, 86, 255, 0.6);
-    color: white;
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: var(--text-primary);
 }
 
 .tab-nav-arrow:active {
@@ -634,12 +737,12 @@ button:hover {
 
 .terminal-tab-content {
     display: none;
-    font-family: "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
-    color: #00ff00;
+    color: var(--chart-color-3);
     padding: 10px;
-    background-color: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
     height: 100%;
     overflow-y: auto;
     flex-grow: 1;
@@ -658,15 +761,14 @@ button:hover {
 }
 
 .terminal-tab-content::-webkit-scrollbar-thumb {
-    background: rgba(120, 86, 255, 0.5);
+    background: rgba(139, 92, 246, 0.5);
     border-radius: 4px;
 }
 
 .terminal-tab-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(120, 86, 255, 0.7);
+    background: rgba(139, 92, 246, 0.7);
 }
 
-/* Update terminal content area to work with tabs */
 #terminal-content {
     display: flex;
     flex-direction: column;
@@ -677,32 +779,32 @@ button:hover {
 
 #overview {
     font-size: small;
+    color: var(--text-secondary);
 }
 
-/* Floating terminal open button (positioned on right side) */
 #open-terminal {
     position: fixed;
     top: 50%;
     right: 20px;
     transform: translateY(-50%);
-    background-color: var(--primary-color);
-    color: white;
+    background: var(--mixpanel-purple);
+    color: var(--text-accent);
     border: none;
     padding: 12px 20px;
     border-radius: 25px;
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+    box-shadow: var(--shadow);
     transition: all 0.3s ease;
     z-index: 999;
     animation: pulse 2s infinite;
 }
 
 #open-terminal:hover {
-    background-color: var(--secondary-color);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(157, 92, 255, 0.4);
+    background: var(--mixpanel-purple-dark);
+    transform: translateY(-52px);
+    box-shadow: var(--shadow-sm);
 }
 
 #open-terminal.hidden {
@@ -711,21 +813,19 @@ button:hover {
 
 @keyframes pulse {
     0% {
-        box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+        box-shadow: var(--shadow);
     }
-
     50% {
-        box-shadow: 0 4px 20px rgba(157, 92, 255, 0.5);
+        box-shadow: var(--shadow-sm);
     }
-
     100% {
-        box-shadow: 0 4px 12px rgba(157, 92, 255, 0.3);
+        box-shadow: var(--shadow);
     }
 }
 
 h2,
 h3 {
-    color: var(--primary-color);
+    color: var(--mixpanel-purple-light);
     font-weight: 600;
 }
 
@@ -733,7 +833,6 @@ h2 {
     font-size: 2em;
 }
 
-/* Terminal typing effect for new messages */
 .terminal-line {
     opacity: 0;
     animation: fadeIn 0.2s ease-in forwards;
@@ -745,154 +844,35 @@ h2 {
     }
 }
 
-/* Add a subtle glow and transition to the form container */
-.form-container {
-    background-color: #2a2a2a;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 0 20px rgba(157, 92, 255, 0.1);
-    padding: 1.5rem;
-    width: 100%;
-    max-width: 41vw;
-    border: 1px solid var(--input-border);
-    transition: all 0.3s ease-in-out;
-}
-
-.form-container:hover {
-    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15), 0 0 30px rgba(120, 86, 255, 0.2);
-    transform: translateY(-2px);
-}
-
-/* Style the descriptive text */
 #form-description-line1,
 #form-description-line2 {
     text-align: center;
     font-size: 1.1rem;
-    font-family: "Courier New", monospace;
-    color: var(--highlight-color);
+    font-family: var(--font-mono);
     margin: 0;
 }
 
 #form-description-line1 {
     margin-bottom: 0.25rem;
+    color: var(--accent-purple-light);
 }
 
 #form-description-line2 {
     margin-bottom: 0.25rem;
-    color: var(--accent-color);
-}
-
-/* General Label Styling */
-label {
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-    display: flex;
-    /* Aligns checkbox and text */
-    align-items: center;
-    gap: 0.75rem;
-    /* Space between checkbox and text */
-    color: #ccc;
-}
-
-/* Improve input field focus and appearance */
-input[type="text"],
-input[type="range"] {
-    width: 100%;
-    /* Fallback */
-    /* Use calc to account for padding */
-    width: -webkit-calc(100% - 1rem);
-    width: -moz-calc(100% - 1rem);
-    width: calc(100% - 1rem);
-    padding: 0.75rem;
-    background-color: var(--input-bg);
-    border: 1px solid var(--input-border);
-    border-radius: 4px;
-    font-size: 1rem;
-    color: var(--text-color);
-    transition: all 0.2s ease-in-out;
-}
-
-input[type="text"]:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 10px rgba(157, 92, 255, 0.5);
-}
-
-/* Style the checkboxes to look more modern */
-input[type="checkbox"] {
-    -webkit-appearance: none;
-    appearance: none;
-    background-color: var(--input-bg);
-    margin: 0;
-    font: inherit;
-    color: currentColor;
-    width: 1.15em;
-    height: 1.15em;
-    border: 1px solid var(--input-border);
-    border-radius: 3px;
-    transform: translateY(-0.075em);
-    display: grid;
-    place-content: center;
-    cursor: pointer;
-}
-
-input[type="checkbox"]::before {
-    content: "";
-    width: 0.65em;
-    height: 0.65em;
-    transform: scale(0);
-    transition: 120ms transform ease-in-out;
-    box-shadow: inset 1em 1em var(--primary-color);
-    background-color: var(--primary-color);
-    transform-origin: bottom left;
-    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-}
-
-input[type="checkbox"]:checked::before {
-    transform: scale(1.2);
-}
-
-input[type="checkbox"]:checked {
-    border-color: var(--primary-color);
-}
-
-/* Add a cool gradient and shadow to the button */
-button[type="submit"] {
-    background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
-    color: var(--text-color);
-    border: none;
-    border-radius: 4px;
-    padding: 0.9rem 1.2rem;
-    font-size: 1.2rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-button[type="submit"]:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    filter: brightness(1.1);
-}
-
-button[type="submit"]:active {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    color: var(--chart-color-3);
 }
 
 #masking-container {
     padding-left: 3vw;
 }
 
-/* Slider value output styling */
 #usersOutput {
     display: block;
     text-align: center;
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--mixpanel-purple-light);
     font-size: 1.2rem;
     margin-top: -0.5rem;
-    /* Pulls it closer to the slider */
 }
 
 /* Responsive design for mobile devices */
