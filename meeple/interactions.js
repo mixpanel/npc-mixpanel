@@ -1202,17 +1202,7 @@ function calculateHoverDuration(target, persona) {
 	return Math.max(400, Math.round(finalDuration)); // Minimum 400ms hover (was 800ms)
 }
 
-/**
- * Simple pause function for timing delays
- * @param {Function} log - Logging function
- * @returns {Promise<boolean>} - Always returns true
- */
-export async function shortPause(log = console.log) {
-	const delay = randomBetween(1000, 3000);
-	log(`⏸️ Short pause: ${delay}ms`);
-	await new Promise(resolve => setTimeout(resolve, delay));
-	return true;
-}
+// shortPause function removed - unused (use wait() instead)
 
 /**
  * Perform random mouse movement

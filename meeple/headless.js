@@ -10,7 +10,7 @@ import u from 'ak-tools';
 // Import from new modular structure
 import { ensurePageSetup, retry, relaxCSP } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, CLICK_FUZZINESS } from './interactions.js';
+import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll, CLICK_FUZZINESS } from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
@@ -285,6 +285,8 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		rageClick: '😡',
 		scroll: '📜',
 		mouse: '🖱️',
+		randomMouse: '🎲',
+		randomScroll: '🎯',
 		hover: '👁️',
 		wait: '⏸️',
 		form: '📝',
@@ -325,6 +327,12 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 				break;
 			case "mouse":
 				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
+				break;
+			case "randomMouse":
+				funcToPerform = () => randomMouse(page, log);
+				break;
+			case "randomScroll":
+				funcToPerform = () => randomScroll(page, log);
 				break;
 			case "hover":
 				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
@@ -390,27 +398,4 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 	return actionResults;
 }
 
-/**
- * Perform scroll action
- * @param {Page} page - Puppeteer page object
- * @param {Function} log - Logging function
- * @returns {Promise<void>}
- */
-async function performScroll(page, log) {
-	try {
-		const viewport = await page.viewport();
-		const scrollDistance = randomBetween(200, 800);
-		const direction = Math.random() < 0.8 ? 1 : -1; // 80% down, 20% up
-		
-		await page.evaluate((distance, dir) => {
-			window.scrollBy(0, distance * dir);
-		}, scrollDistance, direction);
-		
-		log(`📜 Scrolled ${direction > 0 ? 'down' : 'up'} ${scrollDistance}px`);
-	} catch (error) {
-		log(`⚠️ Scroll error: ${error.message}`);
-		throw error;
-	}
-}
-
-// Simple functions moved to interactions.js - now using sophisticated versions
+// performScroll function removed - unused (intelligentScroll from interactions.js is used instead)

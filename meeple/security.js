@@ -437,17 +437,104 @@ export async function relaxCSP(page, log = console.log) {
 			window.TRUSTED_TYPES_BYPASS = true;
 		});
 
-		// Inject the relaxed CSP script
-		await page.addScriptTag({ content: relaxedCSP });
+		// Inject the relaxed CSP script with Trusted Types bypass
+		try {
+			await page.addScriptTag({ content: relaxedCSP });
+		} catch (trustedScriptError) {
+			log(`⚠️ Direct CSP script injection failed due to Trusted Types, trying bypass...`);
+			
+			// Try Trusted Types bypass for CSP relaxation script
+			await page.evaluate((scriptContent) => {
+				try {
+					// Strategy 1: Create permissive policy for CSP script
+					if (window.trustedTypes && window.trustedTypes.createPolicy) {
+						try {
+							const policy = window.trustedTypes.createPolicy('csp-relaxation-' + Date.now(), {
+								createScript: (input) => input,
+								createScriptURL: (input) => input,
+								createHTML: (input) => input
+							});
+							
+							const script = document.createElement('script');
+							script.textContent = policy.createScript(scriptContent);
+							document.head.appendChild(script);
+							return { success: true, method: 'trustedTypesCSP' };
+						} catch (e) {
+							// Policy creation failed
+						}
+					}
+					
+					// Strategy 2: Use existing policies
+					if (window.trustedTypes && window.trustedTypes.getPolicyNames) {
+						const policies = window.trustedTypes.getPolicyNames();
+						for (const policyName of policies) {
+							try {
+								const existingPolicy = window.trustedTypes.getPolicy(policyName);
+								if (existingPolicy && existingPolicy.createScript) {
+									const script = document.createElement('script');
+									script.textContent = existingPolicy.createScript(scriptContent);
+									document.head.appendChild(script);
+									return { success: true, method: 'existingPolicyCSP' };
+								}
+							} catch (e) {
+								// Continue trying other policies
+							}
+						}
+					}
+					
+					// Strategy 3: Function constructor bypass
+					try {
+						const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+						const executeScript = new AsyncFunction('scriptContent', `
+							try {
+								const fn = new Function(scriptContent);
+								fn();
+								return { success: true, method: 'functionConstructorCSP' };
+							} catch (e) {
+								throw e;
+							}
+						`);
+						
+						return executeScript(scriptContent);
+					} catch (e) {
+						// Function constructor failed
+					}
+					
+					return { success: false, error: 'All CSP bypass strategies failed' };
+				} catch (error) {
+					return { success: false, error: error.message };
+				}
+			}, relaxedCSP);
+		}
 
-		// Set permissions for common origins
+		// Set permissions for the current URL and common variations
 		const context = page.browser().defaultBrowserContext();
-		await context.overridePermissions(page.url(), [
-			'camera',
-			'microphone',
-			'geolocation',
-			'notifications'
-		]);
+		const currentUrl = page.url();
+		const urlObj = new URL(currentUrl);
+		const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+		
+		// Set permissions for current URL and common URL variations
+		const urlsToPermit = [
+			currentUrl,
+			baseUrl,
+			`${baseUrl}/`,
+			`https://${urlObj.hostname}`,
+			`https://www.${urlObj.hostname}`,
+			urlObj.hostname.startsWith('www.') ? `https://${urlObj.hostname.replace('www.', '')}` : `https://www.${urlObj.hostname}`
+		];
+		
+		for (const url of urlsToPermit) {
+			try {
+				await context.overridePermissions(url, [
+					'camera',
+					'microphone',
+					'geolocation',
+					'notifications'
+				]);
+			} catch (e) {
+				// Some URLs might be invalid, continue with others
+			}
+		}
 
 		log(`🔓 CSP relaxed and permissions set`);
 

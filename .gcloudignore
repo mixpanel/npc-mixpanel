@@ -35,6 +35,8 @@ Thumbs.db
 *.log
 # Ignore backup files
 *.bak
+# Ignore archived code
+archived
 # Ignore lock files
 package-lock.json
 yarn.lock

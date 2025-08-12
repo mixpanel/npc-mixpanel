@@ -62,8 +62,14 @@ export async function launchBrowser(headless = true, log = console.log) {
 				isMobile: false,
 				hasTouch: false,
 				isLandscape: true
-			}
+			},
+			// Additional security bypasses at launch level
+			ignoreDefaultArgs: ['--enable-automation'],
+			ignoreHTTPSErrors: true,
+			protocolTimeout: 240000
 		});
+
+		// Browser-level security setup (URL-specific permissions will be set per page)
 
 		log(`🚀 Browser launched (headless: ${headless})`);
 		return browser;
@@ -82,6 +88,9 @@ export async function launchBrowser(headless = true, log = console.log) {
 export async function createPage(browser, log = console.log) {
 	try {
 		const page = await browser.newPage();
+
+		// CRITICAL: Enable CSP bypass at page level immediately
+		await page.setBypassCSP(true);
 
 		// Set random realistic user agent
 		const randomAgent = agents[Math.floor(Math.random() * agents.length)];
@@ -135,25 +144,53 @@ export async function createPage(browser, log = console.log) {
  * @returns {Promise<any>} - Navigation response
  */
 export async function navigateToUrl(page, url, log = console.log) {
-	try {
-		log(`🌐 Navigating to: ${url}`);
+	const maxRetries = 2;
+	let lastError;
 
-		const response = await page.goto(url, {
-			waitUntil: 'networkidle2',
-			timeout: 60000 // 1 minute timeout
-		});
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			log(`🌐 Navigating to: ${url}${attempt > 1 ? ` (attempt ${attempt}/${maxRetries})` : ''}`);
 
-		if (response && !response.ok()) {
-			log(`⚠️ HTTP ${response.status()}: ${response.statusText()}`);
-		} else {
-			log(`✅ Page loaded successfully`);
+			// Try different wait strategies based on attempt
+			const waitStrategies = ['networkidle2', 'domcontentloaded', 'load'];
+			const waitUntil = waitStrategies[Math.min(attempt - 1, waitStrategies.length - 1)];
+
+			const response = await page.goto(url, {
+				waitUntil,
+				timeout: 60000 // 1 minute timeout
+			});
+
+			if (response && !response.ok()) {
+				log(`⚠️ HTTP ${response.status()}: ${response.statusText()}`);
+				// Don't retry for HTTP errors, they're usually legitimate
+				return response;
+			} else {
+				log(`✅ Page loaded successfully`);
+			}
+
+			return response;
+		} catch (error) {
+			lastError = error;
+			log(`❌ Navigation attempt ${attempt} failed: ${error.message}`);
+			
+			// Check if it's a network error that might be retryable
+			if (error.message.includes('net::ERR_INVALID_ARGUMENT') || 
+				error.message.includes('net::ERR_FAILED') ||
+				error.message.includes('Navigation timeout')) {
+				
+				if (attempt < maxRetries) {
+					log(`⏳ Retrying navigation in 2 seconds...`);
+					await new Promise(resolve => setTimeout(resolve, 2000));
+					continue;
+				}
+			}
+			
+			// Don't retry for other types of errors
+			break;
 		}
-
-		return response;
-	} catch (error) {
-		log(`❌ Navigation failed: ${error.message}`);
-		throw error;
 	}
+
+	throw lastError;
 }
 
 /**
