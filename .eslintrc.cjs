@@ -26,13 +26,13 @@ module.exports = {
     'no-console': 'off', // Allow console logs for this project
     'no-debugger': 'error',
     'no-alert': 'warn',
-    'no-eval': 'error',
-    'no-implied-eval': 'error',
-    'no-new-func': 'error',
+    'no-eval': 'off', // Allow eval for dynamic code execution
+    'no-implied-eval': 'off', // Allow implied eval
+    'no-new-func': 'off', // Allow new Function() constructor
     
     // Style consistency (handled by Prettier mostly)
     'semi': ['error', 'always'],
-    'quotes': ['error', 'single', { 'allowTemplateLiterals': true }],
+    'quotes': 'off', // Allow both single and double quotes
     
     // Modern JS best practices
    

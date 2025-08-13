@@ -53,9 +53,9 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	const userPromises = Array.from({ length: users }, (_, i) => {
 		return limit(() => {
 			return new Promise(async (resolve) => {
-				try {
-					// Generate unique username for this meeple
-					const usersHandle = u.makeName(3, '-');
+				// Generate unique username for this meeple
+				const usersHandle = u.makeName(3, '-');
+				try {					
 					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
 					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, { masking }, log);

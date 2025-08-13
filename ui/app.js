@@ -498,7 +498,7 @@ form.addEventListener('submit', async (e) => {
 	const tokenField = form.querySelector('#token');
 
 	if (injectCheckbox.checked && !tokenField.value.trim()) {
-		alert('Project token is required when "Inject Mixpanel in Site" is enabled.');
+		// alert('Project token is required when "Inject Mixpanel in Site" is enabled.');
 		tokenField.focus();
 		return;
 	}
@@ -747,10 +747,10 @@ document.addEventListener('DOMContentLoaded', () => {
 	const headlessCheckbox = document.getElementById('headless');
 	const headlessLabel = headlessCheckbox.closest('label');
 	const isLocalhost = window.location.hostname === 'localhost' || 
-					   window.location.hostname === '127.0.0.1' || 
-					   window.location.hostname.startsWith('192.168.') ||
-					   window.location.hostname.startsWith('10.') ||
-					   window.location.hostname.includes('.local');
+		window.location.hostname === '127.0.0.1' || 
+		window.location.hostname.startsWith('192.168.') ||
+		window.location.hostname.startsWith('10.') ||
+		window.location.hostname.includes('.local');
 
 	if (!isLocalhost) {
 		// When not on localhost, disable the checkbox and check it
