@@ -534,9 +534,9 @@ form.addEventListener('submit', async (e) => {
 	openTerminalButton.classList.add('hidden');
 	addTerminalLineToTab('general', '🔌 Connecting to server...');
 
-	// Get user from cookie for server-side analytics (parse IAP format: accounts.google.com:user@example.com)
+	// Get user from cookie for server-side analytics (server already parsed clean email)
 	const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
-	const user = userCookie ? decodeURIComponent(userCookie.split('=')[1]).split(":").pop() : null;
+	const user = userCookie ? decodeURIComponent(userCookie.split('=')[1]) : null;
 	
 	// Connect to WebSocket (same server for Cloud Run) with user info
 	const socket = io({ 
@@ -784,7 +784,7 @@ if (window.mixpanel) {
 			if (!restParams) restParams = {};
 			mp.register(restParams);
 			try {
-				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user']).split(":").pop();
+				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user'] || '');
 				if (userFromCookie) user = userFromCookie;
 				if (user) mp.identify(user);
 				if (user) mp.people.set({ $name: user, $email: user });

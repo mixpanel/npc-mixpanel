@@ -231,8 +231,16 @@ app.use(cookieParser());
 
 app.use(function (req, res, next) {
 	//for idmgmt: https://cloud.google.com/iap/docs/identity-howto
-	const user = req.headers["x-goog-authenticated-user-email"];
-	if (user) {
+	const rawUser = req.headers["x-goog-authenticated-user-email"];
+	if (rawUser) {
+		let user;
+		try {
+			// URL decode first, then extract email from accounts.google.com:user@domain.com format
+			const decodedUser = decodeURIComponent(rawUser);
+			user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
+		} catch (error) {
+			user = 'anonymous';
+		}
 		res.cookie("user", user, {
 			maxAge: 900000,
 			httpOnly: false
@@ -263,9 +271,15 @@ app.get('/', (req, res) => {
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
 	const runId = uid();
-	// Extract user from IAP header and parse same as client-side
+	// Extract user from IAP header (URL decode first, then parse)
 	const rawUser = req.headers["x-goog-authenticated-user-email"];
-	const user = rawUser ? rawUser.split(":").pop() : 'anonymous';
+	let user;
+	try {
+		const decodedUser = decodeURIComponent(rawUser);
+		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
+	} catch (error) {
+		user = 'CRON';
+	}
 
 	try {
 		const mergedParams = {
@@ -276,7 +290,7 @@ app.post('/simulate', async (req, res) => {
 		const startTime = Date.now();
 
 		// Server-side analytics: Track API job start
-		logger.notice(`/SIMULATE START`, { ...mergedParams, user });
+		logger.notice(`/SIMULATE START`, { ...mergedParams, user, rawUser });
 
 		// Mixpanel server-side tracking
 		const userId = user || 'unauthenticated';
@@ -296,7 +310,8 @@ app.post('/simulate', async (req, res) => {
 		logger.notice(`/SIMULATE END in ${duration} seconds`, {
 			...mergedParams,
 			user,
-			duration
+			duration,
+			rawUser
 		});
 
 		// Mixpanel server-side tracking

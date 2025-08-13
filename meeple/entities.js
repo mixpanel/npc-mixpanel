@@ -107,7 +107,6 @@ export const puppeteerArgs = [
 	'--no-zygote',
 	'--disable-dev-shm-usage',
 	'--memory-pressure-off',
-	'--max_old_space_size=4096',
 
 	// Disable unnecessary features that could block injection
 	'--disable-sync',
@@ -146,7 +145,6 @@ export const puppeteerArgs = [
 	'--mute-audio',
 
 	// Network and rendering optimizations
-	'--enable-features=NetworkService,NetworkServiceLogging',
 	'--force-color-profile=srgb',
 	'--disable-color-correct-rendering'
 ];

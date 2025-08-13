@@ -1,0 +1,12 @@
+node_modules/
+tmp/
+archived/
+dist/
+build/
+coverage/
+*.min.js
+.env
+.env.*
+*.log
+tests/
+utils/injectMixpanel.js
