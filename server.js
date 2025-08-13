@@ -6,7 +6,7 @@ import main from './meeple/headless.js';
 import { log } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { cloudLog, logger } from './utils/cloudLogger.js';
+import { logger } from './utils/cloudLogger.js';
 import cookieParser from 'cookie-parser';
 import * as Mixpanel from 'mixpanel';
 import { Diagnostics } from 'ak-diagnostic';
@@ -72,9 +72,10 @@ io.on('connection', (socket) => {
 		const diagnostics = new Diagnostics({
 			name: 'npc-mixpanel-server',
 		});
+		let coercedData;
 		try {
 			const jobId = uid(4);
-			const coercedData = coerceTypes(data);
+			coercedData = coerceTypes(data);
 
 
 			// Send initial status to general tab (no meepleId)
@@ -263,7 +264,7 @@ app.get('/ping', async (req, res) => {
 });
 
 // Main UI route
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
 	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
 
@@ -273,7 +274,7 @@ app.post('/simulate', async (req, res) => {
 	const runId = uid();
 	// Extract user from IAP header (URL decode first, then parse)
 	const rawUser = req.headers["x-goog-authenticated-user-email"];
-	let user;
+	let user, userId;
 	try {
 		const decodedUser = decodeURIComponent(rawUser);
 		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
@@ -293,7 +294,7 @@ app.post('/simulate', async (req, res) => {
 		logger.notice(`/SIMULATE START`, { ...mergedParams, user, rawUser });
 
 		// Mixpanel server-side tracking
-		const userId = user || 'unauthenticated';
+		userId = user || 'unauthenticated';
 		mp.track('server: job start', {
 			distinct_id: userId,
 			runId,
@@ -349,7 +350,7 @@ app.post('/simulate', async (req, res) => {
 });
 
 // Catch-all for SPA routing
-app.get('*', (req, res) => {
+app.get('*', (_req, res) => {
 	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
 
