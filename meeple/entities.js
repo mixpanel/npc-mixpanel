@@ -4,7 +4,7 @@
  */
 
 // User behavior personas with action probabilities - Enhanced with modern user diversity
-export const personas = {
+const basePersonas = {
 	// Power users - confident, fast, goal-oriented
 	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1, rageClick: 0.15 },
 	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1, rageClick: 0.2 },
@@ -65,16 +65,34 @@ export const personas = {
 	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1, rageClick: 0.05 },
 };
 
-// Puppeteer launch arguments for enhanced stealth and modern browser simulation
+// Add randomMouse and randomScroll to all personas with small probability (0.03 = 3%)
+export const personas = {};
+for (const [personaName, personaData] of Object.entries(basePersonas)) {
+	personas[personaName] = {
+		...personaData,
+		randomMouse: 0.03,
+		randomScroll: 0.03
+	};
+}
+
+// Puppeteer launch arguments optimized for maximum security bypass and Mixpanel injection
 export const puppeteerArgs = [
-	// Core security and isolation bypasses
+	// CRITICAL: Core security bypasses for injection compatibility
 	'--disable-web-security',
-	'--disable-features=VizDisplayCompositor',
-	'--disable-features=IsolateOrigins,site-per-process,TrustedDOMTypes',
 	'--disable-site-isolation-trials',
+	'--disable-features=VizDisplayCompositor,IsolateOrigins,site-per-process,TrustedDOMTypes,ContentSecurityPolicy,AudioServiceOutOfProcess,TranslateUI,BlinkGenPropertyTrees,SecurePaymentConfirmation,CertificateTransparencyComponentUpdater,AutofillServerCommunication',
 	'--disable-blink-features=AutomationControlled',
 	'--disable-client-side-phishing-detection',
-	// '--no-startup-window',
+	
+	// CSP and Content Security bypasses
+	'--allow-running-insecure-content',
+	'--allow-insecure-localhost',
+	'--disable-popup-blocking',
+	'--ignore-certificate-errors',
+	'--ignore-ssl-errors',
+	'--ignore-certificate-errors-spki-list',
+	'--ignore-urlfetcher-cert-requests',
+
 	// Enhanced stealth - disable automation detection
 	'--exclude-switches=enable-automation',
 	'--disable-automation',
@@ -83,7 +101,14 @@ export const puppeteerArgs = [
 	'--disable-autofill-keyboard-accessory-view',
 	'--disable-full-form-autofill-ios',
 
-	// Privacy and tracking protection
+	// Process management for cloud environments
+	'--no-sandbox',
+	'--disable-setuid-sandbox',
+	'--no-zygote',
+	'--disable-dev-shm-usage',
+	'--memory-pressure-off',
+
+	// Disable unnecessary features that could block injection
 	'--disable-sync',
 	'--disable-background-networking',
 	'--disable-background-timer-throttling',
@@ -99,18 +124,7 @@ export const puppeteerArgs = [
 	'--disable-plugins',
 	'--disable-plugins-discovery',
 
-	// Security bypasses for testing
-	'--disable-popup-blocking',
-	'--allow-running-insecure-content',
-	'--allow-insecure-localhost',
-	'--ignore-certificate-errors',
-	'--ignore-ssl-errors',
-	'--ignore-certificate-errors-spki-list',
-	'--ignore-urlfetcher-cert-requests',
-
-	// Performance and resource management
-	'--no-sandbox',
-	'--disable-setuid-sandbox',
+	// Performance optimizations
 	'--disable-accelerated-2d-canvas',
 	'--disable-accelerated-jpeg-decoding',
 	'--disable-accelerated-mjpeg-decode',
@@ -118,34 +132,19 @@ export const puppeteerArgs = [
 	'--disable-gpu',
 	'--disable-gpu-sandbox',
 	'--disable-software-rasterizer',
-	'--disable-background-timer-throttling',
-	'--disable-backgrounding-occluded-windows',
-	'--disable-renderer-backgrounding',
 
 	// Browser behavior normalization
 	'--no-first-run',
-	// '--no-zygote',
 	'--no-default-browser-check',
-	'--disable-default-apps',
 	'--disable-translate',
 	'--disable-ipc-flooding-protection',
-	'--disable-features=TranslateUI',
-	'--disable-features=BlinkGenPropertyTrees',
 
-	// Audio/Video handling
+	// Audio/Video handling (muted for headless)
 	'--autoplay-policy=user-gesture-required',
 	'--disable-audio-output',
 	'--mute-audio',
 
-	// Memory and process management  
-	'--memory-pressure-off',
-	'--max_old_space_size=4096',
-	'--disable-dev-shm-usage',
-	// '--single-process',
-
-	// Modern web features
-	'--enable-features=NetworkService,NetworkServiceLogging',
-	'--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess',
+	// Network and rendering optimizations
 	'--force-color-profile=srgb',
 	'--disable-color-correct-rendering'
 ];

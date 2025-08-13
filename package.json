@@ -9,8 +9,13 @@
 		"deploy": "./scripts/deploy.sh",
 		"perms": "chmod +x ./scripts/*.sh",
 		"prune": "rm -rf tmp/*",
-		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.test.js",
-		"test:headless": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js tests/headless.test.js"
+		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",
+		"validate": "npm run typecheck && npm run lint && npm run format:check",
+		"typecheck": "tsc --noEmit",
+		"lint": "eslint . --ext .js,.mjs,.ts",
+		"lint:fix": "eslint . --ext .js,.mjs,.ts --fix",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
 	},
 	"type": "module",
 	"keywords": [
@@ -25,19 +30,25 @@
 	"description": "puppeteer in the cloud!",
 	"dependencies": {
 		"@google-cloud/storage": "^7.12.0",
+		"ak-diagnostic": "^1.0.0",
 		"ak-fetch": "^1.0.6",
 		"ak-tools": "^1.0.66",
 		"cookie-parser": "^1.4.7",
 		"dayjs": "^1.11.10",
 		"dotenv": "^16.4.5",
 		"express": "^4.18.2",
+		"mixpanel": "^0.18.1",
 		"p-limit": "^6.1.0",
 		"puppeteer": "^23.6.1",
 		"socket.io": "^4.8.1"
 	},
 	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"eslint": "^8.57.0",
 		"jest": "^29.7.0",
 		"jest-puppeteer": "^11.0.0",
-		"nodemon": "^3.1.4"
+		"nodemon": "^3.1.4",
+		"prettier": "^3.2.5",
+		"typescript": "^5.4.5"
 	}
 }

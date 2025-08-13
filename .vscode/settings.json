@@ -1,25 +1,9 @@
 {
-	"jest.runMode": "on-demand",
-	"js/ts.implicitProjectConfig.checkJs": false,
-	"jest.jestCommandLine": "npm run test --",
 	"cSpell.words": [
-		"autocapture",
-		"backgrounding",
-		"blogspot",
-		"clickables",
-		"EZTRACK",
-		"fixpanel",
-		"haspopup",
-		"headlessly",
-		"hotzones",
-		"Maxer",
-		"Meeple",
-		"meeples",
-		"meepling",
-		"Metas",
-		"replayin",
-		"repost",
-		"Slawyer",
-		"targetcreated"
-	]
+		"meeple",
+		"meeples"
+	],
+	"jest.runMode": "on-demand",
+	"jest.jestCommandLine": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",
+	"jest.rootPath": "/Users/ak/code/npc-mixpanel"
 }

@@ -1,31 +1,6 @@
 import u from 'ak-tools';
 import { personas } from './entities.js';
-
-/**
- * Select a random item based on weights
- * @param {Array} items - Array of items to choose from
- * @param {Array} weights - Array of weights corresponding to items
- * @returns {any} - Selected item
- */
-export function weightedRandom(items, weights) {
-	if (items.length !== weights.length) {
-		throw new Error('Items and weights arrays must have the same length');
-	}
-	
-	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-	const random = Math.random() * totalWeight;
-	
-	let weightSum = 0;
-	for (let i = 0; i < items.length; i++) {
-		weightSum += weights[i];
-		if (random <= weightSum) {
-			return items[i];
-		}
-	}
-	
-	// Fallback to last item
-	return items[items.length - 1];
-}
+import { weightedRandom } from './utils.js';
 
 /**
  * Randomly select a persona from available personas
@@ -112,8 +87,8 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, perso
 	const totalActions = maxActions || u.rand(25, 100); // Default session length
 	const actionHistory = [];
 
-	// Ensure minimum engagement - at least 40% of actions should be clicks
-	const minClicks = Math.floor(totalActions * 0.4);
+	// Ensure minimum engagement - at least 80% of actions should be clicks (doubled for better heatmap data)
+	const minClicks = Math.floor(totalActions * 0.8);
 	let clickCount = 0;
 
 	// Prevent excessive consecutive same actions

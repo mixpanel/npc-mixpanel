@@ -78,7 +78,162 @@ const possibleUrls = [
 	"https://marketwatch.com",
 	"https://investopedia.com",
 	"https://cryptoslate.com",
-	"https://coindesk.com"
+	"https://coindesk.com",
+	// Social Media & Forums
+	"https://reddit.com",
+	"https://x.com",
+	"https://facebook.com",
+	"https://instagram.com",
+	"https://threads.net",
+	"https://linkedin.com",
+	"https://pinterest.com",
+	"https://tumblr.com",
+	"https://bsky.app",
+	"https://news.ycombinator.com/",
+	"https://quora.com",
+	"https://stackoverflow.com",
+	"https://stackexchange.com",
+	"https://weibo.com",
+	"https://vk.com",
+
+	// Video, Audio & Image Platforms
+	"https://youtube.com",
+	"https://vimeo.com",
+	"https://twitch.tv",
+	"https://tiktok.com",
+	"https://soundcloud.com",
+	"https://spotify.com",
+	"https://bandcamp.com",
+	"https://imgur.com",
+	"https://flickr.com",
+
+	// News & Media
+	"https://nytimes.com",
+	"https://washingtonpost.com",
+	"https://wsj.com",
+	"https://theguardian.com",
+	"https://bbc.com",
+	"https://cnn.com",
+	"https://reuters.com",
+	"https://apnews.com",
+	"https://cnbc.com",
+	"https://forbes.com",
+	"https://bloomberg.com",
+	"https://businessinsider.com",
+	"https://huffpost.com",
+	"https://vox.com",
+	"https://vice.com",
+	"https://npr.org",
+	"https://news.google.com/",
+	"https://theatlantic.com",
+	"https://economist.com",
+	"https://time.com",
+
+	// Tech & Development
+	"https://github.com",
+	"https://gitlab.com",
+	"https://bitbucket.org",
+	"https://dev.to",
+	"https://medium.com",
+	"https://theverge.com",
+	"https://techcrunch.com",
+	"https://arstechnica.com",
+	"https://wired.com",
+	"https://engadget.com",
+	"https://gizmodo.com",
+	"https://cnet.com",
+	"https://zdnet.com",
+	"https://slashdot.org",
+	"https://producthunt.com",
+	"https://vercel.com",
+	"https://netlify.com",
+	"https://digitalocean.com",
+
+	// E-commerce & Marketplaces
+	"https://amazon.com",
+	"https://ebay.com",
+	"https://walmart.com",
+	"https://target.com",
+	"https://etsy.com",
+	"https://alibaba.com",
+	"https://aliexpress.com",
+	"https://bestbuy.com",
+	"https://homedepot.com",
+	"https://wayfair.com",
+	"https://craigslist.org",
+	"https://shopify.com",
+
+	// Gaming
+	"https://polygon.com",
+	"https://kotaku.com",
+	"https://ign.com",
+	"https://gamespot.com",
+	"https://steampowered.com",
+	"https://epicgames.com",
+	"https://gog.com",
+
+	// Education & Reference
+	"https://wikipedia.org",
+	"https://wiktionary.org",
+	"https://w3schools.com",
+	"https://freecodecamp.org",
+	"https://codecademy.com",
+	"https://khanacademy.org",
+	"https://coursera.org",
+	"https://udemy.com",
+	"https://edx.org",
+	"https://tutorialspoint.com",
+	"https://geeksforgeeks.org",
+	"https://developer.mozilla.org",
+
+	// Finance & Crypto
+	"https://marketwatch.com",
+	"https://investopedia.com",
+	"https://seekingalpha.com",
+	"https://finance.yahoo.com",
+	"https://coinmarketcap.com",
+	"https://coindesk.com",
+	"https://coinbase.com",
+	"https://binance.com",
+	"https://cryptoslate.com",
+
+	// Travel & Hospitality
+	"https://expedia.com",
+	"https://booking.com",
+	"https://airbnb.com",
+	"https://tripadvisor.com",
+	"https://kayak.com",
+	"https://uber.com",
+	"https://lyft.com",
+
+	// Lifestyle & How-To
+	"https://howtogeek.com",
+	"https://lifewire.com",
+	"https://makeuseof.com",
+	"https://lifehacker.com",
+	"https://mentalfloss.com",
+	"https://allrecipes.com",
+	"https://foodnetwork.com",
+	"https://webmd.com",
+	"https://mayoclinic.org",
+	"https://healthline.com",
+
+	// Science & Culture
+	"https://nature.com",
+	"https://sciencedaily.com",
+	"https://livescience.com",
+	"https://space.com",
+	"https://nationalgeographic.com",
+	"https://smithsonianmag.com",
+	"https://history.com",
+	"https://imdb.com",
+	"https://rottentomatoes.com",
+
+	// Hardware & Reviews
+	"https://digitaltrends.com",
+	"https://tomshardware.com",
+	"https://pcmag.com",
+	"https://anandtech.com"
 ];
 url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
@@ -302,10 +457,22 @@ function addTerminalLineToTab(meepleId, message) {
 		// Check if this message indicates meeple completion/failure
 		// ONLY close on the final "simulation complete." message, not intermediate "completed" messages
 		if (message.includes('simulation complete.')) {
-			// Close the tab after a longer delay to let users see the final message
-			setTimeout(() => {
-				closeMeepleTab(meepleId);
-			}, 20000); // 20 second delay
+			// Add a close button to the tab header
+			const tab = meepleTabsData[meepleId];
+			if (tab && tab.header) {
+				// Check if close button already exists
+				if (!tab.header.querySelector('.tab-close-btn')) {
+					const closeBtn = document.createElement('button');
+					closeBtn.className = 'tab-close-btn';
+					closeBtn.innerHTML = '×';
+					closeBtn.title = 'Close this meeple tab';
+					closeBtn.addEventListener('click', (e) => {
+						e.stopPropagation(); // Prevent tab switching
+						closeMeepleTab(meepleId);
+					});
+					tab.header.appendChild(closeBtn);
+				}
+			}
 		}
 	}
 }
@@ -365,14 +532,23 @@ form.addEventListener('submit', async (e) => {
 	// Show terminal and hide open button
 	terminal.classList.remove('hidden');
 	openTerminalButton.classList.add('hidden');
-	addTerminalLine(terminalContent, '🔌 Connecting to server...');
+	addTerminalLineToTab('general', '🔌 Connecting to server...');
 
-	// Connect to WebSocket (same server for Cloud Run)
-	const socket = io({ reconnection: true });
+	// Get user from cookie for server-side analytics (server already parsed clean email)
+	const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
+	const user = userCookie ? decodeURIComponent(userCookie.split('=')[1]) : null;
+	
+	// Connect to WebSocket (same server for Cloud Run) with user info
+	const socket = io({ 
+		reconnection: true,
+		auth: {
+			user: user
+		}
+	});
 
 	socket.on('connect', () => {
 		startTime = Date.now();
-		addTerminalLine(terminalContent, '✅ Connected to server. Sending data...');
+		addTerminalLineToTab('general', '✅ Connected to server. Sending data...');
 		socket.emit('start_job', data);
 		loading.style.display = 'none';
 	});
@@ -566,6 +742,35 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 		});
 	}
+
+	// Handle headless checkbox state based on current URL
+	const headlessCheckbox = document.getElementById('headless');
+	const headlessLabel = headlessCheckbox.closest('label');
+	const isLocalhost = window.location.hostname === 'localhost' || 
+					   window.location.hostname === '127.0.0.1' || 
+					   window.location.hostname.startsWith('192.168.') ||
+					   window.location.hostname.startsWith('10.') ||
+					   window.location.hostname.includes('.local');
+
+	if (!isLocalhost) {
+		// When not on localhost, disable the checkbox and check it
+		headlessCheckbox.disabled = true;
+		headlessCheckbox.checked = true;
+		
+		// Add visual styling to show it's disabled
+		headlessLabel.style.opacity = '0.6';
+		headlessLabel.style.cursor = 'not-allowed';
+		headlessLabel.title = 'Headless mode is required when running on cloud/remote servers';
+		
+		// Add disabled styling to the checkbox
+		headlessCheckbox.style.cursor = 'not-allowed';
+	} else {
+		// On localhost, ensure it's enabled and can be toggled
+		headlessCheckbox.disabled = false;
+		headlessLabel.style.opacity = '1';
+		headlessLabel.style.cursor = 'pointer';
+		headlessLabel.title = 'Toggle headless mode (only available when running locally)';
+	}
 });
 
 // analytics
@@ -579,7 +784,7 @@ if (window.mixpanel) {
 			if (!restParams) restParams = {};
 			mp.register(restParams);
 			try {
-				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user']).split(":").pop();
+				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user'] || '');
 				if (userFromCookie) user = userFromCookie;
 				if (user) mp.identify(user);
 				if (user) mp.people.set({ $name: user, $email: user });

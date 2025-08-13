@@ -6,10 +6,17 @@
  * Incorporates research-based improvements while maintaining simplicity
  */
 
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 import { interactiveSelectors, actionWords } from './entities.js';
 
 /**
  * Helper function to check if two rectangles overlap
+ * @param {Object} rect1 - First rectangle with bounds
+ * @param {Object} rect2 - Second rectangle with bounds
+ * @returns {boolean} True if rectangles overlap
  */
 function rectsOverlap(rect1, rect2) {
 	return !(rect1.right < rect2.left || rect1.left > rect2.right ||
@@ -18,6 +25,11 @@ function rectsOverlap(rect1, rect2) {
 
 /**
  * Enhanced visual prominence scoring based on research
+ * @param {Element} element - DOM element to score
+ * @param {DOMRect} rect - Element's bounding rectangle
+ * @param {Function} getCachedStyle - Function to get cached computed styles
+ * @param {Array<string>} actionWords - Array of action words for CTA detection
+ * @returns {number} Visual prominence score
  */
 function calculateVisualProminence(element, rect, getCachedStyle, actionWords) {
 	let score = 0;
@@ -92,6 +104,10 @@ function calculateVisualProminence(element, rect, getCachedStyle, actionWords) {
 
 /**
  * Check if element is actually visible and interactive
+ * @param {Element} el - DOM element to check
+ * @param {DOMRect} rect - Element's bounding rectangle
+ * @param {CSSStyleDeclaration} style - Element's computed style
+ * @returns {boolean} True if element is interactive
  */
 function isElementInteractive(el, rect, style) {
 	// Skip if hidden

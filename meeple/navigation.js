@@ -3,8 +3,15 @@
  * Extracted from headless.js for better code organization
  */
 
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 /**
  * Navigate back using browser back button
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} True if navigation was successful
  */
 export async function navigateBack(page, log = console.log) {
 	try {
@@ -23,6 +30,9 @@ export async function navigateBack(page, log = console.log) {
 
 /**
  * Navigate forward using browser forward button
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} True if navigation was successful
  */
 export async function navigateForward(page, log = console.log) {
 	try {

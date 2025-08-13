@@ -3,10 +3,14 @@ dotenv.config();
 import pLimit from 'p-limit';
 import u from 'ak-tools';
 
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').Browser} Browser */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 // Import from new modular structure
 import { ensurePageSetup, retry, relaxCSP } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, CLICK_FUZZINESS } from './interactions.js';
+import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll, CLICK_FUZZINESS } from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
@@ -23,6 +27,7 @@ if (!NODE_ENV) throw new Error("NODE_ENV is required");
  * Main function to simulate user behavior.
  * @param {Object} PARAMS - Configuration parameters
  * @param {Function} logFunction - Optional logging function for real-time updates
+ * @returns {Promise<Array>} Array of simulation results
  */
 export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
@@ -58,16 +63,20 @@ export default async function main(PARAMS = {}, logFunction = null) {
 
 					if (result && !result.error && !result.timedOut) {
 						log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					} else if (result && result.timedOut) {
 						log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					} else {
 						log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					}
 
 					resolve(result || { error: 'Unknown error', user: i + 1 });
 				} catch (e) {
 					const errorMsg = e.message || 'Unknown error';
 					log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
+					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 					resolve({ error: errorMsg, user: i + 1, crashed: true });
 				}
 			});
@@ -83,17 +92,41 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
+	// Enhanced simulation summary for general tab
 	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
 
+	// Calculate total actions performed
+	let totalActions = 0;
+	let totalSuccessfulActions = 0;
+	
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
-			return r.value;
+			const result = r.value;
+			if (result && result.actions) {
+				totalActions += result.actions.length;
+				totalSuccessfulActions += result.actions.filter(action => action.success !== false).length;
+			}
+			return result;
 		} else {
 			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
 			return { error: r.reason?.message || 'Promise rejected', crashed: true };
 		}
 	}).filter(Boolean);
+
+	// Send detailed summary to general tab (null meepleId)
+	log(``, null); // Empty line
+	log(`🎯 <span style="color: #07B096;">Mission Accomplished!</span>`, null);
+	log(`📈 Total Actions Performed: ${totalActions}`, null);
+	log(`✅ Successful Actions: ${totalSuccessfulActions}`, null);
+	log(`📊 Action Success Rate: ${totalActions > 0 ? ((totalSuccessfulActions / totalActions) * 100).toFixed(1) : 0}%`, null);
+	log(`🤖 Meeple Performance:`, null);
+	log(`  ├─ ✅ Completed successfully: ${successful}`, null);
+	if (timedOut > 0) log(`  ├─ ⏰ Timed out: ${timedOut}`, null);
+	if (crashed > 0) log(`  ├─ 💥 Crashed: ${crashed}`, null);
+	if (failed > 0) log(`  └─ ❌ Failed to start: ${failed}`, null);
+	log(``, null); // Empty line
+	log(`🎉 All meeples have completed their digital adventures!`, null);
 
 	return finalResults;
 }
@@ -173,7 +206,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			await navigateToUrl(page, url, log);
 			// Set up page environment
 			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
-			await sleep(randomBetween(100, 500)); // Random sleep to simulate human behavior
+			await sleep(randomBetween(50, 250)); // Random sleep to simulate human behavior (was 100-500ms)
 
 			const pageInfo = await getPageInfo(page, log);
 			log(`📄 Page loaded: "${pageInfo.title}"`);
@@ -229,11 +262,14 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 
 /**
  * Execute the main user session with action sequence
- * @param {Object} page - Puppeteer page object
+ * @param {Page} page - Puppeteer page object
  * @param {Array} actionSequence - Array of actions to perform
+ * @param {Array} hotZones - Array of identified hot zones
+ * @param {string} persona - Selected persona type
  * @param {string} usersHandle - User identifier
  * @param {Object} opts - Options object
  * @param {Function} log - Logging function
+ * @returns {Promise<Array>} Array of completed actions
  */
 async function simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, opts, log) {
 	const actionResults = [];
@@ -249,6 +285,8 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		rageClick: '😡',
 		scroll: '📜',
 		mouse: '🖱️',
+		randomMouse: '🎲',
+		randomScroll: '🎯',
 		hover: '👁️',
 		wait: '⏸️',
 		form: '📝',
@@ -289,6 +327,12 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 				break;
 			case "mouse":
 				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
+				break;
+			case "randomMouse":
+				funcToPerform = () => randomMouse(page, log);
+				break;
+			case "randomScroll":
+				funcToPerform = () => randomScroll(page, log);
 				break;
 			case "hover":
 				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
@@ -354,26 +398,4 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 	return actionResults;
 }
 
-/**
- * Perform scroll action
- * @param {Object} page - Puppeteer page object
- * @param {Function} log - Logging function
- */
-async function performScroll(page, log) {
-	try {
-		const viewport = await page.viewport();
-		const scrollDistance = randomBetween(200, 800);
-		const direction = Math.random() < 0.8 ? 1 : -1; // 80% down, 20% up
-		
-		await page.evaluate((distance, dir) => {
-			window.scrollBy(0, distance * dir);
-		}, scrollDistance, direction);
-		
-		log(`📜 Scrolled ${direction > 0 ? 'down' : 'up'} ${scrollDistance}px`);
-	} catch (error) {
-		log(`⚠️ Scroll error: ${error.message}`);
-		throw error;
-	}
-}
-
-// Simple functions moved to interactions.js - now using sophisticated versions
+// performScroll function removed - unused (intelligentScroll from interactions.js is used instead)

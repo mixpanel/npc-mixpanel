@@ -1,3 +1,6 @@
+/** @typedef {import('puppeteer').Page} Page */
+/** @typedef {import('puppeteer').ElementHandle} ElementHandle */
+
 import { formTestData } from './entities.js';
 import u from 'ak-tools';
 
@@ -85,7 +88,7 @@ export async function interactWithForms(page, log = console.log) {
 					element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 				}
 			}, target);
-			await u.sleep(u.rand(500, 1000)); // Wait for scroll
+			await u.sleep(u.rand(250, 500)); // Wait for scroll (was 500-1000ms)
 		}
 
 		// Click into the field
@@ -93,7 +96,7 @@ export async function interactWithForms(page, log = console.log) {
 		const targetY = target.rect.y + (target.rect.height * 0.5) + u.rand(-target.rect.height * CLICK_FUZZINESS.FORM_FIELD, target.rect.height * CLICK_FUZZINESS.FORM_FIELD);
 
 		await page.mouse.click(targetX, targetY);
-		await u.sleep(u.rand(100, 300));
+		await u.sleep(u.rand(50, 150)); // (was 100-300ms)
 
 		// Choose realistic search terms based on input type
 		const searchTerms = formTestData;
@@ -150,13 +153,13 @@ export async function interactWithForms(page, log = console.log) {
 			if (Math.random() < 0.05) {
 				const wrongChar = String.fromCharCode(97 + Math.floor(Math.random() * 26)); // random letter
 				await page.keyboard.type(wrongChar);
-				await u.sleep(u.rand(100, 200));
+				await u.sleep(u.rand(50, 100)); // (was 100-200ms)
 				await page.keyboard.press('Backspace');
-				await u.sleep(u.rand(50, 150));
+				await u.sleep(u.rand(25, 75)); // (was 50-150ms)
 			}
 
 			await page.keyboard.type(char);
-			await u.sleep(u.rand(50, 150)); // Realistic typing speed
+			await u.sleep(u.rand(25, 75)); // Realistic typing speed (was 50-150ms)
 		}
 
 		// Sometimes submit (30%), sometimes just leave it
