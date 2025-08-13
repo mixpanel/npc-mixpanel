@@ -8,20 +8,19 @@ import u from 'ak-tools';
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
 // Import from new modular structure
-import { ensurePageSetup, retry, relaxCSP } from './security.js';
+import { ensurePageSetup,  } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, rageClick, moveMouse, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll, CLICK_FUZZINESS } from './interactions.js';
+import { wait, exploratoryClick, rageClick, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll } from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
-import { getRandomTimestampWithinLast5Days } from './analytics.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
-import { randomBetween, sleep, clamp } from './utils.js';
-import { puppeteerArgs } from './entities.js';
+import { randomBetween, sleep } from './utils.js';
 
-const { NODE_ENV = "" } = process.env;
-let { MIXPANEL_TOKEN = "" } = process.env;
-if (!NODE_ENV) throw new Error("NODE_ENV is required");
+
+const { NODE_ENV = '' } = process.env;
+let { MIXPANEL_TOKEN = '' } = process.env;
+if (!NODE_ENV) throw new Error('NODE_ENV is required');
 
 /**
  * Main function to simulate user behavior.
@@ -33,18 +32,18 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
 	const log = logFunction || ((message) => console.log(message));
 	let { 
-		url = "https://ak--47.github.io/fixpanel/",
+		url = 'https://ak--47.github.io/fixpanel/',
 		users = 10,
 		concurrency = 5,
 		headless = true,
 		inject = true,
 		past = false,
-		token = "",
+		token = '',
 		maxActions = null,
 		masking = false
 	} = PARAMS;
 	
-	if (url === "fixpanel") url = `https://ak--47.github.io/fixpanel/`;
+	if (url === 'fixpanel') url = `https://ak--47.github.io/fixpanel/`;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
 	if (concurrency > 10) concurrency = 10;
@@ -56,7 +55,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 			return new Promise(async (resolve) => {
 				try {
 					// Generate unique username for this meeple
-					const usersHandle = u.makeName(3, "-");
+					const usersHandle = u.makeName(3, '-');
 					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
 					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, { masking }, log);
@@ -193,7 +192,7 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 		try {
 			browser = await launchBrowser(headless, log);
 			const page = await createPage(browser, log);
-			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN
+			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN;
 
 
 			// Validate and navigate to URL
@@ -315,38 +314,43 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		}
 
 		switch (action) {
-			case "click":
-			case "exploratoryClick":
+			case 'click':
 				funcToPerform = () => clickStuff(page, hotZones, log);
 				break;
-			case "rageClick":
+			case 'exploratoryClick':
+				funcToPerform = () => exploratoryClick(page, log);
+				break;
+			case 'rageClick':
 				funcToPerform = () => rageClick(page, log);
 				break;
-			case "scroll":
+			case 'scroll':
 				funcToPerform = () => intelligentScroll(page, hotZones, log);
 				break;
-			case "mouse":
+			case 'mouse':
 				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
 				break;
-			case "randomMouse":
+			case 'moveMouse':
+				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
+				break;
+			case 'randomMouse':
 				funcToPerform = () => randomMouse(page, log);
 				break;
-			case "randomScroll":
+			case 'randomScroll':
 				funcToPerform = () => randomScroll(page, log);
 				break;
-			case "hover":
+			case 'hover':
 				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
 				break;
-			case "form":
+			case 'form':
 				funcToPerform = () => interactWithForms(page, log);
 				break;
-			case "back":
+			case 'back':
 				funcToPerform = () => navigateBack(page, log);
 				break;
-			case "forward":
+			case 'forward':
 				funcToPerform = () => navigateForward(page, log);
 				break;
-			case "wait":
+			case 'wait':
 				funcToPerform = () => wait();
 				break;
 			default:

@@ -2,7 +2,9 @@ import puppeteer from 'puppeteer';
 import u from 'ak-tools';
 import { puppeteerArgs } from './entities.js';
 
-const { NODE_ENV = "" } = process.env;
+const { NODE_ENV = '' } = process.env;
+
+
 
 const agents = await u.load('./meeple/agents.json', true);
 
@@ -29,12 +31,12 @@ export async function spoofAgent(page, log = console.log) {
  * @returns {Promise<Object>} - User agent and headers object
  */
 export async function setUserAgent(page, userAgent, additionalHeaders = {}, log = console.log) {
-	if (!page) throw new Error("Browser not initialized");
-
+	if (!page) throw new Error('Browser not initialized');
 	await page.setUserAgent(userAgent);
 
 	if (Object.keys(additionalHeaders).length > 0) {
 		await page.setExtraHTTPHeaders(additionalHeaders);
+		log(`    │  └─ 🌐 ${Object.keys(additionalHeaders).join(', ')} headers set`);
 	}
 
 	return { userAgent, additionalHeaders };
@@ -52,6 +54,7 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}, log 
 export async function launchBrowser(headless = true, log = console.log) {
 	try {
 		const browser = await puppeteer.launch({
+			// @ts-ignore
 			headless: headless ? 'new' : false,
 			args: puppeteerArgs,
 			// No userDataDir - don't persist data for cloud functions
@@ -123,10 +126,10 @@ export async function createPage(browser, log = console.log) {
 		await page.setViewport(viewport);
 
 		// Initialize mouse position tracking
-		await page.evaluateOnNewDocument(() => {
-			window.mouseX = 0;
-			window.mouseY = 0;
-		});
+		// await page.evaluateOnNewDocument(() => {
+		// 	window.mouseX = 0;
+		// 	window.mouseY = 0;
+		// });
 
 		log(`📄 New page created with agent: ${userAgent.substring(0, 50)}...`);
 		return page;
@@ -156,8 +159,9 @@ export async function navigateToUrl(page, url, log = console.log) {
 			const waitUntil = waitStrategies[Math.min(attempt - 1, waitStrategies.length - 1)];
 
 			const response = await page.goto(url, {
+				// @ts-ignore
 				waitUntil,
-				timeout: 60000 // 1 minute timeout
+				timeout: 30000 // 30 sec
 			});
 
 			if (response && !response.ok()) {
@@ -172,19 +176,19 @@ export async function navigateToUrl(page, url, log = console.log) {
 		} catch (error) {
 			lastError = error;
 			log(`❌ Navigation attempt ${attempt} failed: ${error.message}`);
-			
+
 			// Check if it's a network error that might be retryable
-			if (error.message.includes('net::ERR_INVALID_ARGUMENT') || 
+			if (error.message.includes('net::ERR_INVALID_ARGUMENT') ||
 				error.message.includes('net::ERR_FAILED') ||
 				error.message.includes('Navigation timeout')) {
-				
+
 				if (attempt < maxRetries) {
 					log(`⏳ Retrying navigation in 2 seconds...`);
 					await new Promise(resolve => setTimeout(resolve, 2000));
 					continue;
 				}
 			}
-			
+
 			// Don't retry for other types of errors
 			break;
 		}

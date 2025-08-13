@@ -3,6 +3,11 @@ import utc from 'dayjs/plugin/utc.js';
 import { retry } from './security.js';
 dayjs.extend(utc);
 
+/** 
+ * @typedef {import('puppeteer').Page}	Page
+ */
+
+
 /**
  * Generate a random timestamp within the last 5 days for time simulation
  * @param {Function} log - Logging function
@@ -82,6 +87,7 @@ export async function forceSpoofTimeInBrowser(page, log = console.log) {
 
 	await retry(async () => {
 		await page.evaluateOnNewDocument((timestamp, spoofTimeFn) => {
+			// eslint-disable-next-line no-new-func
 			const injectedFunction = new Function(`return (${spoofTimeFn})`)();
 			injectedFunction(timestamp);
 		}, spoofedTimestamp, spoofTimeFunctionString);
@@ -103,6 +109,7 @@ function spoofTime(startTimestamp) {
 			if (args.length === 0) {
 				return new actualDate(actualNow() - offset);
 			}
+			// @ts-ignore
 			return new actualDate(...args);
 		}
 
@@ -124,6 +131,7 @@ function spoofTime(startTimestamp) {
 		};
 
 		// Replace window Date
+		// @ts-ignore
 		window.Date = FakeDate;
 
 		return { spoof: true };

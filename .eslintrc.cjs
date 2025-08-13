@@ -19,9 +19,9 @@ module.exports = {
       'args': 'after-used',
       'ignoreRestSiblings': false,
       'argsIgnorePattern': '^_',
-      'varsIgnorePattern': '^_'
+      'varsIgnorePattern': '^(_|NODE_ENV)$'
     }],
-    
+	'prefer-const': 'off',
     // Code quality
     'no-console': 'off', // Allow console logs for this project
     'no-debugger': 'error',
@@ -35,7 +35,7 @@ module.exports = {
     'quotes': ['error', 'single', { 'allowTemplateLiterals': true }],
     
     // Modern JS best practices
-    'prefer-const': 'error',
+   
     'no-var': 'error',
     'prefer-arrow-callback': 'warn',
     

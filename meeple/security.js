@@ -198,7 +198,7 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 
 						// Strategy 5: Function constructor bypass with Promises
 						try {
-							const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+							const AsyncFunction = Object.getPrototypeOf(async () =>{}).constructor;
 							const asyncInject = new AsyncFunction('injectCode', 'token', 'username', 'opts', `
 								return new Promise((resolve, reject) => {
 									try {
@@ -484,7 +484,7 @@ export async function relaxCSP(page, log = console.log) {
 					
 					// Strategy 3: Function constructor bypass
 					try {
-						const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+						const AsyncFunction = Object.getPrototypeOf(async () =>{}).constructor;
 						const executeScript = new AsyncFunction('scriptContent', `
 							try {
 								const fn = new Function(scriptContent);

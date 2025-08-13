@@ -16,8 +16,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const {
-	NODE_ENV = "production",
-	MIXPANEL_TRACKING_TOKEN = "6c3bc01ddc1f16d01e4fda11d3a4d166"
+	NODE_ENV = 'production',
+	MIXPANEL_TRACKING_TOKEN = '6c3bc01ddc1f16d01e4fda11d3a4d166'
 } = process.env;
 let io = null;
 
@@ -57,8 +57,8 @@ function coerceTypes(obj) {
 // Initialize Socket.IO server
 io = new Server(httpServer, {
 	cors: {
-		origin: "*", // Adjust in production for security
-		methods: ["GET", "POST"]
+		origin: '*', // Adjust in production for security
+		methods: ['GET', 'POST']
 	}
 });
 
@@ -66,7 +66,7 @@ io.on('connection', (socket) => {
 	// Extract user from socket auth (passed from client)
 	const user = socket.handshake.auth?.user || 'anonymous';
 	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
-	var startTime = Date.now();
+	const startTime = Date.now();
 
 	socket.on('start_job', async (data) => {
 		const diagnostics = new Diagnostics({
@@ -105,9 +105,9 @@ io.on('connection', (socket) => {
 			});
 
 			// Enhanced job logger with periodic progress updates
-			let jobStartTime = Date.now();
+			const jobStartTime = Date.now();
 			let completedMeeples = 0;
-			let totalMeeples = coercedData.users;
+			const totalMeeples = coercedData.users;
 
 			const jobLogger = (message, meepleId) => {
 				// Send all messages through the existing log function
@@ -230,9 +230,9 @@ io.on('connection', (socket) => {
 app.use(express.static('ui'));
 app.use(cookieParser());
 
-app.use(function (req, res, next) {
+app.use((req, res, next) => {
 	//for idmgmt: https://cloud.google.com/iap/docs/identity-howto
-	const rawUser = req.headers["x-goog-authenticated-user-email"];
+	const rawUser = req.headers['x-goog-authenticated-user-email'];
 	if (rawUser) {
 		let user;
 		try {
@@ -242,7 +242,7 @@ app.use(function (req, res, next) {
 		} catch (error) {
 			user = 'anonymous';
 		}
-		res.cookie("user", user, {
+		res.cookie('user', user, {
 			maxAge: 900000,
 			httpOnly: false
 			//sameSite: 'none'
@@ -256,8 +256,8 @@ app.use(function (req, res, next) {
 // API routes
 app.get('/ping', async (req, res) => {
 	res.json({
-		status: "ok",
-		message: "npc-mixpanel service is alive",
+		status: 'ok',
+		message: 'npc-mixpanel service is alive',
 		environment: NODE_ENV,
 		echo: req.query.data
 	});
@@ -273,7 +273,7 @@ app.get('/', (_req, res) => {
 app.post('/simulate', async (req, res) => {
 	const runId = uid();
 	// Extract user from IAP header (URL decode first, then parse)
-	const rawUser = req.headers["x-goog-authenticated-user-email"];
+	const rawUser = req.headers['x-goog-authenticated-user-email'];
 	let user, userId;
 	try {
 		const decodedUser = decodeURIComponent(rawUser);
