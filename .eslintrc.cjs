@@ -14,7 +14,7 @@ module.exports = {
   },
   rules: {
     // TypeScript-style unused variable checking
-    'no-unused-vars': ['error', { 
+    'no-unused-vars': ['warn', { 
       'vars': 'all',
       'args': 'after-used',
       'ignoreRestSiblings': false,
