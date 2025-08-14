@@ -132,12 +132,21 @@ io.on('connection', (socket) => {
 
 				// Track meeple spawns for general tab
 				if (meepleId && message.includes('Spawning')) {
-					const spawnNumber = message.match(/\((\d+)\/\d+\)/)?.[1];
-					if (spawnNumber) {
-						socket.emit('job_update', {
-							message: `🎬 Meeple ${spawnNumber}/${totalMeeples} spawned: <span style="color: #FF7557;">${meepleId}</span>`,
-							meepleId: null
-						});
+					const match = message.match(/\((\d+)\/(\d+)\)/);
+					if (match) {
+						const spawnNumber = parseInt(match[1]);
+						const totalFromMessage = parseInt(match[2]);
+						
+						// Use the total from the message to ensure consistency
+						const actualTotal = totalFromMessage || totalMeeples;
+						
+						// Validate spawn number is within expected range
+						if (spawnNumber <= actualTotal) {
+							socket.emit('job_update', {
+								message: `🎬 Meeple ${spawnNumber}/${actualTotal} spawned: <span style="color: #FF7557;">${meepleId}</span>`,
+								meepleId: null
+							});
+						}
 					}
 				}
 			};
