@@ -454,12 +454,16 @@ function addTerminalLineToTab(meepleId, message) {
 	if (tab && tab.content) {
 		addTerminalLine(tab.content, message, meepleId);
 
-		// Check if this message indicates meeple completion/failure
-		// ONLY close on the final "simulation complete." message, not intermediate "completed" messages
-		if (message.includes('simulation complete.')) {
+		// Check if this message indicates any type of meeple completion/failure
+		// Add close button for any completion state (completed, failed, timed out, etc.)
+		if (message.includes('simulation complete.') || 
+		    message.includes('completed!') || 
+		    message.includes('timed out') || 
+		    message.includes('failed:') ||
+		    message.includes('completed with issues')) {
 			// Add a close button to the tab header
 			const tab = meepleTabsData[meepleId];
-			if (tab && tab.header) {
+			if (tab && tab.header && meepleId !== 'general') {
 				// Check if close button already exists
 				if (!tab.header.querySelector('.tab-close-btn')) {
 					const closeBtn = document.createElement('button');

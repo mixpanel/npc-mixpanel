@@ -106,25 +106,25 @@ io.on('connection', (socket) => {
 
 			// Enhanced job logger with periodic progress updates
 			const jobStartTime = Date.now();
-			let completedMeeples = 0;
+			const completedMeeples = new Set();
 			const totalMeeples = coercedData.users;
 
 			const jobLogger = (message, meepleId) => {
 				// Send all messages through the existing log function
 				log(message, meepleId, socket);
 
-				// Track meeple completions for general tab progress updates
-				if (meepleId && (message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))) {
-					completedMeeples++;
+				// Track meeple completions for general tab progress updates (only on first completion message per meeple)
+				if (meepleId && !completedMeeples.has(meepleId) && (message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))) {
+					completedMeeples.add(meepleId);
 					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
-					const progress = ((completedMeeples / totalMeeples) * 100).toFixed(1);
+					const progress = ((completedMeeples.size / totalMeeples) * 100).toFixed(1);
 
 					socket.emit('job_update', {
-						message: `📈 Progress: ${completedMeeples}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`,
+						message: `📈 Progress: ${completedMeeples.size}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`,
 						meepleId: null
 					});
 
-					if (completedMeeples === totalMeeples) {
+					if (completedMeeples.size === totalMeeples) {
 						socket.emit('job_update', { message: ``, meepleId: null });
 						socket.emit('job_update', { message: `🎯 All meeples have finished their missions!`, meepleId: null });
 					}
@@ -155,7 +155,7 @@ io.on('connection', (socket) => {
 			const progressInterval = setInterval(() => {
 				const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
 				socket.emit('job_update', {
-					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples}`,
+					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples.size}`,
 					meepleId: null
 				});
 			}, 30000); // Every 30 seconds

@@ -16,7 +16,7 @@ steps:
       - '--image=gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
       - '--region=${_REGION}'
       - '--platform=managed'
-      - '--allow-unauthenticated'
+      - '--no-allow-unauthenticated'
       - '--memory=8Gi'
       - '--cpu=4'
       - '--timeout=3600'
