@@ -6,7 +6,7 @@
  */
 
 import { getRandomTimestampWithinLast5Days, extractTopLevelDomain } from '../meeple/analytics.js';
-import { selectPersona, getContextAwareAction, generatePersonaActionSequence, weightedRandom } from '../meeple/personas.js';
+import { selectPersona, getContextAwareAction, generatePersonaActionSequence } from '../meeple/personas.js';
 import { 
   generateHumanizedPath, 
   bezierPoint, 
@@ -24,8 +24,9 @@ import { interactWithForms } from '../meeple/forms.js';
 import { navigateBack, navigateForward } from '../meeple/navigation.js';
 import { identifyHotZones, calculateVisualProminence, rectsOverlap } from '../meeple/hotzones.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from '../meeple/browser.js';
-import { randomBetween, sleep, clamp, randomFloat, lerp, distance, shuffle } from '../meeple/utils.js';
+import { randomBetween, sleep, clamp, randomFloat, lerp, distance, shuffle, weightedRandom } from '../meeple/utils.js';
 import { retry, ensureCSPRelaxed, ensurePageSetup } from '../meeple/security.js';
+import { executeSequence, validateSequence, validateSequences } from '../meeple/sequences.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -354,10 +355,249 @@ describe('Meeple Modules - Unit Tests', () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
       const hotZones = await identifyHotZones(testPage, consoleSpy);
-      
+
       await naturalMouseMovement(testPage, hotZones, consoleSpy);
-      
+
       expect(logMessages.length).toBeGreaterThan(0);
     }, 10000);
+  });
+
+  describe('Sequence Execution', () => {
+    beforeEach(async () => {
+      // Create a simple test page with known elements
+      await testPage.setContent(`
+        <html>
+          <head><title>Test Page</title></head>
+          <body>
+            <button id="testButton">Click Me</button>
+            <input id="testInput" type="text" placeholder="Type here">
+            <select id="testSelect">
+              <option value="option1">Option 1</option>
+              <option value="option2">Option 2</option>
+            </select>
+            <div id="content">Test content area</div>
+          </body>
+        </html>
+      `);
+    });
+
+    test('validateSequence accepts valid sequence specification', () => {
+      const validSequence = {
+        description: "Test sequence",
+        temperature: 7,
+        "chaos-range": [1, 5],
+        actions: [
+          { action: "click", selector: "#testButton" },
+          { action: "type", selector: "#testInput", text: "test text" },
+          { action: "select", selector: "#testSelect", value: "option2" }
+        ]
+      };
+
+      const result = validateSequence(validSequence);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('validateSequence rejects invalid sequence specifications', () => {
+      const invalidSequence = {
+        description: "Invalid sequence",
+        temperature: 15, // Too high
+        "chaos-range": [5, 1], // Reversed range
+        actions: [
+          { action: "invalid", selector: "#test" }, // Invalid action type
+          { action: "type", selector: "#test" }, // Missing text field
+          { action: "select", selector: "#test" } // Missing value field
+        ]
+      };
+
+      const result = validateSequence(invalidSequence);
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    test('validateSequences handles multiple sequences', () => {
+      const sequences = {
+        "test-sequence-1": {
+          description: "First test",
+          actions: [{ action: "click", selector: "#test1" }]
+        },
+        "test-sequence-2": {
+          description: "Second test",
+          actions: [{ action: "type", selector: "#test2", text: "hello" }]
+        }
+      };
+
+      const result = validateSequences(sequences);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('executeSequence performs click actions', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Click test",
+        temperature: 10, // High temperature for strict sequence following
+        "chaos-range": [1, 1], // No chaos
+        actions: [
+          { action: "click", selector: "#testButton" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].action).toBe('click');
+      expect(results[0].selector).toBe('#testButton');
+      expect(logMessages.length).toBeGreaterThan(0);
+    }, 15000);
+
+    test('executeSequence performs type actions', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Type test",
+        temperature: 10,
+        "chaos-range": [1, 1],
+        actions: [
+          { action: "type", selector: "#testInput", text: "Hello World" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].action).toBe('type');
+      expect(results[0].text).toBe('Hello World');
+
+      // Verify text was actually typed
+      const inputValue = await testPage.$eval('#testInput', el => el.value);
+      expect(inputValue).toBe('Hello World');
+    }, 15000);
+
+    test('executeSequence performs select actions', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Select test",
+        temperature: 10,
+        "chaos-range": [1, 1],
+        actions: [
+          { action: "select", selector: "#testSelect", value: "option2" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].action).toBe('select');
+      expect(results[0].value).toBe('option2');
+
+      // Verify option was actually selected
+      const selectedValue = await testPage.$eval('#testSelect', el => el.value);
+      expect(selectedValue).toBe('option2');
+    }, 15000);
+
+    test('executeSequence handles failed actions gracefully', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Failure test",
+        temperature: 10,
+        "chaos-range": [1, 1],
+        actions: [
+          { action: "click", selector: "#nonexistent" }, // This should fail
+          { action: "click", selector: "#testButton" }  // This should succeed
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results).toHaveLength(2);
+      expect(results[0].success).toBe(false); // First action should fail
+      expect(results[1].success).toBe(true);  // Second action should succeed
+    }, 15000);
+
+    test('executeSequence respects temperature settings', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Temperature test",
+        temperature: 0, // Very low temperature should cause random actions
+        "chaos-range": [1, 1],
+        actions: [
+          { action: "click", selector: "#testButton" },
+          { action: "click", selector: "#testButton" },
+          { action: "click", selector: "#testButton" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      // With temperature 0, should get some mix of defined and random actions
+      expect(results.length).toBeGreaterThan(0);
+      expect(logMessages.some(msg => msg.includes('random action'))).toBe(true);
+    }, 15000);
+
+    test('executeSequence includes chaos multiplier in temperature calculation', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Chaos test",
+        temperature: 5,
+        "chaos-range": [1, 10], // Wide chaos range
+        actions: [
+          { action: "click", selector: "#testButton" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results.length).toBeGreaterThan(0);
+      // Should log the effective temperature calculation
+      expect(logMessages.some(msg => msg.includes('Effective temperature'))).toBe(true);
+    }, 15000);
+
+    test('executeSequence handles multiple action types in sequence', async () => {
+      const logMessages = [];
+      const consoleSpy = (message) => logMessages.push(message);
+
+      const sequenceSpec = {
+        description: "Multi-action test",
+        temperature: 10,
+        "chaos-range": [1, 1],
+        actions: [
+          { action: "type", selector: "#testInput", text: "Test123" },
+          { action: "select", selector: "#testSelect", value: "option1" },
+          { action: "click", selector: "#testButton" }
+        ]
+      };
+
+      const hotZones = [];
+      const results = await executeSequence(testPage, sequenceSpec, hotZones, 'researcher', 'test-user', {}, consoleSpy);
+
+      expect(results).toHaveLength(3);
+      expect(results[0].action).toBe('type');
+      expect(results[1].action).toBe('select');
+      expect(results[2].action).toBe('click');
+
+      // Verify all actions were performed
+      const inputValue = await testPage.$eval('#testInput', el => el.value);
+      const selectValue = await testPage.$eval('#testSelect', el => el.value);
+      expect(inputValue).toBe('Test123');
+      expect(selectValue).toBe('option1');
+    }, 20000);
   });
 });

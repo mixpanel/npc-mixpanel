@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"private": true,
 	"main": "server.js",
+	"types": "index.d.ts",
 	"scripts": {
 		"local": "./scripts/local.sh",
 		"fire": "./scripts/fire.sh",
