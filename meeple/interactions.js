@@ -52,13 +52,13 @@ export async function wait() {
 	
 	if (waitType < 0.6) {
 		// Quick pause (60% of the time)
-		delay = Math.random() * 400 + 100; // 100-500ms (was 200-1000ms)
+		delay = Math.random() * 300 + 75; // 75-375ms (was 100-500ms)
 	} else if (waitType < 0.9) {
 		// Medium pause (30% of the time)
-		delay = Math.random() * 1000 + 500; // 500-1500ms (was 1-3 seconds)
+		delay = Math.random() * 600 + 300; // 300-900ms (was 500-1500ms)
 	} else {
 		// Longer pause (10% of the time)
-		delay = Math.random() * 2000 + 1000; // 1-3 seconds (was 2-6 seconds)
+		delay = Math.random() * 1200 + 600; // 600ms-1.8s (was 1-3 seconds)
 	}
 	
 	await new Promise(resolve => setTimeout(resolve, delay));
@@ -109,8 +109,8 @@ export function generateHumanizedPath(startX, startY, endX, endY, targetWidth = 
 	// Fitts' Law: Movement time increases with distance and decreases with target size
 	const targetSize = Math.min(targetWidth, targetHeight);
 	const difficultyIndex = Math.log2(distance / targetSize + 1);
-	const baseMoveTime = 50 + (difficultyIndex * 80); // 50-600ms base time
-	const totalMoveTime = baseMoveTime + (Math.random() - 0.5) * baseMoveTime * 0.3; // ±30% variation
+	const baseMoveTime = 30 + (difficultyIndex * 55); // 30-400ms base time (was 50-600ms)
+	const totalMoveTime = baseMoveTime + (Math.random() - 0.5) * baseMoveTime * 0.25; // ±25% variation (was ±30%)
 	
 	// Create more dynamic control points for realistic arcs
 	const angle = Math.atan2(endY - startY, endX - startX);
@@ -223,8 +223,8 @@ export async function moveMouse(page, startX, startY, endX, endY, targetWidth = 
 			const timingDelta = point.timing - lastTiming;
 			const actualDelay = Math.max(1, Math.round(timingDelta));
 			
-			// Add minor random variations to timing (±20%)
-			const finalDelay = actualDelay + (Math.random() - 0.5) * actualDelay * 0.2;
+			// Add minor random variations to timing (±15%)
+			const finalDelay = actualDelay + (Math.random() - 0.5) * actualDelay * 0.15;
 			await new Promise(resolve => setTimeout(resolve, Math.max(1, Math.round(finalDelay))));
 			
 			lastTiming = point.timing;
@@ -419,7 +419,7 @@ export async function rageClick(page, log = console.log) {
 		}, boundedPos.x, boundedPos.y);
 		
 		// Brief pause after rage clicking (frustration/recovery time)
-		const recoveryTime = 250 + Math.random() * 500; // 0.25-0.75s (was 0.5-1.5s)
+		const recoveryTime = 150 + Math.random() * 300; // 0.15-0.45s (was 0.25-0.75s)
 		await new Promise(resolve => setTimeout(resolve, recoveryTime));
 		
 	} catch (error) {
@@ -644,7 +644,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			);
 
 			// More realistic pause before clicking (humans don't click immediately)
-			await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 100)); // 100-400ms (was 200-800ms)
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 75)); // 75-275ms (was 100-400ms)
 
 			// Natural click with slight delay
 			await page.mouse.click(targetX, targetY, {
@@ -656,7 +656,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			log(`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
 
 			// Pause after click to see results
-			await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 150)); // 150-500ms (was 300-1000ms)
+			await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100)); // 100-300ms (was 150-500ms)
 			return true;
 		}
 
@@ -762,7 +762,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		);
 
 		// More realistic pause before clicking (humans take time to aim)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 100)); // 100-400ms (was 200-800ms)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 75)); // 75-275ms (was 100-400ms)
 
 		// Natural click with more realistic timing
 		await page.mouse.click(targetX, targetY, {
@@ -779,7 +779,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 
 			for (let i = 0; i < additionalClicks; i++) {
 				// Brief pause between rapid clicks
-				await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50)); // 50-150ms (was 100-300ms)
+				await new Promise(resolve => setTimeout(resolve, Math.random() * 75 + 40)); // 40-115ms (was 50-150ms)
 
 				// Nearby click with smaller fuzziness (frustrated clicking behavior)
 				const nearbyX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * rect.width * 0.3;
@@ -793,7 +793,7 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		}
 
 		// Pause after click to see results (more realistic)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 150)); // 150-500ms (was 300-1000ms)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100)); // 100-300ms (was 150-500ms)
 
 		return true;
 	} catch (error) {
@@ -892,7 +892,7 @@ export async function intelligentScroll(page, hotZones = [], log = console.log) 
 		}, targetScroll);
 
 		// Wait for scroll to complete (more realistic timing)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 350 + 400)); // 400-750ms (was 800-1500ms)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 250 + 250)); // 250-500ms (was 400-750ms)
 
 		log(`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`);
 		return true;
@@ -962,8 +962,8 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 			log
 		);
 
-		// Longer, more realistic pause (users move mouse then pause to read/think)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 600 + 400)); // 400-1000ms (was 800-2000ms)
+		// More realistic pause (users move mouse then pause to read/think)
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 400 + 200)); // 200-600ms (was 400-1000ms)
 
 		// Track mouse movement for heatmap data
 		await trackMouseMovement(page, target, log);
@@ -1122,28 +1122,28 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
  * Calculate realistic hover duration based on content type and persona
  */
 function calculateHoverDuration(target, persona) {
-	// Base durations by content type (in milliseconds) - reduced by ~50%
+	// Base durations by content type (in milliseconds) - optimized for snappier feel
 	const contentTypeDurations = {
 		// Reading content - longer hover times
-		text: { min: 1500, max: 4000 },
-		paragraph: { min: 2000, max: 6000 },
-		article: { min: 2500, max: 7500 },
+		text: { min: 1000, max: 2500 },
+		paragraph: { min: 1200, max: 3500 },
+		article: { min: 1500, max: 4500 },
 
 		// Interactive elements - moderate hover times
-		button: { min: 1000, max: 3000 },
-		link: { min: 750, max: 2500 },
-		form: { min: 1500, max: 3500 },
+		button: { min: 600, max: 1800 },
+		link: { min: 400, max: 1500 },
+		form: { min: 800, max: 2200 },
 
 		// Media content - variable hover times
-		image: { min: 1000, max: 4000 },
-		video: { min: 1500, max: 5000 },
+		image: { min: 700, max: 2500 },
+		video: { min: 1000, max: 3000 },
 
 		// Navigation - shorter hover times
-		nav: { min: 500, max: 1500 },
-		menu: { min: 750, max: 2000 },
+		nav: { min: 300, max: 900 },
+		menu: { min: 400, max: 1200 },
 
 		// Default for unknown content
-		default: { min: 1000, max: 3000 }
+		default: { min: 600, max: 1800 }
 	};
 
 	// Determine content type based on target properties
@@ -1199,10 +1199,9 @@ function calculateHoverDuration(target, persona) {
 	const variation = baseHoverTime * 0.1;
 	const finalDuration = baseHoverTime + (Math.random() - 0.5) * 2 * variation;
 
-	return Math.max(400, Math.round(finalDuration)); // Minimum 400ms hover (was 800ms)
+	return Math.max(250, Math.round(finalDuration)); // Minimum 250ms hover (was 400ms)
 }
 
-// shortPause function removed - unused (use wait() instead)
 
 /**
  * Perform random mouse movement

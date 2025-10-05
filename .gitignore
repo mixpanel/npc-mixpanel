@@ -14,3 +14,5 @@ env.yaml
 .prettierrc
 CLAUDE.md
 vscode-profile-*
+spec-*.jsonc
+service-account.json

@@ -280,6 +280,76 @@ a:visited {
     color: var(--text-muted);
 }
 
+code {
+    font-family: var(--font-mono);
+    background: var(--bg-tertiary);
+    color: var(--accent-purple-light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    border: 1px solid var(--border-primary);
+    word-break: break-all;
+}
+
+/* Configuration display styling */
+.config-status {
+    font-size: 1.2em;
+    color: var(--success-light);
+    font-weight: 500;
+}
+
+.config-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.config-label {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.config-value {
+    background: var(--bg-elevated);
+    color: var(--mixpanel-purple-light);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    border: 1px solid var(--border-primary);
+    word-break: break-all;
+    font-family: var(--font-mono);
+}
+
+.config-flags {
+    color: var(--text-primary);
+    font-size: 0.95em;
+    margin-top: 0.25rem;
+}
+
+.default-project-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: var(--accent-purple) !important;
+    text-decoration: none;
+    font-size: 0.9em;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    transition: all 0.2s ease;
+}
+
+.default-project-link:hover {
+    background: var(--accent-purple);
+    color: var(--text-accent) !important;
+    border-color: var(--accent-purple);
+    transform: translateX(2px);
+}
+
 .container {
     flex-grow: 1;
     display: flex;

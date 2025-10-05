@@ -456,11 +456,7 @@ function addTerminalLineToTab(meepleId, message) {
 
 		// Check if this message indicates any type of meeple completion/failure
 		// Add close button for any completion state (completed, failed, timed out, etc.)
-		if (message.includes('simulation complete.') || 
-		    message.includes('completed!') || 
-		    message.includes('timed out') || 
-		    message.includes('failed:') ||
-		    message.includes('completed with issues')) {
+		if (message.includes('simulation complete.') || message.includes('completed!') || message.includes('timed out') || message.includes('failed:') || message.includes('completed with issues')) {
 			// Add a close button to the tab header
 			const tab = meepleTabsData[meepleId];
 			if (tab && tab.header && meepleId !== 'general') {
@@ -541,9 +537,9 @@ form.addEventListener('submit', async (e) => {
 	// Get user from cookie for server-side analytics (server already parsed clean email)
 	const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
 	const user = userCookie ? decodeURIComponent(userCookie.split('=')[1]) : null;
-	
+
 	// Connect to WebSocket (same server for Cloud Run) with user info
-	const socket = io({ 
+	const socket = io({
 		reconnection: true,
 		auth: {
 			user: user
@@ -621,11 +617,15 @@ form.addEventListener('submit', async (e) => {
 		addTerminalLine(terminalContent, '🔌 Disconnected from server');
 	});
 
-	// Update form text to show in progress
-	overview.textContent = 'Meeples are meepling...';
-	formLine1.textContent = 'replays in replayin\'';
-	formLine2.textContent = 'see the actions on the right!';
-	formLine3.innerHTML = defaultProjectHTML;
+	// Update form text to show configuration
+	overview.innerHTML = `<div class="config-status">🎭 Meeples are meepling...</div>`;
+	formLine1.innerHTML = `<div class="config-row"><span class="config-label">URL:</span> <code class="config-value">${data.url}</code></div>`;
+	formLine2.innerHTML = `<div class="config-row"><span class="config-label">Token:</span> <code class="config-value">${data.token || '(not injecting)'}</code></div>`;
+	formLine3.innerHTML = `<div class="config-row">
+		<span class="config-label">${data.users} meeple${data.users > 1 ? 's' : ''}</span>
+		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${data.past ? '✓' : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}</span>
+		${data.inject && data.token === '7127e52d6d61ee30a4d7fb4555277f87' ? `<a href="https://mixpanel.com/project/3769788/view/4266856/app/events" target="_blank" class="default-project-link">→ view project</a>` : ''}
+	</div>`;
 
 
 	// Hide form inputs but keep the description text visible
@@ -750,8 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Handle headless checkbox state based on current URL
 	const headlessCheckbox = document.getElementById('headless');
 	const headlessLabel = headlessCheckbox.closest('label');
-	const isLocalhost = window.location.hostname === 'localhost' || 
-		window.location.hostname === '127.0.0.1' || 
+	const isLocalhost = window.location.hostname === 'localhost' ||
+		window.location.hostname === '127.0.0.1' ||
 		window.location.hostname.startsWith('192.168.') ||
 		window.location.hostname.startsWith('10.') ||
 		window.location.hostname.includes('.local');
@@ -760,12 +760,12 @@ document.addEventListener('DOMContentLoaded', () => {
 		// When not on localhost, disable the checkbox and check it
 		headlessCheckbox.disabled = true;
 		headlessCheckbox.checked = true;
-		
+
 		// Add visual styling to show it's disabled
 		headlessLabel.style.opacity = '0.6';
 		headlessLabel.style.cursor = 'not-allowed';
 		headlessLabel.title = 'Headless mode is required when running on cloud/remote servers';
-		
+
 		// Add disabled styling to the checkbox
 		headlessCheckbox.style.cursor = 'not-allowed';
 	} else {

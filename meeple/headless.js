@@ -8,13 +8,14 @@ import u from 'ak-tools';
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
 // Import from new modular structure
-import { ensurePageSetup,  } from './security.js';
+import { ensurePageSetup, } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
 import { wait, exploratoryClick, rageClick, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll } from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
+import { executeSequence } from './sequences.js';
 import { randomBetween, sleep } from './utils.js';
 
 
@@ -24,14 +25,14 @@ if (!NODE_ENV) throw new Error('NODE_ENV is required');
 
 /**
  * Main function to simulate user behavior.
- * @param {Object} PARAMS - Configuration parameters
- * @param {Function} logFunction - Optional logging function for real-time updates
- * @returns {Promise<Array>} Array of simulation results
+ * @param {import('../index.js').MeepleParams} PARAMS - Configuration parameters
+ * @param {import('../index.js').LogFunction} [logFunction] - Optional logging function for real-time updates
+ * @returns {Promise<import('../index.js').SimulationResult[]>} Array of simulation results
  */
 export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
 	const log = logFunction || ((message) => console.log(message));
-	let { 
+	let {
 		url = 'https://ak--47.github.io/fixpanel/',
 		users = 10,
 		concurrency = 5,
@@ -40,9 +41,10 @@ export default async function main(PARAMS = {}, logFunction = null) {
 		past = false,
 		token = '',
 		maxActions = null,
-		masking = false
+		masking = false,
+		sequences = null
 	} = PARAMS;
-	
+
 	if (url === 'fixpanel') url = `https://ak--47.github.io/fixpanel/`;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
@@ -50,34 +52,57 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	if (token) MIXPANEL_TOKEN = token;
 	if (NODE_ENV === 'production') headless = true; // Always headless in production
 
+	// Prepare sequence distribution if sequences are provided
+	let sequenceNames = [];
+	if (sequences && typeof sequences === 'object') {
+		sequenceNames = Object.keys(sequences);
+		log(`🎯 <span style="color: #7856FF;">Deterministic sequences detected:</span> ${sequenceNames.length} sequence(s) available`);
+		sequenceNames.forEach(name => {
+			const seq = sequences[name];
+			log(`  ├─ "${name}": ${seq.description || 'No description'} (temp: ${seq.temperature || 5}, ${seq.actions?.length || 0} actions)`);
+		});
+	}
+
 	const userPromises = Array.from({ length: users }, (_, i) => {
 		return limit(() => {
-			return new Promise(async (resolve) => {
-				// Generate unique username for this meeple
-				const usersHandle = u.makeName(3, '-');
-				try {					
-					log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
+			// Generate unique username for this meeple
+			const usersHandle = u.makeName(3, '-');
 
-					const result = await simulateUser(url, headless, inject, past, maxActions, usersHandle, { masking }, log);
+			// Select sequence for this user if sequences are available
+			let selectedSequence = null;
+			let selectedSequenceName = null;
+			if (sequenceNames.length > 0) {
+				// Distribute sequences evenly among users, with cycling if more users than sequences
+				selectedSequenceName = sequenceNames[i % sequenceNames.length];
+				selectedSequence = sequences[selectedSequenceName];
+				log(`🎯 <span style="color: #9B59B6;">${usersHandle} assigned sequence:</span> "${selectedSequenceName}"`, usersHandle);
+			}
 
-					if (result && !result.error && !result.timedOut) {
-						log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
-						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-					} else if (result && result.timedOut) {
-						log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
-						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-					} else {
-						log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
-						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-					}
+			log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
 
-					resolve(result || { error: 'Unknown error', user: i + 1 });
-				} catch (e) {
-					const errorMsg = e.message || 'Unknown error';
-					log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
+			// Return the promise directly from simulateUser, handling success/error cases
+			return simulateUser(url, headless, inject, past, maxActions, usersHandle, {
+				masking,
+				sequence: selectedSequence,
+				sequenceName: selectedSequenceName
+			}, log).then(result => {
+				if (result && !result.error && !result.timedOut) {
+					log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
 					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-					resolve({ error: errorMsg, user: i + 1, crashed: true });
+				} else if (result && result.timedOut) {
+					log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
+					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+				} else {
+					log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
+					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
 				}
+
+				return result || { error: 'Unknown error', user: i + 1 };
+			}).catch(e => {
+				const errorMsg = e.message || 'Unknown error';
+				log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
+				log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+				return { error: errorMsg, user: i + 1, crashed: true };
 			});
 		});
 	});
@@ -86,8 +111,11 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	const results = await Promise.allSettled(userPromises);
 
 	// Process results and provide summary
+	// @ts-ignore
 	const successful = results.filter(r => r.status === 'fulfilled' && r.value && !r.value.error && !r.value.crashed).length;
+	// @ts-ignore
 	const timedOut = results.filter(r => r.status === 'fulfilled' && r.value && r.value.timedOut).length;
+	// @ts-ignore
 	const crashed = results.filter(r => r.status === 'fulfilled' && r.value && r.value.crashed).length;
 	const failed = results.filter(r => r.status === 'rejected').length;
 
@@ -97,7 +125,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	// Calculate total actions performed
 	let totalActions = 0;
 	let totalSuccessfulActions = 0;
-	
+
 	// Return the actual results, filtering out any undefined values
 	const finalResults = results.map(r => {
 		if (r.status === 'fulfilled') {
@@ -133,13 +161,14 @@ export default async function main(PARAMS = {}, logFunction = null) {
 /**
  * Simulate a single user session
  * @param {string} url - Target URL
- * @param {boolean} headless - Run in headless mode
- * @param {boolean} inject - Inject Mixpanel
- * @param {boolean} past - Simulate past time
- * @param {number} maxActions - Maximum actions per session
- * @param {string} usersHandle - User identifier
- * @param {Object} opts - Additional options
- * @param {Function} logFunction - Logging function
+ * @param {boolean} [headless=true] - Run in headless mode
+ * @param {boolean} [inject=true] - Inject Mixpanel
+ * @param {boolean} [past=false] - Simulate past time
+ * @param {number|null} [maxActions=null] - Maximum actions per session
+ * @param {string|null} [usersHandle=null] - User identifier
+ * @param {import('../index.js').MeepleOptions} [opts={}] - Additional options
+ * @param {import('../index.js').LogFunction} [logFunction=console.log] - Logging function
+ * @returns {Promise<import('../index.js').SimulationResult>} Simulation result
  */
 export async function simulateUser(url, headless = true, inject = true, past = false, maxActions = null, usersHandle = null, opts = {}, logFunction = console.log) {
 	// Create user-specific logger that automatically includes the usersHandle
@@ -213,25 +242,37 @@ export async function simulateUser(url, headless = true, inject = true, past = f
 			// Identify hot zones for intelligent targeting
 			const hotZones = await identifyHotZones(page, log);
 			log(`🎯 <span style="color: #7856FF;">Hot zones identified:</span> ${hotZones.length} priority elements`);
-			
-			// Select persona and generate action sequence
-			const persona = selectPersona(log);
-			const actionSequence = generatePersonaActionSequence(persona, maxActions);
-			
-			log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona}, ${actionSequence.length} actions planned`);
 
+			// Select persona and generate action sequence or use provided sequence
+			const persona = selectPersona(log);
+			let actionResults;
 			const startTime = Date.now();
-			const actionResults = await simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, meepleOpts, log);
-			
+
+			// Check if a deterministic sequence is provided
+			if (meepleOpts.sequence && meepleOpts.sequenceName) {
+				log(`🎯 <span style="color: #9B59B6;">Executing deterministic sequence:</span> "${meepleOpts.sequenceName}"`);
+				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona} (for fallback actions)`);
+
+				// Execute the deterministic sequence
+				actionResults = await executeSequence(page, meepleOpts.sequence, hotZones, persona, usersHandle, meepleOpts, log);
+			} else {
+				// Fall back to regular persona-based behavior
+				const actionSequence = generatePersonaActionSequence(persona, maxActions);
+				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona}, ${actionSequence.length} actions planned`);
+
+				actionResults = await simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, meepleOpts, log);
+			}
+
 			await closeBrowser(browser);
-			
+
 			const durationSec = Math.round((Date.now() - startTime) / 1000);
 			log(`⏱️ <span style="color: #7856FF;">Session completed in ${durationSec}s</span>`);
-			
+
 			return {
 				actions: actionResults,
 				duration: durationSec,
 				persona,
+				sequence: meepleOpts.sequenceName || null,
 				success: true
 			};
 
@@ -296,7 +337,7 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 	for (const [index, originalAction] of actionSequence.entries()) {
 		// Apply context-aware action selection
 		const action = getContextAwareAction(actionHistory, originalAction, log);
-		
+
 		const emoji = actionEmojis[action] || '🎯';
 		const contextNote = action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
 		log(`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${actionSequence.length}</span>: ${action}${contextNote}`);
@@ -368,7 +409,7 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 			);
 
 			await Promise.race([funcToPerform(), actionTimeout]);
-			
+
 			actionResults.push(action);
 			consecutiveFailures = 0; // Reset failure count on success
 			actionHistory.push({
@@ -380,7 +421,7 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		} catch (actionError) {
 			consecutiveFailures++;
 			log(`    ├─ ⚠️ <span style="color: #F8BC3B;">Action failed:</span> ${actionError.message}`);
-			
+
 			actionHistory.push({
 				action,
 				success: false,

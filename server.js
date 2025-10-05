@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { uid } from 'ak-tools';
 import main from './meeple/headless.js';
+import { validateSequences } from './meeple/sequences.js';
 import { log } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -263,7 +264,7 @@ app.use((req, res, next) => {
 
 
 // API routes
-app.get('/ping', async (req, res) => {
+app.get('/ping', (req, res) => {
 	res.json({
 		status: 'ok',
 		message: 'npc-mixpanel service is alive',
@@ -297,6 +298,19 @@ app.post('/simulate', async (req, res) => {
 			...req.body,
 			runId
 		};
+
+		// Validate sequences parameter if provided
+		if (mergedParams.sequences) {
+			const validation = validateSequences(mergedParams.sequences);
+			if (!validation.valid) {
+				logger.error(`/SIMULATE validation error`, { errors: validation.errors, user, rawUser });
+				return res.status(400).json({
+					error: 'Invalid sequences specification',
+					details: validation.errors
+				});
+			}
+		}
+
 		const startTime = Date.now();
 
 		// Server-side analytics: Track API job start
