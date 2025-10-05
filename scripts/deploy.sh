@@ -27,7 +27,7 @@ if ! grep -q "^MIXPANEL_TOKEN=" .env; then
 fi
 
 # Load SERVICE_NAME into environment
-export $(grep "^SERVICE_NAME=" .env | xargs)
+export "$(grep "^SERVICE_NAME=" .env | xargs)"
 
 # Convert .env to flat YAML format
 echo "Generating .env.yaml from .env file..."
@@ -45,6 +45,14 @@ echo "Deploying $SERVICE_NAME to Cloud Run using Cloud Build..."
 gcloud builds submit \
   --config cloudbuild.yaml \
   --substitutions _SERVICE_NAME="$SERVICE_NAME" \
+  --region us-central1
+
+# Deploy a copy of the service to Cloud Run with $SERVICE_NAME_API 
+# this will be used for programmatic access to the service (since above uses IAP)
+echo "Deploying $SERVICE_NAME-API to Cloud Run using Cloud Build..."
+gcloud builds submit \
+  --config cloudbuild-api.yaml \
+  --substitutions _SERVICE_NAME="${SERVICE_NAME}-API" \
   --region us-central1
 
 echo "✅ Cloud Run deployment complete!"

@@ -617,11 +617,15 @@ form.addEventListener('submit', async (e) => {
 		addTerminalLine(terminalContent, '🔌 Disconnected from server');
 	});
 
-	// Update form text to show in progress
-	overview.textContent = 'Meeples are meepling...';
-	formLine1.textContent = 'replays in replayin\'';
-	formLine2.textContent = 'see the actions on the right!';
-	formLine3.innerHTML = defaultProjectHTML;
+	// Update form text to show configuration
+	overview.innerHTML = `<div class="config-status">🎭 Meeples are meepling...</div>`;
+	formLine1.innerHTML = `<div class="config-row"><span class="config-label">URL:</span> <code class="config-value">${data.url}</code></div>`;
+	formLine2.innerHTML = `<div class="config-row"><span class="config-label">Token:</span> <code class="config-value">${data.token || '(not injecting)'}</code></div>`;
+	formLine3.innerHTML = `<div class="config-row">
+		<span class="config-label">${data.users} meeple${data.users > 1 ? 's' : ''}</span>
+		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${data.past ? '✓' : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}</span>
+		${data.inject && data.token === '7127e52d6d61ee30a4d7fb4555277f87' ? `<a href="https://mixpanel.com/project/3769788/view/4266856/app/events" target="_blank" class="default-project-link">→ view project</a>` : ''}
+	</div>`;
 
 
 	// Hide form inputs but keep the description text visible

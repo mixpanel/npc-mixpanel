@@ -84,7 +84,7 @@ export function generatePersonaActionSequence(persona, maxActions = null) {
  */
 export function generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions = null) {
 	const sequence = [];
-	const totalActions = maxActions || u.rand(25, 100); // Default session length
+	const totalActions = maxActions || u.rand(50, 150); // Default session length (increased for more data)
 	const actionHistory = [];
 
 	// Ensure minimum engagement - at least 80% of actions should be clicks (doubled for better heatmap data)

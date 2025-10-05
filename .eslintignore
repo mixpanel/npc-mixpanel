@@ -10,3 +10,4 @@ coverage/
 *.log
 tests/
 utils/injectMixpanel.js
+service-account.json

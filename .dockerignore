@@ -11,3 +11,4 @@ coverage
 tests
 tmp/*
 .nyc_output
+service-account.json

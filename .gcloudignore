@@ -13,7 +13,7 @@ scripts
 .cache
 .claude
 .prettierrc
-
+service-account.json
 
 # Ignore node_modules (generated during npm install)
 node_modules
