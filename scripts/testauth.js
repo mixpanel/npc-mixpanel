@@ -1,9 +1,9 @@
 import {GoogleAuth} from 'google-auth-library';
 
-const audience = '369001918367-t5qrahnqdaasaifvk6akpqkpjk9vli58.apps.googleusercontent.com'; // IAP client ID
+const audience = 'https://npc-mixpanel-api-1078767167468.us-central1.run.app'; // IAP client ID
 
 
-const url = 'https://npc-mixpanel-1078767167468.us-central1.run.app/ping';                   // your Cloud Run URL
+const url = 'https://npc-mixpanel-api-1078767167468.us-central1.run.app/ping';                   // your Cloud Run URL
 
 async function main() {
   // Point to your SA key file OR set GOOGLE_APPLICATION_CREDENTIALS
