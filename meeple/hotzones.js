@@ -223,6 +223,27 @@ export async function identifyHotZones(page) {
 				// Short, punchy text is often a CTA
 				if (text.length > 0 && text.length < 25) score += 1;
 
+				// 6. ENHANCED: Form element scoring
+				const tagName = element.tagName.toLowerCase();
+				const role = element.getAttribute('role');
+				const type = element.type || '';
+
+				// Form inputs and interactive elements get bonus points
+				if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+					score += 3; // Forms are important interactive elements
+					if (!element.disabled && !element.readOnly) score += 1;
+				}
+
+				// Radio groups and checkboxes
+				if (role === 'radiogroup' || role === 'checkbox' || type === 'checkbox' || type === 'radio') {
+					score += 3;
+				}
+
+				// Form containers
+				if (tagName === 'form' || element.classList.contains('form-group') || element.classList.contains('input-group')) {
+					score += 2; // Form containers are good targets
+				}
+
 				return Math.round(score * 10) / 10;
 			}
 
@@ -230,7 +251,17 @@ export async function identifyHotZones(page) {
 			function isElementInteractive(el, rect, style) {
 				// Skip if hidden
 				if (style.display === 'none' || style.visibility === 'hidden' ||
-					style.opacity === '0' || el.disabled || el.hidden) {
+					style.opacity === '0' || el.hidden) {
+					return false;
+				}
+
+				// ENHANCED: Form elements can be interactive even if disabled (we can still detect them)
+				const tagName = el.tagName.toLowerCase();
+				const isFormElement = tagName === 'input' || tagName === 'textarea' || tagName === 'select' ||
+					tagName === 'form' || el.getAttribute('role') === 'radiogroup' || el.getAttribute('role') === 'checkbox';
+
+				// Disabled forms are still visible targets (just not interactable)
+				if (!isFormElement && el.disabled) {
 					return false;
 				}
 
@@ -256,9 +287,37 @@ export async function identifyHotZones(page) {
 			}
 
 			// Enhanced selector list incorporating ARIA and modern patterns
+			// ENHANCED: Now includes form elements as hot zones
+			const formSelectors = [
+				'input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="hidden"])',
+				'textarea',
+				'select',
+				'[role="radiogroup"]',
+				'[role="checkbox"]',
+				'form',
+				'.form-group',
+				'.input-group'
+			];
+
 			// Analyze elements with batching for performance
 			const allElements = [];
+
+			// Add interactive elements
 			interactiveSelectors.forEach(selector => {
+				try {
+					const elements = document.querySelectorAll(selector);
+					elements.forEach(el => {
+						if (!allElements.includes(el)) {
+							allElements.push(el);
+						}
+					});
+				} catch (e) {
+					// Ignore invalid selectors
+				}
+			});
+
+			// Add form elements
+			formSelectors.forEach(selector => {
 				try {
 					const elements = document.querySelectorAll(selector);
 					elements.forEach(el => {
@@ -288,6 +347,12 @@ export async function identifyHotZones(page) {
 					const baseThreshold = 4; // Lower threshold for marketing sites
 
 					if (visualProminence >= baseThreshold) {
+						// ENHANCED: Add form-specific metadata
+						const tagName = el.tagName.toLowerCase();
+						const role = el.getAttribute('role');
+						const isFormElement = tagName === 'input' || tagName === 'textarea' || tagName === 'select' ||
+							tagName === 'form' || role === 'radiogroup' || role === 'checkbox';
+
 						hotZones.push({
 							element: el,
 							rect: {
@@ -300,10 +365,15 @@ export async function identifyHotZones(page) {
 							},
 							priority: visualProminence,
 							text: (el.textContent || '').trim().substring(0, 50),
-							tag: el.tagName.toLowerCase(),
+							tag: tagName,
 							href: el.href || null,
-							ariaRole: el.getAttribute('role'),
-							ariaLabel: el.getAttribute('aria-label')
+							ariaRole: role,
+							ariaLabel: el.getAttribute('aria-label'),
+							// Form-specific metadata
+							isForm: isFormElement,
+							formType: isFormElement ? (el.type || tagName) : null,
+							formName: isFormElement ? el.name : null,
+							formPlaceholder: isFormElement ? el.placeholder : null
 						});
 					}
 				}

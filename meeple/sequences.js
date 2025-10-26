@@ -2,7 +2,7 @@
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
 import { wait, naturalMouseMovement, intelligentScroll, exploratoryClick } from './interactions.js';
-import { interactWithForms } from './forms.js';
+import { interactWithForms, fillRadioGroup, toggleCheckbox, fillSelectDropdown, fillTextInput } from './forms.js';
 import { randomBetween, sleep } from './utils.js';
 
 /**
@@ -96,7 +96,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
  * @returns {Promise<Object>} Action result
  */
 async function executeSequenceAction(page, action, hotZones, log) {
-	const { action: actionType, selector, text, value } = action;
+	const { action: actionType, selector, text, value, clicksPerGroup, requireActive } = action;
 	const startTime = Date.now();
 
 	try {
@@ -105,10 +105,42 @@ async function executeSequenceAction(page, action, hotZones, log) {
 			throw new Error(`Invalid action: missing action type or selector`);
 		}
 
+		// Special handling for fillOutForm - it finds multiple elements
+		if (actionType.toLowerCase() === 'filloutform') {
+			const result = await executeFillOutForm(page, selector, clicksPerGroup, log);
+			const duration = Date.now() - startTime;
+			return {
+				...result,
+				action: actionType,
+				selector,
+				clicksPerGroup: clicksPerGroup || undefined,
+				duration,
+				timestamp: startTime
+			};
+		}
+
 		// Wait for element to be available with timeout
 		const element = await waitForElement(page, selector, log);
 		if (!element) {
 			throw new Error(`Element not found: ${selector}`);
+		}
+
+		// Handle requireActive flag for click actions
+		if (requireActive && actionType.toLowerCase() === 'click') {
+			const isActive = await page.evaluate(el => {
+				return !el.disabled && !el.classList.contains('disabled');
+			}, element);
+			if (!isActive) {
+				log(`⏭️ <span style="color: #F39C12;">Skipping click:</span> ${selector} is not active`);
+				return {
+					success: true,
+					skipped: true,
+					action: actionType,
+					selector,
+					duration: Date.now() - startTime,
+					timestamp: startTime
+				};
+			}
 		}
 
 		let result;
@@ -294,6 +326,85 @@ async function executeSelect(page, element, selector, value, log) {
 }
 
 /**
+ * Execute a fillOutForm action - fills out all form elements matching a selector
+ * REFACTORED: Now uses shared utilities from forms.js for consistency
+ * @param {Page} page - Puppeteer page object
+ * @param {string} selector - CSS selector for form elements (e.g., "[role=radiogroup]")
+ * @param {number} clicksPerGroup - Number of clicks per group element (default: 2)
+ * @param {Function} log - Logging function
+ * @returns {Promise<Object>} Action result
+ */
+async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
+	try {
+		// Find all matching elements
+		const elements = await page.$$(selector);
+
+		if (elements.length === 0) {
+			log(`⚠️ <span style="color: #F39C12;">No elements found matching:</span> ${selector}`);
+			return { success: false, error: 'No elements found', elementsProcessed: 0 };
+		}
+
+		log(`📝 <span style="color: #3498DB;">Filling out form:</span> ${elements.length} element(s) matching ${selector}`);
+		let successCount = 0;
+
+		for (const [index, element] of elements.entries()) {
+			try {
+				// Determine element type
+				const elementInfo = await page.evaluate(el => {
+					const tagName = el.tagName.toLowerCase();
+					const type = el.type || tagName;
+					const role = el.getAttribute('role');
+
+					// For radiogroups, find all radio buttons within
+					if (role === 'radiogroup') {
+						const radios = el.querySelectorAll('input[type="radio"], [role="radio"]');
+						return {
+							type: 'radiogroup',
+							role,
+							radioCount: radios.length,
+							tagName
+						};
+					}
+
+					return { type, role, tagName };
+				}, element);
+
+				// Use shared utilities from forms.js
+				let success = false;
+
+				if (elementInfo.role === 'radiogroup') {
+					log(`🔘 <span style="color: #9B59B6;">Radio group ${index + 1}:</span> ${elementInfo.radioCount} options, clicking ${clicksPerGroup} times`);
+					success = await fillRadioGroup(page, element, clicksPerGroup, log);
+				} else if (elementInfo.type === 'checkbox' || elementInfo.role === 'checkbox') {
+					success = await toggleCheckbox(page, element, log);
+					if (success) log(`☑️ <span style="color: #2ECC71;">Toggled checkbox</span> ${index + 1}`);
+				} else if (elementInfo.tagName === 'select') {
+					success = await fillSelectDropdown(page, element, null, log);
+					if (success) log(`🔽 <span style="color: #9B59B6;">Selected option</span> in dropdown ${index + 1}`);
+				} else if (elementInfo.tagName === 'textarea' || elementInfo.tagName === 'input') {
+					success = await fillTextInput(page, element, null, log);
+					if (success) log(`⌨️ <span style="color: #3498DB;">Typed text</span> in field ${index + 1}`);
+				}
+
+				if (success) {
+					successCount++;
+				}
+
+			} catch (elementError) {
+				log(`⚠️ <span style="color: #F39C12;">Error with element ${index + 1}:</span> ${elementError.message}`);
+			}
+		}
+
+		log(`✅ <span style="color: #27AE60;">Form filled:</span> ${successCount}/${elements.length} elements processed`);
+		return { success: successCount > 0, elementsProcessed: successCount, totalElements: elements.length };
+
+	} catch (error) {
+		log(`❌ <span style="color: #E74C3C;">Fill form failed:</span> ${error.message}`);
+		return { success: false, error: error.message, elementsProcessed: 0 };
+	}
+}
+
+/**
  * Execute a random action when temperature causes sequence bypass
  * @param {Page} page - Puppeteer page object
  * @param {Array} hotZones - Hot zones for targeting
@@ -407,7 +518,7 @@ export function validateSequence(sequenceSpec) {
 
 			if (!actionType || typeof actionType !== 'string') {
 				errors.push(`Action ${index + 1} must have a valid action type`);
-			} else if (!['click', 'type', 'select'].includes(actionType.toLowerCase())) {
+			} else if (!['click', 'type', 'select', 'filloutform'].includes(actionType.toLowerCase())) {
 				errors.push(`Action ${index + 1} has unsupported action type: ${actionType}`);
 			}
 

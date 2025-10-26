@@ -508,7 +508,7 @@ form.addEventListener('submit', async (e) => {
 	data.safeWord = 'let me in...';
 	data.users = parseInt(data.users);
 	data.concurrency = data.users;
-	if (data.concurrency > 10) data.concurrency = 10;
+	if (data.concurrency > 5) data.concurrency = 5;
 
 	// Ensure checkbox values are included in the data
 	data.inject = form.querySelector('#inject').checked;

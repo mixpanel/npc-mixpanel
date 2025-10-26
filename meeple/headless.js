@@ -35,7 +35,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	let {
 		url = 'https://ak--47.github.io/fixpanel/',
 		users = 10,
-		concurrency = 5,
+		concurrency = 10,
 		headless = true,
 		inject = true,
 		past = false,

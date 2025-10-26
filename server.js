@@ -11,6 +11,7 @@ import { logger } from './utils/cloudLogger.js';
 import cookieParser from 'cookie-parser';
 import * as Mixpanel from 'mixpanel';
 import { Diagnostics } from 'ak-diagnostic';
+import { runMicrositesJob } from './microsites.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -366,6 +367,173 @@ app.post('/simulate', async (req, res) => {
 			runId,
 			error: error.message,
 			source: 'api'
+		});
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Microsites endpoint - runs all 6 microsites sequentially
+app.post('/microsites', async (req, res) => {
+	const jobId = uid();
+	// Extract user from IAP header (URL decode first, then parse)
+	const rawUser = req.headers['x-goog-authenticated-user-email'];
+	let user, userId;
+	try {
+		const decodedUser = decodeURIComponent(rawUser);
+		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
+	} catch (error) {
+		user = 'CRON';
+	}
+
+	try {
+		const mergedParams = {
+			...coerceTypes(req.query || {}),
+			...req.body,
+			jobId
+		};
+
+		const startTime = Date.now();
+
+		// Server-side analytics: Track microsites job start
+		logger.notice(`/MICROSITES START`, { ...mergedParams, user, rawUser });
+
+		// Mixpanel server-side tracking
+		userId = user || 'unauthenticated';
+		mp.track('server: microsites job start', {
+			distinct_id: userId,
+			jobId,
+			source: 'api'
+		});
+
+		// Run the microsites job (no WebSocket, returns aggregated results)
+		const result = await runMicrositesJob(mergedParams, (message) => {
+			// Log to console for CRON job output
+			console.log(message);
+		});
+
+		const endTime = Date.now();
+		const duration = (endTime - startTime) / 1000;
+
+		// Server-side analytics: Track microsites job completion
+		logger.notice(`/MICROSITES END in ${duration} seconds`, {
+			...mergedParams,
+			user,
+			duration,
+			rawUser,
+			summary: result.summary
+		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: microsites job finish', {
+			distinct_id: userId,
+			jobId,
+			duration,
+			source: 'api',
+			...result.summary
+		});
+
+		res.status(200).json(result);
+
+	} catch (error) {
+		// Server-side analytics: Track microsites job error
+		logger.error(`ERROR: ${req.path}`, {
+			path: req.path,
+			user,
+			error: error.message,
+			stack: error.stack,
+			jobId
+		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: microsites job error', {
+			distinct_id: userId,
+			jobId,
+			error: error.message,
+			source: 'api'
+		});
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Also support GET requests for microsites (for simple CRON jobs)
+app.get('/microsites', async (req, res) => {
+	const jobId = uid();
+	// Extract user from IAP header (URL decode first, then parse)
+	const rawUser = req.headers['x-goog-authenticated-user-email'];
+	let user, userId;
+	try {
+		const decodedUser = decodeURIComponent(rawUser);
+		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
+	} catch (error) {
+		user = 'CRON';
+	}
+
+	try {
+		const mergedParams = {
+			...coerceTypes(req.query || {}),
+			jobId
+		};
+
+		const startTime = Date.now();
+
+		// Server-side analytics: Track microsites job start
+		logger.notice(`/MICROSITES GET START`, { ...mergedParams, user, rawUser });
+
+		// Mixpanel server-side tracking
+		userId = user || 'unauthenticated';
+		mp.track('server: microsites job start', {
+			distinct_id: userId,
+			jobId,
+			source: 'api-get'
+		});
+
+		// Run the microsites job (no WebSocket, returns aggregated results)
+		const result = await runMicrositesJob(mergedParams, (message) => {
+			// Log to console for CRON job output
+			console.log(message);
+		});
+
+		const endTime = Date.now();
+		const duration = (endTime - startTime) / 1000;
+
+		// Server-side analytics: Track microsites job completion
+		logger.notice(`/MICROSITES GET END in ${duration} seconds`, {
+			...mergedParams,
+			user,
+			duration,
+			rawUser,
+			summary: result.summary
+		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: microsites job finish', {
+			distinct_id: userId,
+			jobId,
+			duration,
+			source: 'api-get',
+			...result.summary
+		});
+
+		res.status(200).json(result);
+
+	} catch (error) {
+		// Server-side analytics: Track microsites job error
+		logger.error(`ERROR: ${req.path}`, {
+			path: req.path,
+			user,
+			error: error.message,
+			stack: error.stack,
+			jobId
+		});
+
+		// Mixpanel server-side tracking
+		mp.track('server: microsites job error', {
+			distinct_id: userId,
+			jobId,
+			error: error.message,
+			source: 'api-get'
 		});
 
 		res.status(500).json({ error: error.message });
