@@ -1,11 +1,18 @@
 let startTime = null;
-const form = document.getElementById('simulatorForm');
-const loading = document.querySelector('.loading');
-const success = document.querySelector('.success');
-const usersSlider = document.getElementById('users');
-const usersOutput = document.getElementById('usersOutput');
-const url = document.getElementById('url');
-const overview = document.getElementById('overview');
+/** @type {HTMLFormElement} */
+const form = /** @type {any} */ (document.getElementById('simulatorForm'));
+/** @type {HTMLElement} */
+const loading = /** @type {any} */ (document.querySelector('.loading'));
+/** @type {HTMLElement} */
+const success = /** @type {any} */ (document.querySelector('.success'));
+/** @type {HTMLInputElement} */
+const usersSlider = /** @type {any} */ (document.getElementById('users'));
+/** @type {HTMLElement} */
+const usersOutput = /** @type {any} */ (document.getElementById('usersOutput'));
+/** @type {HTMLInputElement} */
+const url = /** @type {any} */ (document.getElementById('url'));
+/** @type {HTMLElement} */
+const overview = /** @type {any} */ (document.getElementById('overview'));
 const overviewText = overview.textContent?.toString();
 const formLine1 = document.getElementById('form-description-line1');
 const formLine2 = document.getElementById('form-description-line2');
@@ -238,13 +245,16 @@ const possibleUrls = [
 url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
 usersSlider.addEventListener('input', (e) => {
-	usersOutput.textContent = `${e.target.value} meeples`;
+	usersOutput.textContent = `${/** @type {HTMLInputElement} */ (e.target).value} meeples`;
 });
 
 // Update token field styling based on inject checkbox
-const injectCheckbox = document.getElementById('inject');
-const tokenField = document.getElementById('token');
-const tokenDescription = document.getElementById('form-description-line2');
+/** @type {HTMLInputElement} */
+const injectCheckbox = /** @type {any} */ (document.getElementById('inject'));
+/** @type {HTMLInputElement} */
+const tokenField = /** @type {any} */ (document.getElementById('token'));
+/** @type {HTMLElement} */
+const tokenDescription = /** @type {any} */ (document.getElementById('form-description-line2'));
 
 function updateTokenFieldState() {
 	if (injectCheckbox.checked) {
@@ -263,8 +273,10 @@ injectCheckbox.addEventListener('change', updateTokenFieldState);
 updateTokenFieldState();
 
 // Masking toggle management
-const maskingCheckbox = document.getElementById('masking');
-const maskingLabel = document.getElementById('masking-label');
+/** @type {HTMLInputElement} */
+const maskingCheckbox = /** @type {any} */ (document.getElementById('masking'));
+/** @type {HTMLElement} */
+const maskingLabel = /** @type {any} */ (document.getElementById('masking-label'));
 
 function updateMaskingState() {
 	if (injectCheckbox.checked) {
@@ -292,6 +304,7 @@ const meepleTabsData = {};
 let activeTabId = null;
 
 // Terminal utility functions
+// @ts-expect-error - meepleId parameter reserved for future use
 function addTerminalLine(content, message, meepleId = null) {
 	const timestamp = new Date().toLocaleTimeString();
 	const line = document.createElement('div');
@@ -388,6 +401,7 @@ function closeMeepleTab(meepleId) {
 function updateTabNavigation() {
 	const leftArrow = document.getElementById('tab-nav-left');
 	const rightArrow = document.getElementById('tab-nav-right');
+	// @ts-expect-error - tabsContainer reserved for future scrolling logic
 	const tabsContainer = document.getElementById('terminal-tabs');
 	const tabsCount = Object.keys(meepleTabsData).length;
 
@@ -494,7 +508,9 @@ form.addEventListener('submit', async (e) => {
 
 
 	// Validate token field only if inject is checked
+	/** @type {HTMLInputElement} */
 	const injectCheckbox = form.querySelector('#inject');
+	/** @type {HTMLInputElement} */
 	const tokenField = form.querySelector('#token');
 
 	if (injectCheckbox.checked && !tokenField.value.trim()) {
@@ -504,6 +520,7 @@ form.addEventListener('submit', async (e) => {
 	}
 
 	const formData = new FormData(form);
+	/** @type {any} */
 	const data = Object.fromEntries(formData.entries());
 	data.safeWord = 'let me in...';
 	data.users = parseInt(data.users);
@@ -511,10 +528,10 @@ form.addEventListener('submit', async (e) => {
 	if (data.concurrency > 5) data.concurrency = 5;
 
 	// Ensure checkbox values are included in the data
-	data.inject = form.querySelector('#inject').checked;
-	data.headless = form.querySelector('#headless').checked;
-	data.past = form.querySelector('#past').checked;
-	data.masking = form.querySelector('#masking').checked;
+	data.inject = /** @type {HTMLInputElement} */ (form.querySelector('#inject')).checked;
+	data.headless = /** @type {HTMLInputElement} */ (form.querySelector('#headless')).checked;
+	data.past = /** @type {HTMLInputElement} */ (form.querySelector('#past')).checked;
+	data.masking = /** @type {HTMLInputElement} */ (form.querySelector('#masking')).checked;
 
 	// Show terminal with animation
 	const terminal = document.getElementById('terminal');
@@ -573,7 +590,7 @@ form.addEventListener('submit', async (e) => {
 		});
 	});
 
-	socket.on('job_complete', (result) => {
+	socket.on('job_complete', (_result) => {
 		const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 		addTerminalLineToTab('general', '');
 		addTerminalLineToTab('general', `🎉 Simulation completed successfully! in ${duration} seconds`);
@@ -599,7 +616,7 @@ form.addEventListener('submit', async (e) => {
 
 			// Show all form inputs again
 			const formInputs = form.querySelectorAll('input, button, label, output, a');
-			formInputs.forEach(input => input.style.display = '');
+			formInputs.forEach(input => /** @type {HTMLElement} */ (input).style.display = '');
 
 			form.style.display = 'flex';
 			loading.style.display = 'none';
@@ -630,7 +647,7 @@ form.addEventListener('submit', async (e) => {
 
 	// Hide form inputs but keep the description text visible
 	const formInputs = form.querySelectorAll('input, button, label, output');
-	formInputs.forEach(input => input.style.display = 'none');
+	formInputs.forEach(input => /** @type {HTMLElement} */ (input).style.display = 'none');
 
 	// Show loading indicator as backup
 	loading.style.display = 'block';
@@ -748,7 +765,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	// Handle headless checkbox state based on current URL
-	const headlessCheckbox = document.getElementById('headless');
+	/** @type {HTMLInputElement} */
+	const headlessCheckbox = /** @type {any} */ (document.getElementById('headless'));
 	const headlessLabel = headlessCheckbox.closest('label');
 	const isLocalhost = window.location.hostname === 'localhost' ||
 		window.location.hostname === '127.0.0.1' ||

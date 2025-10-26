@@ -1,7 +1,7 @@
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').Browser} Browser */
 
-import u from 'ak-tools';
+
 import injectMixpanel from '../utils/injectMixpanel.js';
 import { relaxedCSP } from './entities.js';
 
@@ -260,7 +260,7 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 				
 				// Initialize Mixpanel after external script loads
 				const externalResult = await page.evaluate(
-					(username, opts, MIXPANEL_TOKEN) => {
+					(username, _opts, MIXPANEL_TOKEN) => {
 						try {
 							if (window.mixpanel && window.mixpanel.init) {
 								window.mixpanel.init(MIXPANEL_TOKEN, {

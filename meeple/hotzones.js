@@ -1,3 +1,4 @@
+
 /**
  * Hot Zone Detection Module
  * Extracted from utils/headless.js for better code organization
@@ -112,6 +113,7 @@ function calculateVisualProminence(element, rect, getCachedStyle, actionWords) {
 function isElementInteractive(el, rect, style) {
 	// Skip if hidden
 	if (style.display === 'none' || style.visibility === 'hidden' ||
+		// @ts-ignore
 		style.opacity === '0' || el.disabled || el.hidden) {
 		return false;
 	}

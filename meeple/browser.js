@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import u from 'ak-tools';
 import { puppeteerArgs } from './entities.js';
 
+// @ts-expect-error - Reserved for environment-specific configuration
 const { NODE_ENV = '' } = process.env;
 
 

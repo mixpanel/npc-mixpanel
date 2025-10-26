@@ -3,6 +3,98 @@
  * Provides type safety and IntelliSense for the meeple automation system
  */
 
+// Global type augmentations for browser context
+declare global {
+	// Mixpanel library types
+	interface Mixpanel {
+		init(token: string, config?: any, name?: string): void;
+		track(event: string, properties?: any): void;
+		identify(id: string): void;
+		people: {
+			set(properties: any): void;
+			set_once(properties: any): void;
+			increment(property: string, by?: number): void;
+		};
+		register(properties: any): void;
+		reset(): void;
+		headless?: {
+			reset(): void;
+		};
+		__SV?: number;
+		_i?: any[];
+	}
+
+	// Window object augmentations for Puppeteer page context
+	interface Window {
+		mixpanel?: Mixpanel | any[];
+		MIXPANEL_WAS_INJECTED?: boolean;
+		MIXPANEL_INJECTED_TIMESTAMP?: number;
+		MIXPANEL_INJECTION_SUCCESS?: boolean;
+		MIXPANEL_CUSTOM_LIB_URL?: string;
+		trustedTypes?: {
+			createPolicy(name: string, policy: any): any;
+			getPolicy(name: string): any;
+			getPolicyNames(): string[];
+			defaultPolicy?: any;
+		};
+		// CSP (Content Security Policy) bypass properties
+		CSP_RELAXED?: boolean;
+		CSP_WAS_RELAXED?: boolean;
+		CSP_RELAXED_TIMESTAMP?: number;
+		CSP_EVAL_WORKING?: boolean;
+		TRUSTED_TYPES_BYPASS?: boolean;
+		originalEval?: typeof eval;
+		// Mouse tracking properties used by interactions.js
+		mouseX?: number;
+		mouseY?: number;
+	}
+
+	// Global mixpanel variable (for non-window contexts)
+	var mixpanel: Mixpanel | undefined;
+
+	// Socket.IO global (loaded from CDN in browser)
+	function io(opts?: any): any;
+}
+
+// Puppeteer Page type augmentations
+declare module 'puppeteer' {
+	interface Page {
+		MIXPANEL_TOKEN?: string;
+	}
+
+	// ElementHandle augmentation for non-standard browser methods
+	interface ElementHandle {
+		scrollIntoViewIfNeeded?(options?: any): Promise<void>;
+	}
+}
+
+// Browser DOM augmentations for form elements in page.evaluate() contexts
+// These are the actual runtime types when manipulating DOM elements
+declare global {
+	// Extend Element to include common form element properties
+	// This allows TypeScript to understand that elements in page.evaluate() have these properties
+	interface Element {
+		// HTMLInputElement / HTMLTextAreaElement properties
+		type?: string;
+		value?: string;
+		placeholder?: string;
+		name?: string;
+		disabled?: boolean;
+		readOnly?: boolean;
+		checked?: boolean;
+
+		// HTMLSelectElement properties
+		options?: HTMLOptionsCollection;
+		selectedIndex?: number;
+
+		// HTMLElement offset properties (for positioning/layout)
+		offsetTop?: number;
+		offsetLeft?: number;
+		offsetWidth?: number;
+		offsetHeight?: number;
+	}
+}
+
 export interface MeepleParams {
 	/** Target URL to simulate user behavior on */
 	url?: string;

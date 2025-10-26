@@ -1,3 +1,5 @@
+/** @cspell:disable */
+
 /**
  * Configuration entities and data objects for headless browser automation
  * Extracted from headless.js for better code organization

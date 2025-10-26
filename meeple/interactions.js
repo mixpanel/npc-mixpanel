@@ -1,3 +1,4 @@
+
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
@@ -6,8 +7,6 @@ import {
 	regularButtonSelectors,
 	navigationSelectors,
 	contentSelectors,
-	formTestData,
-	actionWords,
 	interactiveSelectors
 } from './entities.js';
 import { randomBetween } from './utils.js';
@@ -534,9 +533,9 @@ export async function trackMouseMovement(page, target, log = null) {
  * @param {Object} target - Target element information
  * @param {number} hoverDuration - Duration of hover in milliseconds
  * @param {string} persona - User persona affecting reading behavior
- * @param {Function} log - Logging function
+ * @param {Function} _log - Logging function
  */
-export async function simulateReadingMovements(page, target, hoverDuration, persona, log) {
+export async function simulateReadingMovements(page, target, hoverDuration, persona, _log) {
 	// Determine reading behavior based on persona
 	let readingIntensity = 1.0; // Default intensity
 	

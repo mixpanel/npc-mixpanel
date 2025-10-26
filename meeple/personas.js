@@ -18,10 +18,10 @@ export function selectPersona(log = console.log) {
  * Get context-aware action based on action history to create realistic user behavior
  * @param {Array} actionHistory - Recent actions performed by the user
  * @param {string} suggestedAction - The action that was randomly selected
- * @param {Function} log - Logging function
+ * @param {Function} _log - Logging function (reserved for future use)
  * @returns {string} - Final action to perform (may be modified for realism)
  */
-export function getContextAwareAction(actionHistory, suggestedAction, log = console.log) {
+export function getContextAwareAction(actionHistory, suggestedAction, _log = console.log) {
 	if (actionHistory.length === 0) return suggestedAction;
 
 	const lastAction = actionHistory[actionHistory.length - 1];
@@ -78,11 +78,11 @@ export function generatePersonaActionSequence(persona, maxActions = null) {
  * Generate a weighted random action sequence with natural flow patterns
  * @param {Array} actionTypes - Types of actions available
  * @param {Array} weights - Weights for each action type
- * @param {string} persona - The persona being used
+ * @param {string} _persona - The persona being used (reserved for future personalization)
  * @param {number|null} maxActions - Maximum number of actions (optional)
  * @returns {Array} - Array of actions to perform
  */
-export function generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions = null) {
+export function generateWeightedRandomActionSequence(actionTypes, weights, _persona, maxActions = null) {
 	const sequence = [];
 	const totalActions = maxActions || u.rand(50, 150); // Default session length (increased for more data)
 	const actionHistory = [];

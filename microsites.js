@@ -23,6 +23,47 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const { NODE_ENV = 'production' } = process.env;
+
+/**
+ * Create a production-safe logger that filters verbose meeple messages
+ * @param {Function} baseLogger - Base logging function (defaults to console.log)
+ * @returns {Function} Filtered logging function with LogFunction signature
+ */
+function createProductionLogger(baseLogger = console.log) {
+	// In development, log everything
+	if (NODE_ENV !== 'production') {
+		return baseLogger;
+	}
+
+	// In production, only log job-level events (not individual meeple actions)
+	return (message, meepleId = null) => {
+		// Only log messages that start with job/microsite markers
+		const isJobLevelLog =
+			message.includes('█') ||           // Job start/end blocks
+			message.includes('🚀') ||          // Job started
+			message.includes('🏁') ||          // Job completed
+			message.includes('🏢') ||          // Microsite starting
+			message.includes('✅') ||          // Microsite completed
+			message.includes('❌') ||          // Microsite/Job failed
+			message.includes('📍') ||          // Progress indicator
+			message.includes('⏸️') ||          // Pause between microsites
+			message.includes('🆔') ||          // Job ID
+			message.includes('⏰') ||          // Timestamps
+			message.includes('⏱️') ||          // Duration
+			message.includes('📊') ||          // Summary stats
+			message.includes('👥') ||          // User counts
+			message.includes('🎲') ||          // Drop-off chance
+			message.includes('🌡️') ||          // Temperature
+			/^={10,}/.test(message) ||        // Separator lines
+			message.trim().startsWith('Progress:'); // Progress messages
+
+		if (isJobLevelLog) {
+			baseLogger(message, meepleId);
+		}
+	};
+}
+
 /**
  * Load a sequence configuration from JSON file
  * @param {string} filename - Name of the sequence file (e.g., "financial-sequence-kyc.json")
@@ -84,13 +125,19 @@ const DEFAULT_MEEPLE_PARAMS = {
 	past: false,
 	token: null,
 	masking: 'no masking',
-	maxDuration: 4 * 60 * 1000 // 4 minutes in milliseconds
+	maxDuration: 3 * 60 * 1000 // 3 minutes in milliseconds (reduced from 4 to fit CRON timeout)
 };
+
+/**
+ * Maximum duration for entire microsites job (27 minutes to fit within 30-minute CRON timeout)
+ */
+const MAX_JOB_DURATION_MS = 27 * 60 * 1000;
 
 /**
  * Get random temperature between 7 and 10
  * @returns {number}
  */
+// @ts-expect-error - Reserved for future temperature randomization
 function randomTemperature() {
 	return Math.floor(Math.random() * 4) + 7; // 7, 8, 9, or 10
 }
@@ -112,11 +159,15 @@ function randomDropOff() {
  */
 async function runMicrositeSimulation(microsite, overrideParams = {}, logger = log) {
 	const startTime = Date.now();
-	logger(`\n${'='.repeat(60)}`);
-	logger(`🏢 Starting microsite: ${microsite.name}`);
-	logger(`🌐 URL: ${microsite.url}`);
-	logger(`📝 Available sequences: ${microsite.sequenceFiles.length}`);
-	logger(`${'='.repeat(60)}\n`);
+
+	// Wrap logger for production filtering (meeple actions will be filtered, job logs will pass)
+	const productionLogger = createProductionLogger(logger);
+
+	productionLogger(`\n${'='.repeat(60)}`);
+	productionLogger(`🏢 Starting microsite: ${microsite.name}`);
+	productionLogger(`🌐 URL: ${microsite.url}`);
+	productionLogger(`📝 Available sequences: ${microsite.sequenceFiles.length}`);
+	productionLogger(`${'='.repeat(60)}\n`);
 
 	try {
 		// Load all sequences for this microsite
@@ -142,22 +193,25 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 
 		// Add random drop-off chance (5-15%)
 		const dropOffChance = randomDropOff();
-		logger(`🎲 Drop-off chance: ${dropOffChance}%`);
-		logger(`🌡️ Temperature range: 7-10 (randomized per meeple)`);
+		productionLogger(`🎲 Drop-off chance: ${dropOffChance}%`);
+		productionLogger(`🌡️ Temperature range: 7-10 (randomized per meeple)`);
 
 		// Run the simulation with timeout wrapper
+		// Pass productionLogger to filter meeple action logs in production
+		// Since meeples run concurrently, timeout is maxDuration (per meeple) + buffer, NOT maxDuration * users
+		const micrositeTimeoutMs = meepleParams.maxDuration + 60000; // 3 min + 1 min buffer = 4 min per microsite
 		const result = await Promise.race([
-			main(meepleParams, logger),
+			// @ts-ignore - productionLogger matches LogFunction signature at runtime
+			main(meepleParams, productionLogger),
 			new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Microsite simulation timeout')),
-					meepleParams.maxDuration * meepleParams.users + 60000) // Total time + 1 min buffer
+				setTimeout(() => reject(new Error('Microsite simulation timeout')), micrositeTimeoutMs)
 			)
 		]);
 
 		const duration = (Date.now() - startTime) / 1000;
 
-		logger(`\n✅ ${microsite.name} completed in ${duration.toFixed(2)}s`);
-		logger(`${'='.repeat(60)}\n`);
+		productionLogger(`\n✅ ${microsite.name} completed in ${duration.toFixed(2)}s`);
+		productionLogger(`${'='.repeat(60)}\n`);
 
 		return {
 			microsite: microsite.name,
@@ -172,8 +226,8 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 	} catch (error) {
 		const duration = (Date.now() - startTime) / 1000;
 
-		logger(`\n❌ ${microsite.name} failed: ${error.message}`);
-		logger(`${'='.repeat(60)}\n`);
+		productionLogger(`\n❌ ${microsite.name} failed: ${error.message}`);
+		productionLogger(`${'='.repeat(60)}\n`);
 
 		return {
 			microsite: microsite.name,
@@ -197,27 +251,65 @@ export async function runMicrositesJob(options = {}, logger = log) {
 	const jobId = uid(6);
 	const jobStartTime = Date.now();
 
-	logger(`\n${'█'.repeat(60)}`);
-	logger(`🚀 MICROSITES JOB STARTED`);
-	logger(`🆔 Job ID: ${jobId}`);
-	logger(`⏰ Start time: ${new Date().toISOString()}`);
-	logger(`📊 Total microsites: ${MICROSITES.length}`);
-	logger(`👥 Meeples per microsite: ${options.users || DEFAULT_MEEPLE_PARAMS.users}`);
-	logger(`${'█'.repeat(60)}\n`);
+	// Wrap logger for production filtering
+	const productionLogger = createProductionLogger(logger);
 
-	const results = [];
+	productionLogger(`\n${'█'.repeat(60)}`);
+	productionLogger(`🚀 MICROSITES JOB STARTED`);
+	productionLogger(`🆔 Job ID: ${jobId}`);
+	productionLogger(`⏰ Start time: ${new Date().toISOString()}`);
+	productionLogger(`⏱️  Max duration: 27 minutes (CRON timeout safety)`);
+	productionLogger(`📊 Total microsites: ${MICROSITES.length}`);
+	productionLogger(`👥 Meeples per microsite: ${options.users || DEFAULT_MEEPLE_PARAMS.users}`);
+	productionLogger(`${'█'.repeat(60)}\n`);
 
-	// Run each microsite sequentially (one at a time for memory safety)
-	for (const [index, microsite] of MICROSITES.entries()) {
-		logger(`\n📍 Progress: ${index + 1}/${MICROSITES.length} microsites`);
+	let results = [];
 
-		const result = await runMicrositeSimulation(microsite, options, logger);
-		results.push(result);
+	try {
+		// Wrap entire job with 27-minute timeout to prevent CRON timeout
+		results = await Promise.race([
+			// Main job execution
+			(async () => {
+				const micrositeResults = [];
 
-		// Small delay between microsites to allow cleanup
-		if (index < MICROSITES.length - 1) {
-			logger(`⏸️  Pausing 5s before next microsite...\n`);
-			await new Promise(resolve => setTimeout(resolve, 5000));
+				// Run each microsite sequentially (one at a time for memory safety)
+				for (const [index, microsite] of MICROSITES.entries()) {
+					// Check if we're approaching timeout (leave 2 min buffer)
+					const elapsed = Date.now() - jobStartTime;
+					if (elapsed > MAX_JOB_DURATION_MS - 120000) {
+						productionLogger(`\n⚠️  Approaching job timeout, stopping after ${index} microsites`);
+						break;
+					}
+
+					productionLogger(`\n📍 Progress: ${index + 1}/${MICROSITES.length} microsites`);
+
+					// Pass the original logger (not productionLogger) to let each simulation create its own wrapper
+					const result = await runMicrositeSimulation(microsite, options, logger);
+					micrositeResults.push(result);
+
+					// Small delay between microsites to allow cleanup
+					if (index < MICROSITES.length - 1) {
+						productionLogger(`⏸️  Pausing 5s before next microsite...\n`);
+						await new Promise(resolve => setTimeout(resolve, 5000));
+					}
+				}
+
+				return micrositeResults;
+			})(),
+
+			// Overall job timeout
+			new Promise((_, reject) =>
+				setTimeout(
+					() => reject(new Error('Overall job timeout (27 minutes exceeded)')),
+					MAX_JOB_DURATION_MS
+				)
+			)
+		]);
+	} catch (error) {
+		productionLogger(`\n❌ Job failed or timed out: ${error.message}`);
+		// Return partial results if we have any
+		if (results.length === 0) {
+			throw error;
 		}
 	}
 
@@ -228,14 +320,14 @@ export async function runMicrositesJob(options = {}, logger = log) {
 	const successfulMicrosites = results.filter(r => r.success).length;
 	const failedMicrosites = results.filter(r => !r.success).length;
 
-	logger(`\n${'█'.repeat(60)}`);
-	logger(`🏁 MICROSITES JOB COMPLETED`);
-	logger(`🆔 Job ID: ${jobId}`);
-	logger(`⏱️  Total duration: ${totalDuration.toFixed(2)}s (${(totalDuration / 60).toFixed(2)} minutes)`);
-	logger(`✅ Successful: ${successfulMicrosites}/${MICROSITES.length}`);
-	logger(`❌ Failed: ${failedMicrosites}/${MICROSITES.length}`);
-	logger(`⏰ End time: ${new Date().toISOString()}`);
-	logger(`${'█'.repeat(60)}\n`);
+	productionLogger(`\n${'█'.repeat(60)}`);
+	productionLogger(`🏁 MICROSITES JOB COMPLETED`);
+	productionLogger(`🆔 Job ID: ${jobId}`);
+	productionLogger(`⏱️  Total duration: ${totalDuration.toFixed(2)}s (${(totalDuration / 60).toFixed(2)} minutes)`);
+	productionLogger(`✅ Successful: ${successfulMicrosites}/${MICROSITES.length}`);
+	productionLogger(`❌ Failed: ${failedMicrosites}/${MICROSITES.length}`);
+	productionLogger(`⏰ End time: ${new Date().toISOString()}`);
+	productionLogger(`${'█'.repeat(60)}\n`);
 
 	return {
 		jobId,
@@ -255,12 +347,14 @@ export async function runMicrositesJob(options = {}, logger = log) {
 
 // Allow standalone execution for testing
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+	// @ts-expect-error - Environment variable reserved for future configuration
 	const { NODE_ENV = 'dev' } = process.env;
 
 	console.log('🧪 Running microsites job in standalone mode...\n');
 
 	// Parse command-line arguments for headless mode
 	const args = process.argv.slice(2);
+	// @ts-expect-error - Headless flag reserved for future CLI options
 	const headless = !args.includes('--no-headless');
 
 	const testOptions = {
