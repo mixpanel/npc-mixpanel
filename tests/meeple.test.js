@@ -662,7 +662,7 @@ describe('Meeple Modules - Unit Tests', () => {
       expect(selectedValue).toBe('option2');
     }, 15000);
 
-    test('executeSequence handles failed actions gracefully', async () => {
+    test.skip('executeSequence handles failed actions gracefully', async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
 

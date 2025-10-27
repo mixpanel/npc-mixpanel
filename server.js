@@ -401,7 +401,7 @@ app.post('/microsites', async (req, res) => {
 		// Mixpanel server-side tracking
 		userId = user || 'unauthenticated';
 		mp.track('server: microsites job start', {
-			distinct_id: userId,
+			distinct_id: 'CRON',
 			jobId,
 			source: 'api'
 		});
@@ -426,7 +426,7 @@ app.post('/microsites', async (req, res) => {
 
 		// Mixpanel server-side tracking
 		mp.track('server: microsites job finish', {
-			distinct_id: userId,
+			distinct_id: 'CRON',
 			jobId,
 			duration,
 			source: 'api',
