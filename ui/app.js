@@ -244,7 +244,7 @@ const possibleUrls = [
 ];
 url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
-usersSlider.addEventListener('input', (e) => {
+usersSlider.addEventListener('input', e => {
 	usersOutput.textContent = `${/** @type {HTMLInputElement} */ (e.target).value} meeples`;
 });
 
@@ -264,7 +264,8 @@ function updateTokenFieldState() {
 	} else {
 		tokenField.style.opacity = '0.5';
 		tokenDescription.style.opacity = '0.5';
-		tokenDescription.innerHTML = '<b>meeples need <em>project token</em></b> <small>(optional when not injecting)</small>';
+		tokenDescription.innerHTML =
+			'<b>meeples need <em>project token</em></b> <small>(optional when not injecting)</small>';
 	}
 }
 
@@ -312,7 +313,7 @@ function addTerminalLine(content, message, meepleId = null) {
 	line.innerHTML = `<span style="color: #666;">[${timestamp}]</span> ${message}`;
 
 	// Check if user is already at the bottom (within 50px threshold)
-	const isAtBottom = (content.scrollTop + content.clientHeight) >= (content.scrollHeight - 50);
+	const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 50;
 
 	content.appendChild(line);
 
@@ -429,10 +430,10 @@ function scrollActiveTabIntoView() {
 	// Check if active tab is out of view
 	if (activeTabRect.left < containerRect.left) {
 		// Tab is too far left, scroll left
-		tabsContainer.scrollLeft -= (containerRect.left - activeTabRect.left) + 20;
+		tabsContainer.scrollLeft -= containerRect.left - activeTabRect.left + 20;
 	} else if (activeTabRect.right > containerRect.right) {
 		// Tab is too far right, scroll right
-		tabsContainer.scrollLeft += (activeTabRect.right - containerRect.right) + 20;
+		tabsContainer.scrollLeft += activeTabRect.right - containerRect.right + 20;
 	}
 }
 
@@ -470,7 +471,13 @@ function addTerminalLineToTab(meepleId, message) {
 
 		// Check if this message indicates any type of meeple completion/failure
 		// Add close button for any completion state (completed, failed, timed out, etc.)
-		if (message.includes('simulation complete.') || message.includes('completed!') || message.includes('timed out') || message.includes('failed:') || message.includes('completed with issues')) {
+		if (
+			message.includes('simulation complete.') ||
+			message.includes('completed!') ||
+			message.includes('timed out') ||
+			message.includes('failed:') ||
+			message.includes('completed with issues')
+		) {
 			// Add a close button to the tab header
 			const tab = meepleTabsData[meepleId];
 			if (tab && tab.header && meepleId !== 'general') {
@@ -480,7 +487,7 @@ function addTerminalLineToTab(meepleId, message) {
 					closeBtn.className = 'tab-close-btn';
 					closeBtn.innerHTML = '×';
 					closeBtn.title = 'Close this meeple tab';
-					closeBtn.addEventListener('click', (e) => {
+					closeBtn.addEventListener('click', e => {
 						e.stopPropagation(); // Prevent tab switching
 						closeMeepleTab(meepleId);
 					});
@@ -495,7 +502,8 @@ function clearTerminal(content) {
 	content.innerHTML = '';
 }
 
-form.addEventListener('submit', async (e) => {
+// eslint-disable-next-line require-await
+form.addEventListener('submit', async e => {
 	e.preventDefault();
 
 	// this links to the default project where meeples are injected
@@ -504,8 +512,6 @@ form.addEventListener('submit', async (e) => {
 					target="_blank"
 					style="float: right; margin-left: auto; ">default project</a>
 					`;
-
-
 
 	// Validate token field only if inject is checked
 	/** @type {HTMLInputElement} */
@@ -570,7 +576,7 @@ form.addEventListener('submit', async (e) => {
 		loading.style.display = 'none';
 	});
 
-	socket.on('job_update', (data) => {
+	socket.on('job_update', data => {
 		// Handle both old string format and new object format
 		let message, meepleId;
 		if (typeof data === 'string') {
@@ -590,7 +596,7 @@ form.addEventListener('submit', async (e) => {
 		});
 	});
 
-	socket.on('job_complete', (_result) => {
+	socket.on('job_complete', _result => {
 		const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 		addTerminalLineToTab('general', '');
 		addTerminalLineToTab('general', `🎉 Simulation completed successfully! in ${duration} seconds`);
@@ -616,7 +622,9 @@ form.addEventListener('submit', async (e) => {
 
 			// Show all form inputs again
 			const formInputs = form.querySelectorAll('input, button, label, output, a');
-			formInputs.forEach(input => /** @type {HTMLElement} */ (input).style.display = '');
+			formInputs.forEach(input => {
+				if (input.style) input.style.display = '';
+			});
 
 			form.style.display = 'flex';
 			loading.style.display = 'none';
@@ -625,7 +633,7 @@ form.addEventListener('submit', async (e) => {
 		socket.disconnect();
 	});
 
-	socket.on('error', (error) => {
+	socket.on('error', error => {
 		addTerminalLine(terminalContent, `❌ Error: ${error}`);
 		socket.disconnect();
 	});
@@ -644,10 +652,11 @@ form.addEventListener('submit', async (e) => {
 		${data.inject && data.token === '7127e52d6d61ee30a4d7fb4555277f87' ? `<a href="https://mixpanel.com/project/3769788/view/4266856/app/events" target="_blank" class="default-project-link">→ view project</a>` : ''}
 	</div>`;
 
-
 	// Hide form inputs but keep the description text visible
 	const formInputs = form.querySelectorAll('input, button, label, output');
-	formInputs.forEach(input => /** @type {HTMLElement} */ (input).style.display = 'none');
+	formInputs.forEach(input => {
+		if (input.style) input.style.display = 'none';
+	});
 
 	// Show loading indicator as backup
 	loading.style.display = 'block';
@@ -694,21 +703,18 @@ scrollToBottomButton.addEventListener('click', () => {
 
 // Terminal resize functionality removed - no longer needed in side-by-side layout
 
-
 function qsToObj(queryString) {
 	try {
 		const parsedQs = new URLSearchParams(queryString);
 		const params = Object.fromEntries(parsedQs);
 		return params;
-	}
-
-	catch (e) {
+	} catch (e) {
 		return {};
 	}
 }
 
 // Tab navigation event handlers
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', e => {
 	// Only handle arrow keys when terminal is visible
 	const terminal = document.getElementById('terminal');
 	if (terminal.classList.contains('hidden')) return;
@@ -768,7 +774,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	/** @type {HTMLInputElement} */
 	const headlessCheckbox = /** @type {any} */ (document.getElementById('headless'));
 	const headlessLabel = headlessCheckbox.closest('label');
-	const isLocalhost = window.location.hostname === 'localhost' ||
+	const isLocalhost =
+		window.location.hostname === 'localhost' ||
 		window.location.hostname === '127.0.0.1' ||
 		window.location.hostname.startsWith('192.168.') ||
 		window.location.hostname.startsWith('10.') ||
@@ -806,7 +813,9 @@ if (window.mixpanel) {
 			if (!restParams) restParams = {};
 			mp.register(restParams);
 			try {
-				const userFromCookie = decodeURIComponent(Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user'] || '');
+				const userFromCookie = decodeURIComponent(
+					Object.fromEntries(document.cookie.split('; ').map(x => x.split('=')))['user'] || ''
+				);
 				if (userFromCookie) user = userFromCookie;
 				if (user) mp.identify(user);
 				if (user) mp.people.set({ $name: user, $email: user });
@@ -814,7 +823,6 @@ if (window.mixpanel) {
 			} catch (e) {
 				console.error('Error identifying user:', e);
 			}
-
 		},
 
 		//autocapture
@@ -837,8 +845,6 @@ if (window.mixpanel) {
 		record_canvas: true,
 		record_heatmap_data: true,
 
-
-
 		//normal mixpanel
 		ignore_dnt: true,
 		batch_flush_interval_ms: 0,
@@ -846,6 +852,5 @@ if (window.mixpanel) {
 		api_transport: 'XHR',
 		persistence: 'localStorage',
 		api_payload_format: 'json'
-
 	});
 }

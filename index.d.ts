@@ -92,6 +92,12 @@ declare global {
 		offsetLeft?: number;
 		offsetWidth?: number;
 		offsetHeight?: number;
+
+		// HTMLElement visibility properties
+		hidden?: boolean;
+
+		// CSSStyleDeclaration for style property
+		style?: CSSStyleDeclaration;
 	}
 }
 

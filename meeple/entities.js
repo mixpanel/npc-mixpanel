@@ -8,63 +8,448 @@
 // User behavior personas with action probabilities - Enhanced with modern user diversity
 const basePersonas = {
 	// Power users - confident, fast, goal-oriented
-	powerUser: { scroll: 0.3, mouse: 0.1, click: 0.95, exploratoryClick: 0.4, wait: 0.1, hover: 0.2, form: 0.3, back: 0.1, forward: 0.1, rageClick: 0.15 },
-	taskFocused: { scroll: 0.2, mouse: 0.1, click: 0.9, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.5, back: 0.2, forward: 0.1, rageClick: 0.2 },
-	digitalNative: { scroll: 0.25, mouse: 0.05, click: 0.92, exploratoryClick: 0.35, wait: 0.05, hover: 0.15, form: 0.45, back: 0.1, forward: 0.05, rageClick: 0.08 },
+	powerUser: {
+		scroll: 0.3,
+		mouse: 0.1,
+		click: 0.95,
+		exploratoryClick: 0.4,
+		wait: 0.1,
+		hover: 0.2,
+		form: 0.3,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.15
+	},
+	taskFocused: {
+		scroll: 0.2,
+		mouse: 0.1,
+		click: 0.9,
+		exploratoryClick: 0.3,
+		wait: 0.2,
+		hover: 0.1,
+		form: 0.5,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.2
+	},
+	digitalNative: {
+		scroll: 0.25,
+		mouse: 0.05,
+		click: 0.92,
+		exploratoryClick: 0.35,
+		wait: 0.05,
+		hover: 0.15,
+		form: 0.45,
+		back: 0.1,
+		forward: 0.05,
+		rageClick: 0.08
+	},
 
 	// Shopping/conversion oriented
-	shopper: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.5, wait: 0.3, hover: 0.4, form: 0.4, back: 0.3, forward: 0.1, rageClick: 0.12 },
-	comparison: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.4, hover: 0.5, form: 0.3, back: 0.4, forward: 0.1, rageClick: 0.25 },
-	conversionOptimized: { scroll: 0.35, mouse: 0.25, click: 0.88, exploratoryClick: 0.45, wait: 0.25, hover: 0.35, form: 0.6, back: 0.2, forward: 0.05, rageClick: 0.18 },
+	shopper: {
+		scroll: 0.4,
+		mouse: 0.2,
+		click: 0.85,
+		exploratoryClick: 0.5,
+		wait: 0.3,
+		hover: 0.4,
+		form: 0.4,
+		back: 0.3,
+		forward: 0.1,
+		rageClick: 0.12
+	},
+	comparison: {
+		scroll: 0.5,
+		mouse: 0.3,
+		click: 0.75,
+		exploratoryClick: 0.4,
+		wait: 0.4,
+		hover: 0.5,
+		form: 0.3,
+		back: 0.4,
+		forward: 0.1,
+		rageClick: 0.25
+	},
+	conversionOptimized: {
+		scroll: 0.35,
+		mouse: 0.25,
+		click: 0.88,
+		exploratoryClick: 0.45,
+		wait: 0.25,
+		hover: 0.35,
+		form: 0.6,
+		back: 0.2,
+		forward: 0.05,
+		rageClick: 0.18
+	},
 
 	// Content consumption
-	reader: { scroll: 0.6, mouse: 0.2, click: 0.75, exploratoryClick: 0.2, wait: 0.5, hover: 0.3, form: 0.2, back: 0.2, forward: 0.1, rageClick: 0.05 },
-	skimmer: { scroll: 0.7, mouse: 0.1, click: 0.7, exploratoryClick: 0.2, wait: 0.2, hover: 0.2, form: 0.1, back: 0.3, forward: 0.1, rageClick: 0.1 },
-	bingeWatcher: { scroll: 0.8, mouse: 0.15, click: 0.72, exploratoryClick: 0.25, wait: 0.4, hover: 0.25, form: 0.15, back: 0.15, forward: 0.05, rageClick: 0.08 },
+	reader: {
+		scroll: 0.6,
+		mouse: 0.2,
+		click: 0.75,
+		exploratoryClick: 0.2,
+		wait: 0.5,
+		hover: 0.3,
+		form: 0.2,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.05
+	},
+	skimmer: {
+		scroll: 0.7,
+		mouse: 0.1,
+		click: 0.7,
+		exploratoryClick: 0.2,
+		wait: 0.2,
+		hover: 0.2,
+		form: 0.1,
+		back: 0.3,
+		forward: 0.1,
+		rageClick: 0.1
+	},
+	bingeWatcher: {
+		scroll: 0.8,
+		mouse: 0.15,
+		click: 0.72,
+		exploratoryClick: 0.25,
+		wait: 0.4,
+		hover: 0.25,
+		form: 0.15,
+		back: 0.15,
+		forward: 0.05,
+		rageClick: 0.08
+	},
 
 	// Exploration patterns
-	explorer: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.7, wait: 0.3, hover: 0.4, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.15 },
-	discoverer: { scroll: 0.3, mouse: 0.4, click: 0.85, exploratoryClick: 0.8, wait: 0.2, hover: 0.6, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.12 },
-	curiosityDriven: { scroll: 0.45, mouse: 0.35, click: 0.82, exploratoryClick: 0.75, wait: 0.25, hover: 0.5, form: 0.35, back: 0.15, forward: 0.08, rageClick: 0.1 },
+	explorer: {
+		scroll: 0.4,
+		mouse: 0.3,
+		click: 0.8,
+		exploratoryClick: 0.7,
+		wait: 0.3,
+		hover: 0.4,
+		form: 0.3,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.15
+	},
+	discoverer: {
+		scroll: 0.3,
+		mouse: 0.4,
+		click: 0.85,
+		exploratoryClick: 0.8,
+		wait: 0.2,
+		hover: 0.6,
+		form: 0.4,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.12
+	},
+	curiosityDriven: {
+		scroll: 0.45,
+		mouse: 0.35,
+		click: 0.82,
+		exploratoryClick: 0.75,
+		wait: 0.25,
+		hover: 0.5,
+		form: 0.35,
+		back: 0.15,
+		forward: 0.08,
+		rageClick: 0.1
+	},
 
 	// Device-specific patterns
-	mobileHabits: { scroll: 0.8, mouse: 0.1, click: 0.75, exploratoryClick: 0.3, wait: 0.2, hover: 0.1, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.22 },
-	mobileFirst: { scroll: 0.85, mouse: 0.05, click: 0.78, exploratoryClick: 0.32, wait: 0.15, hover: 0.08, form: 0.35, back: 0.25, forward: 0.12, rageClick: 0.25 },
-	tabletUser: { scroll: 0.65, mouse: 0.2, click: 0.8, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1, rageClick: 0.18 },
+	mobileHabits: {
+		scroll: 0.8,
+		mouse: 0.1,
+		click: 0.75,
+		exploratoryClick: 0.3,
+		wait: 0.2,
+		hover: 0.1,
+		form: 0.3,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.22
+	},
+	mobileFirst: {
+		scroll: 0.85,
+		mouse: 0.05,
+		click: 0.78,
+		exploratoryClick: 0.32,
+		wait: 0.15,
+		hover: 0.08,
+		form: 0.35,
+		back: 0.25,
+		forward: 0.12,
+		rageClick: 0.25
+	},
+	tabletUser: {
+		scroll: 0.65,
+		mouse: 0.2,
+		click: 0.8,
+		exploratoryClick: 0.4,
+		wait: 0.3,
+		hover: 0.25,
+		form: 0.4,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.18
+	},
 
 	// Efficiency patterns
-	decisive: { scroll: 0.2, mouse: 0.1, click: 0.95, exploratoryClick: 0.2, wait: 0.1, hover: 0.1, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.3 },
-	minimalist: { scroll: 0.25, mouse: 0.12, click: 0.93, exploratoryClick: 0.18, wait: 0.12, hover: 0.12, form: 0.42, back: 0.08, forward: 0.08, rageClick: 0.28 },
+	decisive: {
+		scroll: 0.2,
+		mouse: 0.1,
+		click: 0.95,
+		exploratoryClick: 0.2,
+		wait: 0.1,
+		hover: 0.1,
+		form: 0.4,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.3
+	},
+	minimalist: {
+		scroll: 0.25,
+		mouse: 0.12,
+		click: 0.93,
+		exploratoryClick: 0.18,
+		wait: 0.12,
+		hover: 0.12,
+		form: 0.42,
+		back: 0.08,
+		forward: 0.08,
+		rageClick: 0.28
+	},
 
 	// Deep engagement patterns
-	researcher: { scroll: 0.7, mouse: 0.4, click: 0.65, exploratoryClick: 0.5, wait: 0.6, hover: 0.5, form: 0.4, back: 0.1, forward: 0.1, rageClick: 0.05 },
-	methodical: { scroll: 0.5, mouse: 0.3, click: 0.75, exploratoryClick: 0.4, wait: 0.5, hover: 0.4, form: 0.5, back: 0.2, forward: 0.1, rageClick: 0.08 },
-	analytical: { scroll: 0.6, mouse: 0.45, click: 0.68, exploratoryClick: 0.42, wait: 0.55, hover: 0.48, form: 0.45, back: 0.15, forward: 0.12, rageClick: 0.06 },
+	researcher: {
+		scroll: 0.7,
+		mouse: 0.4,
+		click: 0.65,
+		exploratoryClick: 0.5,
+		wait: 0.6,
+		hover: 0.5,
+		form: 0.4,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.05
+	},
+	methodical: {
+		scroll: 0.5,
+		mouse: 0.3,
+		click: 0.75,
+		exploratoryClick: 0.4,
+		wait: 0.5,
+		hover: 0.4,
+		form: 0.5,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.08
+	},
+	analytical: {
+		scroll: 0.6,
+		mouse: 0.45,
+		click: 0.68,
+		exploratoryClick: 0.42,
+		wait: 0.55,
+		hover: 0.48,
+		form: 0.45,
+		back: 0.15,
+		forward: 0.12,
+		rageClick: 0.06
+	},
 
 	// Accessibility and inclusive patterns
-	accessibilityUser: { scroll: 0.4, mouse: 0.2, click: 0.85, exploratoryClick: 0.3, wait: 0.8, hover: 0.6, form: 0.5, back: 0.25, forward: 0.15, rageClick: 0.4 },
-	keyboardNavigator: { scroll: 0.3, mouse: 0.05, click: 0.9, exploratoryClick: 0.25, wait: 0.4, hover: 0.1, form: 0.6, back: 0.2, forward: 0.2, rageClick: 0.35 },
+	accessibilityUser: {
+		scroll: 0.4,
+		mouse: 0.2,
+		click: 0.85,
+		exploratoryClick: 0.3,
+		wait: 0.8,
+		hover: 0.6,
+		form: 0.5,
+		back: 0.25,
+		forward: 0.15,
+		rageClick: 0.4
+	},
+	keyboardNavigator: {
+		scroll: 0.3,
+		mouse: 0.05,
+		click: 0.9,
+		exploratoryClick: 0.25,
+		wait: 0.4,
+		hover: 0.1,
+		form: 0.6,
+		back: 0.2,
+		forward: 0.2,
+		rageClick: 0.35
+	},
 
 	// Age/generation patterns
-	genZ: { scroll: 0.9, mouse: 0.05, click: 0.8, exploratoryClick: 0.6, wait: 0.1, hover: 0.05, form: 0.25, back: 0.1, forward: 0.05, rageClick: 0.2 },
-	millennial: { scroll: 0.5, mouse: 0.2, click: 0.85, exploratoryClick: 0.4, wait: 0.3, hover: 0.25, form: 0.4, back: 0.2, forward: 0.1, rageClick: 0.15 },
-	genX: { scroll: 0.4, mouse: 0.3, click: 0.8, exploratoryClick: 0.3, wait: 0.4, hover: 0.4, form: 0.5, back: 0.3, forward: 0.15, rageClick: 0.12 },
-	boomer: { scroll: 0.3, mouse: 0.5, click: 0.7, exploratoryClick: 0.2, wait: 0.7, hover: 0.6, form: 0.6, back: 0.4, forward: 0.2, rageClick: 0.45 },
+	genZ: {
+		scroll: 0.9,
+		mouse: 0.05,
+		click: 0.8,
+		exploratoryClick: 0.6,
+		wait: 0.1,
+		hover: 0.05,
+		form: 0.25,
+		back: 0.1,
+		forward: 0.05,
+		rageClick: 0.2
+	},
+	millennial: {
+		scroll: 0.5,
+		mouse: 0.2,
+		click: 0.85,
+		exploratoryClick: 0.4,
+		wait: 0.3,
+		hover: 0.25,
+		form: 0.4,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.15
+	},
+	genX: {
+		scroll: 0.4,
+		mouse: 0.3,
+		click: 0.8,
+		exploratoryClick: 0.3,
+		wait: 0.4,
+		hover: 0.4,
+		form: 0.5,
+		back: 0.3,
+		forward: 0.15,
+		rageClick: 0.12
+	},
+	boomer: {
+		scroll: 0.3,
+		mouse: 0.5,
+		click: 0.7,
+		exploratoryClick: 0.2,
+		wait: 0.7,
+		hover: 0.6,
+		form: 0.6,
+		back: 0.4,
+		forward: 0.2,
+		rageClick: 0.45
+	},
 
 	// Emotional/behavioral patterns
-	anxiousUser: { scroll: 0.6, mouse: 0.4, click: 0.7, exploratoryClick: 0.2, wait: 0.6, hover: 0.5, form: 0.3, back: 0.5, forward: 0.1, rageClick: 0.5 },
-	confidentUser: { scroll: 0.3, mouse: 0.15, click: 0.9, exploratoryClick: 0.5, wait: 0.2, hover: 0.2, form: 0.5, back: 0.15, forward: 0.1, rageClick: 0.1 },
-	cautiousUser: { scroll: 0.5, mouse: 0.35, click: 0.65, exploratoryClick: 0.15, wait: 0.8, hover: 0.7, form: 0.4, back: 0.4, forward: 0.05, rageClick: 0.08 },
+	anxiousUser: {
+		scroll: 0.6,
+		mouse: 0.4,
+		click: 0.7,
+		exploratoryClick: 0.2,
+		wait: 0.6,
+		hover: 0.5,
+		form: 0.3,
+		back: 0.5,
+		forward: 0.1,
+		rageClick: 0.5
+	},
+	confidentUser: {
+		scroll: 0.3,
+		mouse: 0.15,
+		click: 0.9,
+		exploratoryClick: 0.5,
+		wait: 0.2,
+		hover: 0.2,
+		form: 0.5,
+		back: 0.15,
+		forward: 0.1,
+		rageClick: 0.1
+	},
+	cautiousUser: {
+		scroll: 0.5,
+		mouse: 0.35,
+		click: 0.65,
+		exploratoryClick: 0.15,
+		wait: 0.8,
+		hover: 0.7,
+		form: 0.4,
+		back: 0.4,
+		forward: 0.05,
+		rageClick: 0.08
+	},
 
 	// International/cultural patterns
-	international: { scroll: 0.45, mouse: 0.3, click: 0.75, exploratoryClick: 0.35, wait: 0.5, hover: 0.4, form: 0.45, back: 0.3, forward: 0.15, rageClick: 0.2 },
-	rtlUser: { scroll: 0.5, mouse: 0.25, click: 0.8, exploratoryClick: 0.4, wait: 0.4, hover: 0.35, form: 0.4, back: 0.25, forward: 0.1, rageClick: 0.15 },
+	international: {
+		scroll: 0.45,
+		mouse: 0.3,
+		click: 0.75,
+		exploratoryClick: 0.35,
+		wait: 0.5,
+		hover: 0.4,
+		form: 0.45,
+		back: 0.3,
+		forward: 0.15,
+		rageClick: 0.2
+	},
+	rtlUser: {
+		scroll: 0.5,
+		mouse: 0.25,
+		click: 0.8,
+		exploratoryClick: 0.4,
+		wait: 0.4,
+		hover: 0.35,
+		form: 0.4,
+		back: 0.25,
+		forward: 0.1,
+		rageClick: 0.15
+	},
 
 	// Gaming-inspired patterns (original)
-	minMaxer: { scroll: 0.3, mouse: 0.7, click: 0.9, exploratoryClick: 0.6, wait: 0.2, hover: 0.3, form: 0.2, back: 0.1, forward: 0.1, rageClick: 0.7 },
-	rolePlayer: { scroll: 0.6, mouse: 0.4, click: 0.75, exploratoryClick: 0.3, wait: 0.6, hover: 0.5, form: 0.3, back: 0.2, forward: 0.1, rageClick: 0.1 },
-	murderHobo: { scroll: 0.1, mouse: 0.1, click: 0.99, exploratoryClick: 0.9, wait: 0.01, hover: 0.1, form: 0.1, back: 0.1, forward: 0.1, rageClick: 0.95 },
-	ruleSlawyer: { scroll: 0.9, mouse: 0.6, click: 0.65, exploratoryClick: 0.3, wait: 0.7, hover: 0.6, form: 0.6, back: 0.3, forward: 0.1, rageClick: 0.05 },
+	minMaxer: {
+		scroll: 0.3,
+		mouse: 0.7,
+		click: 0.9,
+		exploratoryClick: 0.6,
+		wait: 0.2,
+		hover: 0.3,
+		form: 0.2,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.7
+	},
+	rolePlayer: {
+		scroll: 0.6,
+		mouse: 0.4,
+		click: 0.75,
+		exploratoryClick: 0.3,
+		wait: 0.6,
+		hover: 0.5,
+		form: 0.3,
+		back: 0.2,
+		forward: 0.1,
+		rageClick: 0.1
+	},
+	murderHobo: {
+		scroll: 0.1,
+		mouse: 0.1,
+		click: 0.99,
+		exploratoryClick: 0.9,
+		wait: 0.01,
+		hover: 0.1,
+		form: 0.1,
+		back: 0.1,
+		forward: 0.1,
+		rageClick: 0.95
+	},
+	ruleSlawyer: {
+		scroll: 0.9,
+		mouse: 0.6,
+		click: 0.65,
+		exploratoryClick: 0.3,
+		wait: 0.7,
+		hover: 0.6,
+		form: 0.6,
+		back: 0.3,
+		forward: 0.1,
+		rageClick: 0.05
+	}
 };
 
 // Add randomMouse and randomScroll to all personas with small probability (0.03 = 3%)
@@ -85,7 +470,7 @@ export const puppeteerArgs = [
 	'--disable-features=VizDisplayCompositor,IsolateOrigins,site-per-process,TrustedDOMTypes,ContentSecurityPolicy,AudioServiceOutOfProcess,TranslateUI,BlinkGenPropertyTrees,SecurePaymentConfirmation,CertificateTransparencyComponentUpdater,AutofillServerCommunication',
 	'--disable-blink-features=AutomationControlled',
 	'--disable-client-side-phishing-detection',
-	
+
 	// CSP and Content Security bypasses
 	'--allow-running-insecure-content',
 	'--allow-insecure-localhost',
@@ -152,7 +537,8 @@ export const puppeteerArgs = [
 ];
 
 // Relaxed Content Security Policy for automation
-export const relaxedCSP = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';";
+export const relaxedCSP =
+	"default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';";
 
 // Primary action button selectors - Enhanced for modern frameworks and design systems
 export const primaryButtonSelectors = `
@@ -322,106 +708,221 @@ export const formTestData = {
 	// Search queries for different domains and use cases
 	search: [
 		// General queries
-		'best products', 'how to', 'reviews', 'price', 'compare', 'tutorial', 'guide', 'tips',
+		'best products',
+		'how to',
+		'reviews',
+		'price',
+		'compare',
+		'tutorial',
+		'guide',
+		'tips',
 		// E-commerce
-		'discount', 'sale', 'free shipping', 'return policy', 'size guide', 'customer reviews',
+		'discount',
+		'sale',
+		'free shipping',
+		'return policy',
+		'size guide',
+		'customer reviews',
 		// B2B/SaaS
-		'enterprise pricing', 'API documentation', 'integration guide', 'security features',
-		'trial period', 'implementation', 'support options', 'migration tools',
+		'enterprise pricing',
+		'API documentation',
+		'integration guide',
+		'security features',
+		'trial period',
+		'implementation',
+		'support options',
+		'migration tools',
 		// Content/Media
-		'trending now', 'latest news', 'breaking news', 'popular posts', 'recommended',
+		'trending now',
+		'latest news',
+		'breaking news',
+		'popular posts',
+		'recommended',
 		// Tech/Development
-		'getting started', 'documentation', 'examples', 'best practices', 'troubleshooting'
+		'getting started',
+		'documentation',
+		'examples',
+		'best practices',
+		'troubleshooting'
 	],
-	
+
 	// Realistic email addresses with various domains
 	email: [
 		// Popular providers
-		'user@gmail.com', 'test@yahoo.com', 'demo@outlook.com', 'sample@hotmail.com',
-		'john.doe@gmail.com', 'jane.smith@yahoo.com', 'alex.wilson@outlook.com',
+		'user@gmail.com',
+		'test@yahoo.com',
+		'demo@outlook.com',
+		'sample@hotmail.com',
+		'john.doe@gmail.com',
+		'jane.smith@yahoo.com',
+		'alex.wilson@outlook.com',
 		// Business/Corporate
-		'info@company.com', 'sales@business.org', 'support@startup.io', 'admin@agency.co',
+		'info@company.com',
+		'sales@business.org',
+		'support@startup.io',
+		'admin@agency.co',
 		// International domains
-		'user@email.de', 'test@mail.fr', 'demo@correo.es', 'sample@post.jp'
+		'user@email.de',
+		'test@mail.fr',
+		'demo@correo.es',
+		'sample@post.jp'
 	],
-	
+
 	// Diverse names including international variants
 	text: [
 		// English names
-		'John Doe', 'Jane Smith', 'Alex Johnson', 'Sarah Wilson', 'Michael Brown',
-		'Emily Davis', 'David Miller', 'Lisa Garcia', 'Robert Martinez', 'Amanda Taylor',
+		'John Doe',
+		'Jane Smith',
+		'Alex Johnson',
+		'Sarah Wilson',
+		'Michael Brown',
+		'Emily Davis',
+		'David Miller',
+		'Lisa Garcia',
+		'Robert Martinez',
+		'Amanda Taylor',
 		// International names
-		'María González', 'Jean Dupont', 'Hans Mueller', 'Yuki Tanaka', 'Ahmed Hassan',
-		'Anna Kowalski', 'Lars Andersen', 'Sofia Rossi', 'Chen Wei', 'Raj Patel',
+		'María González',
+		'Jean Dupont',
+		'Hans Mueller',
+		'Yuki Tanaka',
+		'Ahmed Hassan',
+		'Anna Kowalski',
+		'Lars Andersen',
+		'Sofia Rossi',
+		'Chen Wei',
+		'Raj Patel',
 		// Common text inputs
-		'test user', 'sample text', 'hello world', 'demo content', 'placeholder text'
+		'test user',
+		'sample text',
+		'hello world',
+		'demo content',
+		'placeholder text'
 	],
-	
+
 	// Company/organization names
 	company: [
-		'Acme Corp', 'TechStart Inc', 'Global Solutions', 'Innovation Labs', 'Digital Agency',
-		'Creative Studio', 'Consulting Group', 'Development Team', 'Marketing Pro', 'Design Co'
+		'Acme Corp',
+		'TechStart Inc',
+		'Global Solutions',
+		'Innovation Labs',
+		'Digital Agency',
+		'Creative Studio',
+		'Consulting Group',
+		'Development Team',
+		'Marketing Pro',
+		'Design Co'
 	],
-	
+
 	// Realistic but secure passwords
 	password: [
-		'SecurePass123!', 'MyPassword456@', 'TestUser789#', 'DemoAccount2024$',
-		'UserTest2024!', 'SamplePass456@', 'AccountDemo789#', 'TestLogin2024$'
+		'SecurePass123!',
+		'MyPassword456@',
+		'TestUser789#',
+		'DemoAccount2024$',
+		'UserTest2024!',
+		'SamplePass456@',
+		'AccountDemo789#',
+		'TestLogin2024$'
 	],
-	
+
 	// Website URLs for various purposes
 	url: [
-		'https://example.com', 'https://test-site.com', 'https://demo-website.org',
-		'https://my-portfolio.dev', 'https://company-blog.io', 'https://project-docs.net',
-		'https://sample-app.co', 'https://demo-store.shop'
+		'https://example.com',
+		'https://test-site.com',
+		'https://demo-website.org',
+		'https://my-portfolio.dev',
+		'https://company-blog.io',
+		'https://project-docs.net',
+		'https://sample-app.co',
+		'https://demo-store.shop'
 	],
-	
+
 	// International phone number formats
 	tel: [
 		// US formats
-		'555-123-4567', '(555) 987-6543', '555.456.7890', '+1-555-234-5678',
+		'555-123-4567',
+		'(555) 987-6543',
+		'555.456.7890',
+		'+1-555-234-5678',
 		// International formats
-		'+44 20 7946 0958', '+49 30 12345678', '+33 1 42 86 83 26', '+81 3 1234 5678',
+		'+44 20 7946 0958',
+		'+49 30 12345678',
+		'+33 1 42 86 83 26',
+		'+81 3 1234 5678',
 		// Mobile formats
-		'+1 (555) 123-4567', '+44 7700 900123', '+49 171 1234567'
+		'+1 (555) 123-4567',
+		'+44 7700 900123',
+		'+49 171 1234567'
 	],
-	
+
 	// Numeric inputs for various contexts
 	number: [
-		'1', '5', '10', '25', '50', '100', '250', '500', '1000',
-		'42', '99', '2024', '2025', '3.14', '0.5', '1.5', '2.0'
+		'1',
+		'5',
+		'10',
+		'25',
+		'50',
+		'100',
+		'250',
+		'500',
+		'1000',
+		'42',
+		'99',
+		'2024',
+		'2025',
+		'3.14',
+		'0.5',
+		'1.5',
+		'2.0'
 	],
-	
+
 	// Date inputs
 	date: [
-		'2024-01-15', '2024-06-30', '2024-12-25', '2025-01-01', '2025-07-04',
-		'2024-03-20', '2024-09-15', '2024-11-11'
+		'2024-01-15',
+		'2024-06-30',
+		'2024-12-25',
+		'2025-01-01',
+		'2025-07-04',
+		'2024-03-20',
+		'2024-09-15',
+		'2024-11-11'
 	],
-	
+
 	// Time inputs
-	time: [
-		'09:00', '10:30', '12:00', '14:15', '16:45', '18:30', '20:00'
-	],
-	
+	time: ['09:00', '10:30', '12:00', '14:15', '16:45', '18:30', '20:00'],
+
 	// Address components
 	address: [
-		'123 Main Street', '456 Oak Avenue', '789 Pine Road', '321 Elm Drive',
-		'555 Broadway', '777 First Street', '999 Park Avenue', '111 Washington Blvd'
+		'123 Main Street',
+		'456 Oak Avenue',
+		'789 Pine Road',
+		'321 Elm Drive',
+		'555 Broadway',
+		'777 First Street',
+		'999 Park Avenue',
+		'111 Washington Blvd'
 	],
-	
+
 	city: [
-		'New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia',
-		'San Antonio', 'San Diego', 'Dallas', 'San Jose', 'Austin', 'Jacksonville'
+		'New York',
+		'Los Angeles',
+		'Chicago',
+		'Houston',
+		'Phoenix',
+		'Philadelphia',
+		'San Antonio',
+		'San Diego',
+		'Dallas',
+		'San Jose',
+		'Austin',
+		'Jacksonville'
 	],
-	
-	state: [
-		'CA', 'NY', 'TX', 'FL', 'IL', 'PA', 'OH', 'GA', 'NC', 'MI', 'WA', 'AZ'
-	],
-	
-	zip: [
-		'10001', '90210', '60601', '33101', '94102', '02101', '30301', '48201'
-	],
-	
+
+	state: ['CA', 'NY', 'TX', 'FL', 'IL', 'PA', 'OH', 'GA', 'NC', 'MI', 'WA', 'AZ'],
+
+	zip: ['10001', '90210', '60601', '33101', '94102', '02101', '30301', '48201'],
+
 	// Special handling for select dropdowns
 	select: null
 };
@@ -429,52 +930,184 @@ export const formTestData = {
 // Action words for button text matching - Enhanced with B2B, SaaS, and industry-specific terms
 export const actionWords = [
 	// Core actions
-	'buy', 'shop', 'get', 'start', 'try', 'demo', 'download', 'install',
-	'signup', 'sign up', 'register', 'join', 'save', 'claim', 'redeem',
-	'book', 'schedule', 'contact', 'call', 'learn', 'discover', 'explore',
-	
+	'buy',
+	'shop',
+	'get',
+	'start',
+	'try',
+	'demo',
+	'download',
+	'install',
+	'signup',
+	'sign up',
+	'register',
+	'join',
+	'save',
+	'claim',
+	'redeem',
+	'book',
+	'schedule',
+	'contact',
+	'call',
+	'learn',
+	'discover',
+	'explore',
+
 	// E-commerce specific
-	'add to cart', 'checkout', 'purchase', 'order', 'pay', 'subscribe',
-	'add to bag', 'add to basket', 'quick buy', 'buy now', 'shop now',
-	'preorder', 'reserve', 'wishlist', 'compare', 'view details',
-	
+	'add to cart',
+	'checkout',
+	'purchase',
+	'order',
+	'pay',
+	'subscribe',
+	'add to bag',
+	'add to basket',
+	'quick buy',
+	'buy now',
+	'shop now',
+	'preorder',
+	'reserve',
+	'wishlist',
+	'compare',
+	'view details',
+
 	// B2B and SaaS
-	'request demo', 'get started', 'free trial', 'start trial', 'try free',
-	'contact sales', 'schedule demo', 'book meeting', 'request quote',
-	'upgrade', 'upgrade now', 'go pro', 'get premium', 'enterprise',
-	'implementation', 'onboarding', 'migration', 'integration',
-	
+	'request demo',
+	'get started',
+	'free trial',
+	'start trial',
+	'try free',
+	'contact sales',
+	'schedule demo',
+	'book meeting',
+	'request quote',
+	'upgrade',
+	'upgrade now',
+	'go pro',
+	'get premium',
+	'enterprise',
+	'implementation',
+	'onboarding',
+	'migration',
+	'integration',
+
 	// Content and engagement
-	'read more', 'learn more', 'view more', 'see details', 'expand',
-	'play', 'watch', 'listen', 'stream', 'preview', 'sample',
-	'share', 'like', 'follow', 'subscribe', 'notify me', 'alerts',
-	
+	'read more',
+	'learn more',
+	'view more',
+	'see details',
+	'expand',
+	'play',
+	'watch',
+	'listen',
+	'stream',
+	'preview',
+	'sample',
+	'share',
+	'like',
+	'follow',
+	'subscribe',
+	'notify me',
+	'alerts',
+
 	// Account and profile
-	'login', 'log in', 'sign in', 'create account', 'profile', 'settings',
-	'dashboard', 'account', 'my account', 'preferences', 'logout',
-	
+	'login',
+	'log in',
+	'sign in',
+	'create account',
+	'profile',
+	'settings',
+	'dashboard',
+	'account',
+	'my account',
+	'preferences',
+	'logout',
+
 	// Support and help
-	'help', 'support', 'chat', 'message', 'feedback', 'report',
-	'documentation', 'guide', 'tutorial', 'faq', 'resources',
-	
+	'help',
+	'support',
+	'chat',
+	'message',
+	'feedback',
+	'report',
+	'documentation',
+	'guide',
+	'tutorial',
+	'faq',
+	'resources',
+
 	// Navigation and search
-	'search', 'find', 'filter', 'sort', 'browse', 'categories',
-	'menu', 'home', 'back', 'next', 'previous', 'continue',
-	
+	'search',
+	'find',
+	'filter',
+	'sort',
+	'browse',
+	'categories',
+	'menu',
+	'home',
+	'back',
+	'next',
+	'previous',
+	'continue',
+
 	// Forms and submissions
-	'submit', 'send', 'apply', 'create', 'update', 'edit', 'delete',
-	'confirm', 'verify', 'validate', 'check', 'review', 'approve',
-	
+	'submit',
+	'send',
+	'apply',
+	'create',
+	'update',
+	'edit',
+	'delete',
+	'confirm',
+	'verify',
+	'validate',
+	'check',
+	'review',
+	'approve',
+
 	// Urgency and marketing
-	'free', 'trial', 'now', 'today', 'limited', 'offer', 'deal',
-	'sale', 'discount', 'save', 'special', 'exclusive', 'bonus',
-	'instant', 'immediately', 'quick', 'fast', 'easy', 'simple',
-	
+	'free',
+	'trial',
+	'now',
+	'today',
+	'limited',
+	'offer',
+	'deal',
+	'sale',
+	'discount',
+	'save',
+	'special',
+	'exclusive',
+	'bonus',
+	'instant',
+	'immediately',
+	'quick',
+	'fast',
+	'easy',
+	'simple',
+
 	// Industry-specific
-	'enroll', 'apply now', 'admit', 'course', 'class', 'lesson',
-	'appointment', 'consultation', 'assessment', 'evaluation',
-	'donate', 'contribute', 'sponsor', 'volunteer', 'participate',
-	'invest', 'trade', 'portfolio', 'market', 'finance', 'banking'
+	'enroll',
+	'apply now',
+	'admit',
+	'course',
+	'class',
+	'lesson',
+	'appointment',
+	'consultation',
+	'assessment',
+	'evaluation',
+	'donate',
+	'contribute',
+	'sponsor',
+	'volunteer',
+	'participate',
+	'invest',
+	'trade',
+	'portfolio',
+	'market',
+	'finance',
+	'banking'
 ];
 
 // Interactive element selectors for hover functionality - Enhanced for modern frameworks

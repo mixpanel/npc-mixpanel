@@ -1,113 +1,113 @@
 {
-  "failed-coupon": {
-    "description": "Attempt to apply an invalid coupon code during checkout",
-    "temperature": 7,
-    "chaos-range": [1, 3],
-    "actions": [
-      {
-        "action": "click",
-        "selector": "#myItem"
-      },
-      {
-        "action": "click",
-        "selector": "#addToCart"
-      },
-      {
-        "action": "click",
-        "selector": "#viewCart"
-      },
-      {
-        "action": "click",
-        "selector": "#checkout"
-      },
-      {
-        "action": "type",
-        "selector": "#email",
-        "text": "test@example.com"
-      },
-      {
-        "action": "type",
-        "selector": "#creditCard",
-        "text": "4111 1111 1111 1111"
-      },
-      {
-        "action": "type",
-        "selector": "#coupon",
-        "text": "INVALIDCOUPON"
-      },
-      {
-        "action": "click",
-        "selector": "#applyCoupon"
-      }
-    ]
-  },
-  "successful-purchase": {
-    "description": "Complete a successful purchase with valid coupon",
-    "temperature": 8,
-    "chaos-range": [1, 2],
-    "actions": [
-      {
-        "action": "click",
-        "selector": "#myItem"
-      },
-      {
-        "action": "click",
-        "selector": "#addToCart"
-      },
-      {
-        "action": "type",
-        "selector": "#coupon",
-        "text": "VALIDCOUPON"
-      },
-      {
-        "action": "click",
-        "selector": "#applyCoupon"
-      },
-      {
-        "action": "click",
-        "selector": "#checkout"
-      },
-      {
-        "action": "type",
-        "selector": "#email",
-        "text": "customer@example.com"
-      },
-      {
-        "action": "type",
-        "selector": "#creditCard",
-        "text": "4111 1111 1111 1111"
-      },
-      {
-        "action": "click",
-        "selector": "#completePurchase"
-      }
-    ]
-  },
-  "browse-and-leave": {
-    "description": "Browse products but abandon cart without purchasing",
-    "temperature": 5,
-    "chaos-range": [2, 5],
-    "actions": [
-      {
-        "action": "click",
-        "selector": "#category1"
-      },
-      {
-        "action": "click",
-        "selector": "#product1"
-      },
-      {
-        "action": "click",
-        "selector": "#product2"
-      },
-      {
-        "action": "click",
-        "selector": "#addToCart"
-      },
-      {
-        "action": "click",
-        "selector": "#viewCart"
-      }
-    ]
-  }
+	"failed-coupon": {
+		"description": "Attempt to apply an invalid coupon code during checkout",
+		"temperature": 7,
+		"chaos-range": [1, 3],
+		"actions": [
+			{
+				"action": "click",
+				"selector": "#myItem"
+			},
+			{
+				"action": "click",
+				"selector": "#addToCart"
+			},
+			{
+				"action": "click",
+				"selector": "#viewCart"
+			},
+			{
+				"action": "click",
+				"selector": "#checkout"
+			},
+			{
+				"action": "type",
+				"selector": "#email",
+				"text": "test@example.com"
+			},
+			{
+				"action": "type",
+				"selector": "#creditCard",
+				"text": "4111 1111 1111 1111"
+			},
+			{
+				"action": "type",
+				"selector": "#coupon",
+				"text": "INVALIDCOUPON"
+			},
+			{
+				"action": "click",
+				"selector": "#applyCoupon"
+			}
+		]
+	},
+	"successful-purchase": {
+		"description": "Complete a successful purchase with valid coupon",
+		"temperature": 8,
+		"chaos-range": [1, 2],
+		"actions": [
+			{
+				"action": "click",
+				"selector": "#myItem"
+			},
+			{
+				"action": "click",
+				"selector": "#addToCart"
+			},
+			{
+				"action": "type",
+				"selector": "#coupon",
+				"text": "VALIDCOUPON"
+			},
+			{
+				"action": "click",
+				"selector": "#applyCoupon"
+			},
+			{
+				"action": "click",
+				"selector": "#checkout"
+			},
+			{
+				"action": "type",
+				"selector": "#email",
+				"text": "customer@example.com"
+			},
+			{
+				"action": "type",
+				"selector": "#creditCard",
+				"text": "4111 1111 1111 1111"
+			},
+			{
+				"action": "click",
+				"selector": "#completePurchase"
+			}
+		]
+	},
+	"browse-and-leave": {
+		"description": "Browse products but abandon cart without purchasing",
+		"temperature": 5,
+		"chaos-range": [2, 5],
+		"actions": [
+			{
+				"action": "click",
+				"selector": "#category1"
+			},
+			{
+				"action": "click",
+				"selector": "#product1"
+			},
+			{
+				"action": "click",
+				"selector": "#product2"
+			},
+			{
+				"action": "click",
+				"selector": "#addToCart"
+			},
+			{
+				"action": "click",
+				"selector": "#viewCart"
+			}
+		]
+	}
 }

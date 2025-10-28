@@ -1,337 +1,296 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Meeple: A Replay/Heatmap Simulator for NPCs</title>
+		<link rel="stylesheet" href="styles.css" />
+		<script type="text/javascript">
+			var MIXPANEL_CUSTOM_LIB_URL = 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js';
+			(function (f, b) {
+				if (!b.__SV) {
+					var e, g, i, h;
+					window.mixpanel = b;
+					b._i = [];
+					b.init = function (e, f, c) {
+						function g(a, d) {
+							var b = d.split('.');
+							2 == b.length && ((a = a[b[0]]), (d = b[1]));
+							a[d] = function () {
+								a.push([d].concat(Array.prototype.slice.call(arguments, 0)));
+							};
+						}
+						var a = b;
+						'undefined' !== typeof c ? (a = b[c] = []) : (c = 'mixpanel');
+						a.people = a.people || [];
+						a.toString = function (a) {
+							var d = 'mixpanel';
+							'mixpanel' !== c && (d += '.' + c);
+							a || (d += ' (stub)');
+							return d;
+						};
+						a.people.toString = function () {
+							return a.toString(1) + '.people (stub)';
+						};
+						i =
+							'disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove'.split(
+								' '
+							);
+						for (h = 0; h < i.length; h++) g(a, i[h]);
+						var j = 'set set_once union unset remove delete'.split(' ');
+						a.get_group = function () {
+							function b(c) {
+								d[c] = function () {
+									call2_args = arguments;
+									call2 = [c].concat(Array.prototype.slice.call(call2_args, 0));
+									a.push([e, call2]);
+								};
+							}
+							for (
+								var d = {}, e = ['get_group'].concat(Array.prototype.slice.call(arguments, 0)), c = 0;
+								c < j.length;
+								c++
+							)
+								b(j[c]);
+							return d;
+						};
+						b._i.push([e, f, c]);
+					};
+					b.__SV = 1.2;
+					e = f.createElement('script');
+					e.type = 'text/javascript';
+					e.async = !0;
+					e.src =
+						'undefined' !== typeof MIXPANEL_CUSTOM_LIB_URL
+							? MIXPANEL_CUSTOM_LIB_URL
+							: 'file:' === f.location.protocol && '//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js'.match(/^\/\//)
+								? 'https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js'
+								: '//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js';
+					g = f.getElementsByTagName('script')[0];
+					g.parentNode.insertBefore(e, g);
+				}
+			})(document, window.mixpanel || []);
+		</script>
+	</head>
 
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport"
-		content="width=device-width, initial-scale=1.0">
-	<title>Meeple: A Replay/Heatmap Simulator for NPCs</title>
-	<link rel="stylesheet"
-		href="styles.css" />
-	<script type="text/javascript">
-		var MIXPANEL_CUSTOM_LIB_URL = 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js';
-		(function (f, b) { if (!b.__SV) { var e, g, i, h; window.mixpanel = b; b._i = []; b.init = function (e, f, c) { function g(a, d) { var b = d.split("."); 2 == b.length && ((a = a[b[0]]), (d = b[1])); a[d] = function () { a.push([d].concat(Array.prototype.slice.call(arguments, 0))); }; } var a = b; "undefined" !== typeof c ? (a = b[c] = []) : (c = "mixpanel"); a.people = a.people || []; a.toString = function (a) { var d = "mixpanel"; "mixpanel" !== c && (d += "." + c); a || (d += " (stub)"); return d; }; a.people.toString = function () { return a.toString(1) + ".people (stub)"; }; i = "disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" "); for (h = 0; h < i.length; h++) g(a, i[h]); var j = "set set_once union unset remove delete".split(" "); a.get_group = function () { function b(c) { d[c] = function () { call2_args = arguments; call2 = [c].concat(Array.prototype.slice.call(call2_args, 0)); a.push([e, call2]); }; } for (var d = {}, e = ["get_group"].concat(Array.prototype.slice.call(arguments, 0)), c = 0; c < j.length; c++) b(j[c]); return d; }; b._i.push([e, f, c]); }; b.__SV = 1.2; e = f.createElement("script"); e.type = "text/javascript"; e.async = !0; e.src = "undefined" !== typeof MIXPANEL_CUSTOM_LIB_URL ? MIXPANEL_CUSTOM_LIB_URL : "file:" === f.location.protocol && "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//) ? "https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js" : "//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"; g = f.getElementsByTagName("script")[0]; g.parentNode.insertBefore(e, g); } })(document, window.mixpanel || []);
-	</script>
-</head>
-
-<body>
-	<div class="title-bar">
-		<div class="logo-container">
-			<div class="pulse-ring"></div>
-			<div class="sparkles">
-				<div class="sparkle"></div>
-				<div class="sparkle"></div>
-				<div class="sparkle"></div>
-				<div class="sparkle"></div>
-			</div>
-
-			<!-- Main central meeple -->
-			<svg class="main-meeple"
-				viewBox="0 0 100 92"
-				xmlns="http://www.w3.org/2000/svg">
-				<defs>
-					<linearGradient id="mainGradient"
-						x1="0%"
-						y1="0%"
-						x2="100%"
-						y2="100%">
-						<stop offset="0%"
-							style="stop-color:#7856FF;stop-opacity:1" />
-						<stop offset="50%"
-							style="stop-color:#FF7557;stop-opacity:1" />
-						<stop offset="100%"
-							style="stop-color:#80E1D9;stop-opacity:1" />
-					</linearGradient>
-					<filter id="glow">
-						<feGaussianBlur stdDeviation="3"
-							result="coloredBlur" />
-						<feMerge>
-							<feMergeNode in="coloredBlur" />
-							<feMergeNode in="SourceGraphic" />
-						</feMerge>
-					</filter>
-				</defs>
-				<path
-					d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-					fill="url(#mainGradient)"
-					filter="url(#glow)" />
-				<circle cx="42"
-					cy="30"
-					r="4"
-					fill="#ffffff" />
-				<circle cx="58"
-					cy="30"
-					r="4"
-					fill="#ffffff" />
-				<path d="M 35 42 Q 50 52 65 42"
-					stroke="#ffffff"
-					stroke-width="3"
-					fill="none"
-					stroke-linecap="round" />
-				<path d="M 42 20 C 40 25, 45 28, 50 26 C 55 28, 60 25, 58 20"
-					fill="#ffffff"
-					opacity="0.8" />
-			</svg>
-
-			<!-- Dancing meeples around the main one -->
-			<div class="dancing-meeples">
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#FF7557" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#80E1D9" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#7856FF" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#5B0237" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#F8BC3B" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-
-				<svg class="dancing-meeple"
-					viewBox="0 0 100 92"
-					xmlns="http://www.w3.org/2000/svg">
-					<path
-						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
-						fill="#07B096" />
-					<circle cx="42"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<circle cx="58"
-						cy="30"
-						r="3"
-						fill="#ffffff" />
-					<path d="M 35 42 Q 50 52 65 42"
-						stroke="#ffffff"
-						stroke-width="2"
-						fill="none"
-						stroke-linecap="round" />
-				</svg>
-			</div>
-		</div>
-
-		<div class="title-text">
-			<h1 class="title">Meeple</h1>
-			<p class="subtitle">The Replay Simulator</p>
-		</div>
-	</div>
-	<div class="container">
-		<div class="form-container">
-			<form id="simulatorForm">
-				<div id="overview">
-					<p>
-						<span>this app will <b>simulate real-end users</b> (<em>meeples</em>) interacting with a
-							digital product.<br/></span>
-						<span>you can inject mixpanel into the site you specify, so it can send data to any
-							project.<br/></span>
-						<span>use this tool to demonstrate how replays, heatmaps, and autocapture work on any
-							website<br/></span>
-					</p>
+	<body>
+		<div class="title-bar">
+			<div class="logo-container">
+				<div class="pulse-ring"></div>
+				<div class="sparkles">
+					<div class="sparkle"></div>
+					<div class="sparkle"></div>
+					<div class="sparkle"></div>
+					<div class="sparkle"></div>
 				</div>
-				<p id="form-description-line1"><b>meeples want <em>URL</em></b></p>
-				<!-- <label for="url">URL:</label> -->
-				<input type="text"
-					id="url"
-					name="url"
-					required>
-				<p id="form-description-line2"><b>meeples need <em>project token</em></b></p>
-				<!-- <label for="token">Mixpanel Token:</label> -->
-				<input type="text"
-					value="7127e52d6d61ee30a4d7fb4555277f87"
-					id="token"
-					name="token">
-				<p id="form-description-line3">
-					<a href="https://mixpanel.com/project/3769788/view/4266856/app/events"
-						target="_blank"
-						style="float: right; margin-left: auto; ">default project</a>
-				</p>
 
-				<label for="users">Number of Meeples (1-15):</label>
-				<input type="range"
-					id="users"
-					name="users"
-					min="1"
-					max="10"
-					value="5">
-				<output for="users"
-					id="usersOutput">5 meeples</output>
+				<!-- Main central meeple -->
+				<svg class="main-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+					<defs>
+						<linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+							<stop offset="0%" style="stop-color: #7856ff; stop-opacity: 1" />
+							<stop offset="50%" style="stop-color: #ff7557; stop-opacity: 1" />
+							<stop offset="100%" style="stop-color: #80e1d9; stop-opacity: 1" />
+						</linearGradient>
+						<filter id="glow">
+							<feGaussianBlur stdDeviation="3" result="coloredBlur" />
+							<feMerge>
+								<feMergeNode in="coloredBlur" />
+								<feMergeNode in="SourceGraphic" />
+							</feMerge>
+						</filter>
+					</defs>
+					<path
+						d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+						fill="url(#mainGradient)"
+						filter="url(#glow)"
+					/>
+					<circle cx="42" cy="30" r="4" fill="#ffffff" />
+					<circle cx="58" cy="30" r="4" fill="#ffffff" />
+					<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" />
+					<path d="M 42 20 C 40 25, 45 28, 50 26 C 55 28, 60 25, 58 20" fill="#ffffff" opacity="0.8" />
+				</svg>
 
-				<div style="display: flex; align-items: center; gap: 20px;">
-					<label>
-						<input type="checkbox"
-							id="inject"
-							name="inject"
-							checked> Inject Mixpanel in Site
-					</label>
-					<div id="masking-container">
-						<label>
-							<span>masking</span>
-							<input type="checkbox"
-								id="masking"
-								name="masking"
-								disabled>
-							<span id="masking-label">no masking</span>
-						</label>
+				<!-- Dancing meeples around the main one -->
+				<div class="dancing-meeples">
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#FF7557"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#80E1D9"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#7856FF"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#5B0237"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#F8BC3B"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+
+					<svg class="dancing-meeple" viewBox="0 0 100 92" xmlns="http://www.w3.org/2000/svg">
+						<path
+							d="M50,8 C35,8 25,18 25,32 C25,45 35,50 35,60 L25,92 L75,92 L65,60 C65,50 75,45 75,32 C75,18 65,8 50,8 Z"
+							fill="#07B096"
+						/>
+						<circle cx="42" cy="30" r="3" fill="#ffffff" />
+						<circle cx="58" cy="30" r="3" fill="#ffffff" />
+						<path d="M 35 42 Q 50 52 65 42" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" />
+					</svg>
+				</div>
+			</div>
+
+			<div class="title-text">
+				<h1 class="title">Meeple</h1>
+				<p class="subtitle">The Replay Simulator</p>
+			</div>
+		</div>
+		<div class="container">
+			<div class="form-container">
+				<form id="simulatorForm">
+					<div id="overview">
+						<p>
+							<span
+								>this app will <b>simulate real-end users</b> (<em>meeples</em>) interacting with a digital product.<br
+							/></span>
+							<span>you can inject mixpanel into the site you specify, so it can send data to any project.<br /></span>
+							<span>use this tool to demonstrate how replays, heatmaps, and autocapture work on any website<br /></span>
+						</p>
 					</div>
+					<p id="form-description-line1">
+						<b>meeples want <em>URL</em></b>
+					</p>
+					<!-- <label for="url">URL:</label> -->
+					<input type="text" id="url" name="url" required />
+					<p id="form-description-line2">
+						<b>meeples need <em>project token</em></b>
+					</p>
+					<!-- <label for="token">Mixpanel Token:</label> -->
+					<input type="text" value="7127e52d6d61ee30a4d7fb4555277f87" id="token" name="token" />
+					<p id="form-description-line3">
+						<a
+							href="https://mixpanel.com/project/3769788/view/4266856/app/events"
+							target="_blank"
+							style="float: right; margin-left: auto"
+							>default project</a
+						>
+					</p>
+
+					<label for="users">Number of Meeples (1-15):</label>
+					<input type="range" id="users" name="users" min="1" max="10" value="5" />
+					<output for="users" id="usersOutput">5 meeples</output>
+
+					<div style="display: flex; align-items: center; gap: 20px">
+						<label> <input type="checkbox" id="inject" name="inject" checked /> Inject Mixpanel in Site </label>
+						<div id="masking-container">
+							<label>
+								<span>masking</span>
+								<input type="checkbox" id="masking" name="masking" disabled />
+								<span id="masking-label">no masking</span>
+							</label>
+						</div>
+					</div>
+
+					<label> <input type="checkbox" id="headless" name="headless" checked /> Run in Headless Mode </label>
+
+					<label> <input type="checkbox" id="past" name="past" /> Simulate time in past </label>
+
+					<button type="submit">nom nom!</button>
+				</form>
+				<div class="loading">Simulating...</div>
+				<div class="success">
+					<br />Your meeples are doing your bidding!<br />Check out your project!
+					<a
+						href="https://mixpanel.com/project/3769788/view/4266856/app/events"
+						target="_blank"
+						style="float: right; margin-left: auto"
+						>default project</a
+					>
 				</div>
+			</div>
 
-				<label>
-					<input type="checkbox"
-						id="headless"
-						name="headless"
-						checked> Run in Headless Mode
-				</label>
-
-				<label>
-					<input type="checkbox"
-						id="past"
-						name="past"> Simulate time in past
-				</label>
-
-				<button type="submit">nom nom!</button>
-			</form>
-			<div class="loading">Simulating...</div>
-			<div class="success"><br />Your meeples are doing your bidding!<br />Check out your project! <a
-					href="https://mixpanel.com/project/3769788/view/4266856/app/events"
-					target="_blank"
-					style="float: right; margin-left: auto; ">default project</a></div>
-		</div>
-
-		<!-- TERMINAL -->
-		<div id="terminal"
-			class="hidden">
-			<div id="terminal-body">
-				<div id="terminal-header">
-					<h3>🛬 Terminal Output</h3>
-					<button id="close-terminal">−</button>
+			<!-- TERMINAL -->
+			<div id="terminal" class="hidden">
+				<div id="terminal-body">
+					<div id="terminal-header">
+						<h3>🛬 Terminal Output</h3>
+						<button id="close-terminal">−</button>
+					</div>
+					<div id="terminal-tab-controls">
+						<button id="tab-nav-left" class="tab-nav-arrow">←</button>
+						<div id="terminal-tabs"></div>
+						<button id="tab-nav-right" class="tab-nav-arrow">→</button>
+					</div>
+					<div id="terminal-content"></div>
+					<button id="scroll-to-bottom">↓ Scroll</button>
 				</div>
-				<div id="terminal-tab-controls">
-					<button id="tab-nav-left"
-						class="tab-nav-arrow">←</button>
-					<div id="terminal-tabs"></div>
-					<button id="tab-nav-right"
-						class="tab-nav-arrow">→</button>
-				</div>
-				<div id="terminal-content"></div>
-				<button id="scroll-to-bottom">↓ Scroll</button>
 			</div>
 		</div>
-	</div>
 
-	<!-- FLOATING TERMINAL OPEN BUTTON -->
-	<button id="open-terminal"
-		class="hidden">
-		📟 Show Terminal
-	</button>
+		<!-- FLOATING TERMINAL OPEN BUTTON -->
+		<button id="open-terminal" class="hidden">📟 Show Terminal</button>
 
-	<!-- FOOTER -->
-	<footer class="app-footer">
-		<div class="footer-links">
-			<a href="https://www.notion.so/mxpnl/Meeple-Replay-Heatmap-Generator-229e0ba9256280d8a885e625fa376161" target="_blank" rel="noopener">📚 docs</a>
-			<a href="https://www.loom.com/share/decdf3ebec32460a9ba21a39444b2b30?sid=44b908a7-5d3c-434e-a273-a6b3e5abf51e" target="_blank" rel="noopener">🎥 demo</a>
-			<a href="https://github.com/ak--47/npc-mixpanel" target="_blank" rel="noopener">💻 code</a>
-			<a href="https://mixpanel.com/s/VEE5s" target="_blank" rel="noopener">📊 metrics</a>
-			<a href="https://cloudlogging.app.goo.gl/Xa9TsaEK8SxKdw2w5" target="_blank" rel="noopener">📋 logs</a>
-		</div>
-	</footer>
+		<!-- FOOTER -->
+		<footer class="app-footer">
+			<div class="footer-links">
+				<a
+					href="https://www.notion.so/mxpnl/Meeple-Replay-Heatmap-Generator-229e0ba9256280d8a885e625fa376161"
+					target="_blank"
+					rel="noopener"
+					>📚 docs</a
+				>
+				<a
+					href="https://www.loom.com/share/decdf3ebec32460a9ba21a39444b2b30?sid=44b908a7-5d3c-434e-a273-a6b3e5abf51e"
+					target="_blank"
+					rel="noopener"
+					>🎥 demo</a
+				>
+				<a href="https://github.com/ak--47/npc-mixpanel" target="_blank" rel="noopener">💻 code</a>
+				<a href="https://mixpanel.com/s/VEE5s" target="_blank" rel="noopener">📊 metrics</a>
+				<a href="https://cloudlogging.app.goo.gl/Xa9TsaEK8SxKdw2w5" target="_blank" rel="noopener">📋 logs</a>
+			</div>
+		</footer>
 
-	<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
-		integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
-		crossorigin="anonymous"></script>
-	<script src="app.js"></script>
-</body>
-
+		<script
+			src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+			integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+			crossorigin="anonymous"
+		></script>
+		<script src="app.js"></script>
+	</body>
 </html>

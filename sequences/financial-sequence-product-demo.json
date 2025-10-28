@@ -2,19 +2,19 @@
 	"description": "Explore product demo features and interactive elements",
 	"temperature": 8,
 	"actions": [
-		{"action": "click", "selector": "a[href='/fixpanel/financial/product/']"},
-		{"action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-investments"},
-		{"action": "type", "selector": "input[type=number]", "text": "10000"},
-		{"action": "click", "selector": "button[role=switch]"},
-		{"action": "click", "selector": "#rebalance"},
-		{"action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-savings"},
-		{"action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-expenses"},
-		{"action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-investments"},
-		{"action": "type", "selector": "input[type=number]", "text": "25000"},
-		{"action": "click", "selector": "#increaseInvestment"},
-		{"action": "click", "selector": "#decreaseInvestment"},
-		{"action": "click", "selector": "#rebalance"},
-		{"action": "click", "selector": "button[role=switch]"},
-		{"action": "click", "selector": "#generateReport"}
+		{ "action": "click", "selector": "a[href='/fixpanel/financial/product/']" },
+		{ "action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-investments" },
+		{ "action": "type", "selector": "input[type=number]", "text": "10000" },
+		{ "action": "click", "selector": "button[role=switch]" },
+		{ "action": "click", "selector": "#rebalance" },
+		{ "action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-savings" },
+		{ "action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-expenses" },
+		{ "action": "click", "selector": "#radix-\\:R1afnnja\\:-trigger-investments" },
+		{ "action": "type", "selector": "input[type=number]", "text": "25000" },
+		{ "action": "click", "selector": "#increaseInvestment" },
+		{ "action": "click", "selector": "#decreaseInvestment" },
+		{ "action": "click", "selector": "#rebalance" },
+		{ "action": "click", "selector": "button[role=switch]" },
+		{ "action": "click", "selector": "#generateReport" }
 	]
 }

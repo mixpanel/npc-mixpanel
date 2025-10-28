@@ -27,39 +27,42 @@ const { NODE_ENV = 'production' } = process.env;
 
 /**
  * Create a production-safe logger that filters verbose meeple messages
- * @param {Function} baseLogger - Base logging function (defaults to console.log)
- * @returns {Function} Filtered logging function with LogFunction signature
+ * @param {(message: any, meepleId?: any) => void} [baseLogger] - Base logging function
+ * @returns {(message: any, meepleId?: any, socket?: any) => void} Filtered logging function
  */
-function createProductionLogger(baseLogger = console.log) {
+function createProductionLogger(baseLogger) {
+	const defaultLogger = (/** @type {any} */ msg) => console.log(msg);
+	const actualLogger = baseLogger || defaultLogger;
+
 	// In development, log everything
 	if (NODE_ENV !== 'production') {
-		return baseLogger;
+		return actualLogger;
 	}
 
 	// In production, only log job-level events (not individual meeple actions)
-	return (message, meepleId = null) => {
+	return (message, meepleId = null, _socket = null) => {
 		// Only log messages that start with job/microsite markers
 		const isJobLevelLog =
-			message.includes('█') ||           // Job start/end blocks
-			message.includes('🚀') ||          // Job started
-			message.includes('🏁') ||          // Job completed
-			message.includes('🏢') ||          // Microsite starting
-			message.includes('✅') ||          // Microsite completed
-			message.includes('❌') ||          // Microsite/Job failed
-			message.includes('📍') ||          // Progress indicator
-			message.includes('⏸️') ||          // Pause between microsites
-			message.includes('🆔') ||          // Job ID
-			message.includes('⏰') ||          // Timestamps
-			message.includes('⏱️') ||          // Duration
-			message.includes('📊') ||          // Summary stats
-			message.includes('👥') ||          // User counts
-			message.includes('🎲') ||          // Drop-off chance
-			message.includes('🌡️') ||          // Temperature
-			/^={10,}/.test(message) ||        // Separator lines
+			message.includes('█') || // Job start/end blocks
+			message.includes('🚀') || // Job started
+			message.includes('🏁') || // Job completed
+			message.includes('🏢') || // Microsite starting
+			message.includes('✅') || // Microsite completed
+			message.includes('❌') || // Microsite/Job failed
+			message.includes('📍') || // Progress indicator
+			message.includes('⏸️') || // Pause between microsites
+			message.includes('🆔') || // Job ID
+			message.includes('⏰') || // Timestamps
+			message.includes('⏱️') || // Duration
+			message.includes('📊') || // Summary stats
+			message.includes('👥') || // User counts
+			message.includes('🎲') || // Drop-off chance
+			message.includes('🌡️') || // Temperature
+			/^={10,}/.test(message) || // Separator lines
 			message.trim().startsWith('Progress:'); // Progress messages
 
 		if (isJobLevelLog) {
-			baseLogger(message, meepleId);
+			actualLogger(message, meepleId);
 		}
 	};
 }
@@ -82,10 +85,7 @@ const MICROSITES = [
 	{
 		name: 'iBank',
 		url: 'https://ak--47.github.io/fixpanel/financial/',
-		sequenceFiles: [
-			'financial-sequence-kyc.json',
-			'financial-sequence-product-demo.json'
-		]
+		sequenceFiles: ['financial-sequence-kyc.json', 'financial-sequence-product-demo.json']
 	},
 	{
 		name: 'theyBuy',
@@ -154,7 +154,7 @@ function randomDropOff() {
  * Run a single microsite simulation
  * @param {Object} microsite - Microsite configuration
  * @param {Object} overrideParams - Optional parameter overrides
- * @param {Function} logger - Optional logging function
+ * @param {(message: any, meepleId?: any, socket?: any) => void} logger - Optional logging function
  * @returns {Promise<Object>} Simulation results
  */
 async function runMicrositeSimulation(microsite, overrideParams = {}, logger = log) {
@@ -222,7 +222,6 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 			startTime,
 			endTime: Date.now()
 		};
-
 	} catch (error) {
 		const duration = (Date.now() - startTime) / 1000;
 
@@ -244,9 +243,11 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 /**
  * Run all microsites sequentially
  * @param {Object} options - Configuration options
- * @param {Function} logger - Optional logging function
+ * @param {(message: any, meepleId?: any, socket?: any) => void} logger - Optional logging function
  * @returns {Promise<Object>} Aggregated results from all microsites
  */
+export { createProductionLogger };
+
 export async function runMicrositesJob(options = {}, logger = log) {
 	const jobId = uid(6);
 	const jobStartTime = Date.now();
@@ -299,10 +300,7 @@ export async function runMicrositesJob(options = {}, logger = log) {
 
 			// Overall job timeout
 			new Promise((_, reject) =>
-				setTimeout(
-					() => reject(new Error('Overall job timeout (27 minutes exceeded)')),
-					MAX_JOB_DURATION_MS
-				)
+				setTimeout(() => reject(new Error('Overall job timeout (27 minutes exceeded)')), MAX_JOB_DURATION_MS)
 			)
 		]);
 	} catch (error) {
@@ -340,7 +338,7 @@ export async function runMicrositesJob(options = {}, logger = log) {
 			total: MICROSITES.length,
 			successful: successfulMicrosites,
 			failed: failedMicrosites,
-			successRate: (successfulMicrosites / MICROSITES.length * 100).toFixed(1) + '%'
+			successRate: ((successfulMicrosites / MICROSITES.length) * 100).toFixed(1) + '%'
 		}
 	};
 }

@@ -8,10 +8,10 @@ export function weightedRandom(items, weights) {
 	if (items.length !== weights.length) {
 		throw new Error('Items and weights arrays must have the same length');
 	}
-	
+
 	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
 	const random = Math.random() * totalWeight;
-	
+
 	let weightSum = 0;
 	for (let i = 0; i < items.length; i++) {
 		weightSum += weights[i];
@@ -19,7 +19,7 @@ export function weightedRandom(items, weights) {
 			return items[i];
 		}
 	}
-	
+
 	// Fallback to last item
 	return items[items.length - 1];
 }

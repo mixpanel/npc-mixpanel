@@ -1,4 +1,3 @@
-
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
@@ -13,16 +12,16 @@ import { randomBetween } from './utils.js';
 
 // Click fuzziness configuration for different interaction types
 export const CLICK_FUZZINESS = {
-	HOT_ZONE: 0.5,        // ±50% (increased from ±30%)
-	REGULAR_ELEMENT: 0.4,  // ±40% (increased from ±20%)
-	FORM_FIELD: 0.35,     // ±35% (increased from ±20%)
-	EXPLORATORY: 0.6      // ±60% for random exploratory clicks
+	HOT_ZONE: 0.5, // ±50% (increased from ±30%)
+	REGULAR_ELEMENT: 0.4, // ±40% (increased from ±20%)
+	FORM_FIELD: 0.35, // ±35% (increased from ±20%)
+	EXPLORATORY: 0.6 // ±60% for random exploratory clicks
 };
 
 /**
  * Utility function to ensure clicks stay within viewport bounds
  * @param {number} x - X coordinate
- * @param {number} y - Y coordinate 
+ * @param {number} y - Y coordinate
  * @param {Object} viewport - Viewport dimensions
  * @returns {Object} - Bounded coordinates
  */
@@ -48,7 +47,7 @@ export function coinFlip() {
 export async function wait() {
 	const waitType = Math.random();
 	let delay;
-	
+
 	if (waitType < 0.6) {
 		// Quick pause (60% of the time)
 		delay = Math.random() * 300 + 75; // 75-375ms (was 100-500ms)
@@ -59,7 +58,7 @@ export async function wait() {
 		// Longer pause (10% of the time)
 		delay = Math.random() * 1200 + 600; // 600ms-1.8s (was 1-3 seconds)
 	}
-	
+
 	await new Promise(resolve => setTimeout(resolve, delay));
 }
 
@@ -76,11 +75,11 @@ export function bezierPoint(p0, p1, p2, p3, t) {
 	const cX = 3 * (p1.x - p0.x);
 	const bX = 3 * (p2.x - p1.x) - cX;
 	const aX = p3.x - p0.x - cX - bX;
-	
+
 	const cY = 3 * (p1.y - p0.y);
 	const bY = 3 * (p2.y - p1.y) - cY;
 	const aY = p3.y - p0.y - cY - bY;
-	
+
 	return {
 		x: aX * Math.pow(t, 3) + bX * Math.pow(t, 2) + cX * t + p0.x,
 		y: aY * Math.pow(t, 3) + bY * Math.pow(t, 2) + cY * t + p0.y
@@ -100,64 +99,62 @@ export function bezierPoint(p0, p1, p2, p3, t) {
 export function generateHumanizedPath(startX, startY, endX, endY, targetWidth = 50, targetHeight = 50) {
 	const path = [];
 	const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-	
+
 	// More steps for smoother movement (30-80 based on distance)
 	const baseSteps = Math.max(30, Math.min(80, Math.floor(distance / 8)));
 	const adjustedSteps = baseSteps + Math.floor(Math.random() * 10); // Add randomness
-	
+
 	// Fitts' Law: Movement time increases with distance and decreases with target size
 	const targetSize = Math.min(targetWidth, targetHeight);
 	const difficultyIndex = Math.log2(distance / targetSize + 1);
-	const baseMoveTime = 30 + (difficultyIndex * 55); // 30-400ms base time (was 50-600ms)
+	const baseMoveTime = 30 + difficultyIndex * 55; // 30-400ms base time (was 50-600ms)
 	const totalMoveTime = baseMoveTime + (Math.random() - 0.5) * baseMoveTime * 0.25; // ±25% variation (was ±30%)
-	
+
 	// Create more dynamic control points for realistic arcs
 	const angle = Math.atan2(endY - startY, endX - startX);
 	const perpAngle = angle + Math.PI / 2;
-	
+
 	// Varying arc styles based on distance and randomness
 	const arcIntensity = Math.min(distance * 0.3, 120) * (0.3 + Math.random() * 0.7);
 	const arcDirection = Math.random() < 0.5 ? 1 : -1;
-	
+
 	// Control points that create more natural curves
 	const t1 = 0.2 + Math.random() * 0.3; // 20-50% along the path
 	const t2 = 0.5 + Math.random() * 0.3; // 50-80% along the path
-	
+
 	const control1X = startX + (endX - startX) * t1 + Math.cos(perpAngle) * arcIntensity * arcDirection * 0.7;
 	const control1Y = startY + (endY - startY) * t1 + Math.sin(perpAngle) * arcIntensity * arcDirection * 0.7;
 	const control2X = startX + (endX - startX) * t2 + Math.cos(perpAngle) * arcIntensity * arcDirection * 0.3;
 	const control2Y = startY + (endY - startY) * t2 + Math.sin(perpAngle) * arcIntensity * arcDirection * 0.3;
-	
+
 	const p0 = { x: startX, y: startY };
 	const p1 = { x: control1X, y: control1Y };
 	const p2 = { x: control2X, y: control2Y };
 	const p3 = { x: endX, y: endY };
-	
+
 	for (let i = 0; i <= adjustedSteps; i++) {
 		const progress = i / adjustedSteps;
-		
+
 		// Ease-in-out timing for acceleration/deceleration
-		const easeProgress = progress < 0.5 ? 
-			2 * progress * progress : 
-			1 - Math.pow(-2 * progress + 2, 2) / 2;
-		
+		const easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
 		const point = bezierPoint(p0, p1, p2, p3, easeProgress);
-		
+
 		// Progressive tremor (more at start, stabilizes toward end)
 		const tremorIntensity = Math.max(2, 8 * (1 - progress * 0.7)); // 8px -> 2px
 		const tremorX = (Math.random() - 0.5) * tremorIntensity * (0.5 + Math.random());
 		const tremorY = (Math.random() - 0.5) * tremorIntensity * (0.5 + Math.random());
-		
+
 		point.x += tremorX;
 		point.y += tremorY;
-		
+
 		// Micro-corrections (more frequent early in movement)
-		if (i > 0 && i < adjustedSteps - 5 && Math.random() < (0.15 * (1 - progress * 0.8))) {
+		if (i > 0 && i < adjustedSteps - 5 && Math.random() < 0.15 * (1 - progress * 0.8)) {
 			const correctionScale = Math.min(12, distance * 0.05) * (1 - progress * 0.6);
 			point.x += (Math.random() - 0.5) * correctionScale;
 			point.y += (Math.random() - 0.5) * correctionScale;
 		}
-		
+
 		// Add slight overshoot for final approach (last 10% of movement)
 		if (progress > 0.9 && progress < 1.0) {
 			const overshootFactor = (progress - 0.9) * 10; // 0 to 1
@@ -167,7 +164,7 @@ export function generateHumanizedPath(startX, startY, endX, endY, targetWidth = 
 			point.x += overshootX;
 			point.y += overshootY;
 		}
-		
+
 		// Calculate timing for this point (variable speed)
 		let pointTiming;
 		if (progress < 0.1) {
@@ -180,21 +177,21 @@ export function generateHumanizedPath(startX, startY, endX, endY, targetWidth = 
 			// Decelerate for precision
 			pointTiming = totalMoveTime * (0.7 + 0.3 * ((progress - 0.85) / 0.15));
 		}
-		
+
 		path.push({
 			x: point.x,
 			y: point.y,
 			timing: Math.max(1, pointTiming) // Ensure minimum 1ms timing
 		});
 	}
-	
+
 	// Ensure final point is exactly on target (with minor tremor)
 	if (path.length > 0) {
 		const finalTremor = 1 + Math.random();
 		path[path.length - 1].x = endX + (Math.random() - 0.5) * finalTremor;
 		path[path.length - 1].y = endY + (Math.random() - 0.5) * finalTremor;
 	}
-	
+
 	return path;
 }
 
@@ -213,19 +210,19 @@ export async function moveMouse(page, startX, startY, endX, endY, targetWidth = 
 	try {
 		const path = generateHumanizedPath(startX, startY, endX, endY, targetWidth, targetHeight);
 		let lastTiming = 0;
-		
+
 		for (let i = 0; i < path.length; i++) {
 			const point = path[i];
 			await page.mouse.move(Math.round(point.x), Math.round(point.y));
-			
+
 			// Use the calculated timing from the path
 			const timingDelta = point.timing - lastTiming;
 			const actualDelay = Math.max(1, Math.round(timingDelta));
-			
+
 			// Add minor random variations to timing (±15%)
 			const finalDelay = actualDelay + (Math.random() - 0.5) * actualDelay * 0.15;
 			await new Promise(resolve => setTimeout(resolve, Math.max(1, Math.round(finalDelay))));
-			
+
 			lastTiming = point.timing;
 		}
 		return true;
@@ -243,67 +240,79 @@ export async function moveMouse(page, startX, startY, endX, endY, targetWidth = 
 export async function exploratoryClick(page, log = console.log) {
 	try {
 		const viewport = await page.viewport();
-		
+
 		// Try to find content areas first
 		const contentElements = await page.$$(contentSelectors);
-		
+
 		let targetX, targetY;
-		
+
 		if (contentElements.length > 0 && Math.random() < 0.7) {
 			// Click in a content area (70% of the time)
 			const element = contentElements[Math.floor(Math.random() * contentElements.length)];
 			const box = await element.boundingBox();
-			
+
 			if (box && box.width > 0 && box.height > 0) {
 				const fuzziness = CLICK_FUZZINESS.REGULAR_ELEMENT;
 				const fuzzX = (Math.random() - 0.5) * 2 * fuzziness * box.width;
 				const fuzzY = (Math.random() - 0.5) * 2 * fuzziness * box.height;
-				
+
 				targetX = box.x + box.width / 2 + fuzzX;
 				targetY = box.y + box.height / 2 + fuzzY;
 			}
 		}
-		
+
 		// Fallback to random position in content area
 		if (!targetX || !targetY) {
 			const fuzziness = CLICK_FUZZINESS.EXPLORATORY;
 			const marginX = viewport.width * 0.1; // 10% margin
 			const marginY = viewport.height * 0.1;
-			
+
 			targetX = marginX + Math.random() * (viewport.width - 2 * marginX);
 			targetY = marginY + Math.random() * (viewport.height - 2 * marginY);
-			
+
 			// Add fuzziness
 			targetX += (Math.random() - 0.5) * 2 * fuzziness * 50;
 			targetY += (Math.random() - 0.5) * 2 * fuzziness * 50;
 		}
-		
+
 		// Ensure click stays in viewport
 		const boundedPos = boundClickPosition(targetX, targetY, viewport);
-		
+
 		// Get current mouse position for natural movement
 		const currentPos = await page.evaluate(() => {
 			return { x: window.mouseX || 0, y: window.mouseY || 0 };
 		});
-		
+
 		// Natural mouse movement to target (estimate element size for Fitts' law)
-		const estimatedWidth = (targetX && targetY) ? 100 : 50; // Larger for content elements
-		const estimatedHeight = (targetX && targetY) ? 30 : 30;
-		await moveMouse(page, currentPos.x || 100, currentPos.y || 100, boundedPos.x, boundedPos.y, estimatedWidth, estimatedHeight, log);
-		
+		const estimatedWidth = targetX && targetY ? 100 : 50; // Larger for content elements
+		const estimatedHeight = targetX && targetY ? 30 : 30;
+		await moveMouse(
+			page,
+			currentPos.x || 100,
+			currentPos.y || 100,
+			boundedPos.x,
+			boundedPos.y,
+			estimatedWidth,
+			estimatedHeight,
+			log
+		);
+
 		// Click with natural timing
 		await page.mouse.click(boundedPos.x, boundedPos.y, {
 			delay: Math.random() * 50 + 25 // 25-75ms click duration
 		});
-		
+
 		log(`🎯 Exploratory click at (${Math.round(boundedPos.x)}, ${Math.round(boundedPos.y)})`);
-		
+
 		// Update mouse position for tracking
-		await page.evaluate((x, y) => {
-			window.mouseX = x;
-			window.mouseY = y;
-		}, boundedPos.x, boundedPos.y);
-		
+		await page.evaluate(
+			(x, y) => {
+				window.mouseX = x;
+				window.mouseY = y;
+			},
+			boundedPos.x,
+			boundedPos.y
+		);
 	} catch (error) {
 		log(`⚠️ Exploratory click failed: ${error.message}`);
 	}
@@ -317,7 +326,7 @@ export async function exploratoryClick(page, log = console.log) {
 export async function rageClick(page, log = console.log) {
 	try {
 		const viewport = await page.viewport();
-		
+
 		// Try to find clickable elements that might be causing frustration
 		const frustratingSelectors = [
 			'button:not([disabled])',
@@ -329,98 +338,104 @@ export async function rageClick(page, log = console.log) {
 			'.button',
 			'[onclick]'
 		].join(', ');
-		
+
 		const clickableElements = await page.$$(frustratingSelectors);
-		let targetX, targetY, targetWidth = 80, targetHeight = 30;
-		
+		let targetX,
+			targetY,
+			targetWidth = 80,
+			targetHeight = 30;
+
 		if (clickableElements.length > 0 && Math.random() < 0.8) {
 			// 80% chance to rage click on an actual element
 			const element = clickableElements[Math.floor(Math.random() * clickableElements.length)];
 			const box = await element.boundingBox();
-			
+
 			if (box && box.width > 0 && box.height > 0) {
 				targetX = box.x + box.width / 2;
 				targetY = box.y + box.height / 2;
 				targetWidth = box.width;
 				targetHeight = box.height;
-				
+
 				// Add some frustration-based imprecision
 				const frustrationOffset = 8;
 				targetX += (Math.random() - 0.5) * frustrationOffset;
 				targetY += (Math.random() - 0.5) * frustrationOffset;
 			}
 		}
-		
+
 		// Fallback to center area if no element found
 		if (!targetX || !targetY) {
 			targetX = viewport.width / 2 + (Math.random() - 0.5) * 200;
 			targetY = viewport.height / 2 + (Math.random() - 0.5) * 200;
 		}
-		
+
 		// Ensure target stays in viewport
 		const boundedPos = boundClickPosition(targetX, targetY, viewport);
-		
+
 		// Get current mouse position
-		const currentPos = await page.evaluate((vp) => {
+		const currentPos = await page.evaluate(vp => {
 			return { x: window.mouseX || vp.width / 2, y: window.mouseY || vp.height / 2 };
 		}, viewport);
-		
+
 		// Frustrated/aggressive movement to target (faster, less smooth)
 		const frustratedPath = generateFrustratedMousePath(
-			currentPos.x || viewport.width / 2, 
-			currentPos.y || viewport.height / 2, 
-			boundedPos.x, 
+			currentPos.x || viewport.width / 2,
+			currentPos.y || viewport.height / 2,
+			boundedPos.x,
 			boundedPos.y,
 			targetWidth,
 			targetHeight
 		);
-		
+
 		// Execute frustrated movement
 		let lastTiming = 0;
 		for (let i = 0; i < frustratedPath.length; i++) {
 			const point = frustratedPath[i];
 			await page.mouse.move(Math.round(point.x), Math.round(point.y));
-			
+
 			const timingDelta = point.timing - lastTiming;
 			const actualDelay = Math.max(1, Math.round(timingDelta * 0.7)); // 30% faster than normal
 			await new Promise(resolve => setTimeout(resolve, actualDelay));
-			
+
 			lastTiming = point.timing;
 		}
-		
+
 		// Perform multiple rapid clicks (3-7 clicks)
 		const clickCount = 3 + Math.floor(Math.random() * 5); // 3-7 clicks
 		log(`😡 Rage clicking ${clickCount} times at (${Math.round(boundedPos.x)}, ${Math.round(boundedPos.y)})`);
-		
+
 		for (let i = 0; i < clickCount; i++) {
 			// Add slight position variation for each click (tremor from frustration)
 			const clickX = boundedPos.x + (Math.random() - 0.5) * 6;
 			const clickY = boundedPos.y + (Math.random() - 0.5) * 6;
-			
+
 			// Ensure clicks stay within reasonable bounds
 			const finalClickPos = boundClickPosition(clickX, clickY, viewport);
-			
+
 			await page.mouse.click(finalClickPos.x, finalClickPos.y, {
 				delay: Math.random() * 30 + 10 // 10-40ms click duration (shorter than normal)
 			});
-			
+
 			// Variable delay between rage clicks (25-100ms, was 50-200ms)
 			if (i < clickCount - 1) {
 				const interClickDelay = 25 + Math.random() * 75;
 				await new Promise(resolve => setTimeout(resolve, interClickDelay));
 			}
 		}
-		
+
 		// Update final mouse position
-		await page.evaluate((x, y) => {
-			window.mouseX = x;
-			window.mouseY = y;
-		}, boundedPos.x, boundedPos.y);
-		
+		await page.evaluate(
+			(x, y) => {
+				window.mouseX = x;
+				window.mouseY = y;
+			},
+			boundedPos.x,
+			boundedPos.y
+		);
+
 		// Brief pause after rage clicking (frustration/recovery time)
 		const recoveryTime = 150 + Math.random() * 300; // 0.15-0.45s (was 0.25-0.75s)
 		await new Promise(resolve => setTimeout(resolve, recoveryTime));
-		
 	} catch (error) {
 		log(`⚠️ Rage click failed: ${error.message}`);
 	}
@@ -439,63 +454,61 @@ export async function rageClick(page, log = console.log) {
 function generateFrustratedMousePath(startX, startY, endX, endY, targetWidth = 50, targetHeight = 50) {
 	const path = [];
 	const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-	
+
 	// Fewer steps for more aggressive movement (20-40 steps)
 	const adjustedSteps = Math.max(20, Math.min(40, Math.floor(distance / 15))) + Math.floor(Math.random() * 5);
-	
+
 	// Faster movement time (40-60% of normal)
 	const targetSize = Math.min(targetWidth, targetHeight);
 	const difficultyIndex = Math.log2(distance / targetSize + 1);
-	const baseMoveTime = (30 + (difficultyIndex * 40)) * (0.4 + Math.random() * 0.2); // Much faster
-	
+	const baseMoveTime = (30 + difficultyIndex * 40) * (0.4 + Math.random() * 0.2); // Much faster
+
 	// More direct path with less smooth curves (frustrated = less patience for smooth arcs)
 	const angle = Math.atan2(endY - startY, endX - startX);
 	const perpAngle = angle + Math.PI / 2;
 	const arcIntensity = Math.min(distance * 0.15, 60) * (0.2 + Math.random() * 0.4); // Less arc
 	const arcDirection = Math.random() < 0.5 ? 1 : -1;
-	
+
 	const control1X = startX + (endX - startX) * 0.3 + Math.cos(perpAngle) * arcIntensity * arcDirection * 0.5;
 	const control1Y = startY + (endY - startY) * 0.3 + Math.sin(perpAngle) * arcIntensity * arcDirection * 0.5;
 	const control2X = startX + (endX - startX) * 0.7 + Math.cos(perpAngle) * arcIntensity * arcDirection * 0.2;
 	const control2Y = startY + (endY - startY) * 0.7 + Math.sin(perpAngle) * arcIntensity * arcDirection * 0.2;
-	
+
 	const p0 = { x: startX, y: startY };
 	const p1 = { x: control1X, y: control1Y };
 	const p2 = { x: control2X, y: control2Y };
 	const p3 = { x: endX, y: endY };
-	
+
 	for (let i = 0; i <= adjustedSteps; i++) {
 		const progress = i / adjustedSteps;
-		
+
 		// More aggressive easing (less smooth)
-		const easeProgress = progress < 0.3 ? 
-			3 * progress * progress : 
-			1 - Math.pow(-3 * progress + 3, 2) / 9;
-		
+		const easeProgress = progress < 0.3 ? 3 * progress * progress : 1 - Math.pow(-3 * progress + 3, 2) / 9;
+
 		const point = bezierPoint(p0, p1, p2, p3, easeProgress);
-		
+
 		// Higher tremor from frustration/adrenaline
 		const tremorIntensity = 4 + Math.random() * 8; // 4-12px tremor
 		point.x += (Math.random() - 0.5) * tremorIntensity;
 		point.y += (Math.random() - 0.5) * tremorIntensity;
-		
+
 		// More frequent corrections (less precision when frustrated)
 		if (Math.random() < 0.2) {
 			const correctionScale = 8 + Math.random() * 10;
 			point.x += (Math.random() - 0.5) * correctionScale;
 			point.y += (Math.random() - 0.5) * correctionScale;
 		}
-		
+
 		// Calculate aggressive timing
 		const pointTiming = baseMoveTime * progress;
-		
+
 		path.push({
 			x: point.x,
 			y: point.y,
 			timing: Math.max(1, pointTiming)
 		});
 	}
-	
+
 	return path;
 }
 
@@ -508,7 +521,7 @@ function generateFrustratedMousePath(startX, startY, endX, endY, targetWidth = 5
 export async function trackMouseMovement(page, target, log = null) {
 	try {
 		// Track mouse movement via Mixpanel if available
-		await page.evaluate((targetData) => {
+		await page.evaluate(targetData => {
 			if (typeof window.mixpanel !== 'undefined' && window.mixpanel.track) {
 				window.mixpanel.track('Mouse Movement', {
 					target_element: targetData.tagName || 'unknown',
@@ -520,7 +533,7 @@ export async function trackMouseMovement(page, target, log = null) {
 				});
 			}
 		}, target);
-		
+
 		if (log) log(`🖱️ Mouse movement tracked`);
 	} catch (error) {
 		if (log) log(`⚠️ Mouse movement tracking error: ${error.message}`);
@@ -538,29 +551,29 @@ export async function trackMouseMovement(page, target, log = null) {
 export async function simulateReadingMovements(page, target, hoverDuration, persona, _log) {
 	// Determine reading behavior based on persona
 	let readingIntensity = 1.0; // Default intensity
-	
+
 	if (persona === 'researcher' || persona === 'powerUser') {
 		readingIntensity = 1.5; // More thorough reading
 	} else if (persona === 'quickBrowser' || persona === 'impulse') {
 		readingIntensity = 0.7; // Faster, less thorough
 	}
-	
+
 	const movements = Math.floor((hoverDuration / 1000) * readingIntensity * 3); // 3 movements per second base
-	
+
 	for (let i = 0; i < movements; i++) {
 		const progress = i / movements;
-		
+
 		// Simulate reading pattern - left to right, top to bottom
-		const readingX = target.x + (target.width * 0.1) + (target.width * 0.8 * (progress % 1));
-		const readingY = target.y + (target.height * 0.2) + (target.height * 0.6 * Math.floor(progress * 3) / 3);
-		
+		const readingX = target.x + target.width * 0.1 + target.width * 0.8 * (progress % 1);
+		const readingY = target.y + target.height * 0.2 + (target.height * 0.6 * Math.floor(progress * 3)) / 3;
+
 		// Add natural micro-movements
 		const jitterX = (Math.random() - 0.5) * 8;
 		const jitterY = (Math.random() - 0.5) * 4;
-		
+
 		const finalX = readingX + jitterX;
 		const finalY = readingY + jitterY;
-		
+
 		try {
 			await page.mouse.move(finalX, finalY);
 			await new Promise(resolve => setTimeout(resolve, hoverDuration / movements));
@@ -582,27 +595,32 @@ export async function trackHoverDwellEvent(page, target, hoverDuration, persona,
 	try {
 		// Simulate reading movements during hover
 		await simulateReadingMovements(page, target, hoverDuration, persona, log);
-		
+
 		// Track the dwell event
-		await page.evaluate((targetData, duration, personaType) => {
-			if (typeof window.mixpanel !== 'undefined' && window.mixpanel.track) {
-				window.mixpanel.track('Hover Dwell', {
-					target_element: targetData.tagName || 'unknown',
-					target_text: (targetData.innerText || '').substring(0, 200),
-					target_id: targetData.id || null,
-					target_class: targetData.className || null,
-					dwell_duration: duration,
-					persona: personaType,
-					x: targetData.x || 0,
-					y: targetData.y || 0,
-					width: targetData.width || 0,
-					height: targetData.height || 0,
-					viewport_width: window.innerWidth,
-					viewport_height: window.innerHeight
-				});
-			}
-		}, target, hoverDuration, persona);
-		
+		await page.evaluate(
+			(targetData, duration, personaType) => {
+				if (typeof window.mixpanel !== 'undefined' && window.mixpanel.track) {
+					window.mixpanel.track('Hover Dwell', {
+						target_element: targetData.tagName || 'unknown',
+						target_text: (targetData.innerText || '').substring(0, 200),
+						target_id: targetData.id || null,
+						target_class: targetData.className || null,
+						dwell_duration: duration,
+						persona: personaType,
+						x: targetData.x || 0,
+						y: targetData.y || 0,
+						width: targetData.width || 0,
+						height: targetData.height || 0,
+						viewport_width: window.innerWidth,
+						viewport_height: window.innerHeight
+					});
+				}
+			},
+			target,
+			hoverDuration,
+			persona
+		);
+
 		if (log) log(`👁️ Hover dwell tracked (${hoverDuration}ms, persona: ${persona})`);
 	} catch (error) {
 		if (log) log(`⚠️ Hover dwell tracking error: ${error.message}`);
@@ -632,7 +650,8 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			const targetY = selectedZone.y + (Math.random() - 0.5) * 2 * selectedZone.height * CLICK_FUZZINESS.HOT_ZONE;
 
 			// Slower, more realistic mouse movement to target
-			await moveMouse(page,
+			await moveMouse(
+				page,
 				Math.random() * page.viewport().width,
 				Math.random() * page.viewport().height,
 				targetX,
@@ -652,7 +671,9 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 				button: 'left'
 			});
 
-			log(`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`);
+			log(
+				`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`
+			);
 
 			// Pause after click to see results
 			await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100)); // 100-300ms (was 150-500ms)
@@ -660,76 +681,79 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		}
 
 		// Fallback: Get all potentially clickable elements with priority scoring
-		const targetInfo = await page.evaluate((selectors) => {
-			const elements = [];
+		const targetInfo = await page.evaluate(
+			selectors => {
+				const elements = [];
 
-			// Priority 1: Primary action buttons (highest priority)
-			const primaryButtons = document.querySelectorAll(selectors.primary);
-			primaryButtons.forEach(el => {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
-					elements.push({
-						priority: 10,
-						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
-						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-						text: el.textContent?.trim().substring(0, 50) || '',
-						tag: el.tagName.toLowerCase()
-					});
-				}
-			});
+				// Priority 1: Primary action buttons (highest priority)
+				const primaryButtons = document.querySelectorAll(selectors.primary);
+				primaryButtons.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+						elements.push({
+							priority: 10,
+							selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+							rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+							text: el.textContent?.trim().substring(0, 50) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
 
-			// Priority 2: Regular buttons and obvious clickables
-			const buttons = document.querySelectorAll(selectors.regular);
-			buttons.forEach(el => {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
-					elements.push({
-						priority: 7,
-						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
-						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-						text: el.textContent?.trim().substring(0, 50) || '',
-						tag: el.tagName.toLowerCase()
-					});
-				}
-			});
+				// Priority 2: Regular buttons and obvious clickables
+				const buttons = document.querySelectorAll(selectors.regular);
+				buttons.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+						elements.push({
+							priority: 7,
+							selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+							rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+							text: el.textContent?.trim().substring(0, 50) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
 
-			// Priority 3: Navigation and menu items
-			const navItems = document.querySelectorAll(selectors.navigation);
-			navItems.forEach(el => {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
-					elements.push({
-						priority: 5,
-						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
-						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-						text: el.textContent?.trim().substring(0, 50) || '',
-						tag: el.tagName.toLowerCase()
-					});
-				}
-			});
+				// Priority 3: Navigation and menu items
+				const navItems = document.querySelectorAll(selectors.navigation);
+				navItems.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+						elements.push({
+							priority: 5,
+							selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+							rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+							text: el.textContent?.trim().substring(0, 50) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
 
-			// Priority 4: Content headings and cards (lower priority)
-			const contentElements = document.querySelectorAll(selectors.content);
-			contentElements.forEach(el => {
-				const rect = el.getBoundingClientRect();
-				if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
-					elements.push({
-						priority: 2,
-						selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
-						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-						text: el.textContent?.trim().substring(0, 50) || '',
-						tag: el.tagName.toLowerCase()
-					});
-				}
-			});
+				// Priority 4: Content headings and cards (lower priority)
+				const contentElements = document.querySelectorAll(selectors.content);
+				contentElements.forEach(el => {
+					const rect = el.getBoundingClientRect();
+					if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight) {
+						elements.push({
+							priority: 2,
+							selector: `${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}`,
+							rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+							text: el.textContent?.trim().substring(0, 50) || '',
+							tag: el.tagName.toLowerCase()
+						});
+					}
+				});
 
-			return elements;
-		}, {
-			primary: primaryButtonSelectors,
-			regular: regularButtonSelectors,
-			navigation: navigationSelectors,
-			content: contentSelectors
-		});
+				return elements;
+			},
+			{
+				primary: primaryButtonSelectors,
+				regular: regularButtonSelectors,
+				navigation: navigationSelectors,
+				content: contentSelectors
+			}
+		);
 
 		if (targetInfo.length === 0) return false;
 
@@ -746,11 +770,14 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		const rect = selectedInfo.rect;
 
 		// More natural click positioning within the element
-		const targetX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * 2 * rect.width * CLICK_FUZZINESS.REGULAR_ELEMENT;
-		const targetY = rect.y + (rect.height * 0.5) + (Math.random() - 0.5) * 2 * rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT;
+		const targetX =
+			rect.x + rect.width * 0.5 + (Math.random() - 0.5) * 2 * rect.width * CLICK_FUZZINESS.REGULAR_ELEMENT;
+		const targetY =
+			rect.y + rect.height * 0.5 + (Math.random() - 0.5) * 2 * rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT;
 
 		// Natural mouse movement to target
-		await moveMouse(page,
+		await moveMouse(
+			page,
 			Math.random() * page.viewport().width,
 			Math.random() * page.viewport().height,
 			targetX,
@@ -770,7 +797,9 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			button: 'left'
 		});
 
-		log(`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`);
+		log(
+			`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`
+		);
 
 		// Click multiplier logic - 25% chance to perform additional rapid clicks
 		if (Math.random() < 0.25) {
@@ -781,13 +810,15 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 				await new Promise(resolve => setTimeout(resolve, Math.random() * 75 + 40)); // 40-115ms (was 50-150ms)
 
 				// Nearby click with smaller fuzziness (frustrated clicking behavior)
-				const nearbyX = rect.x + (rect.width * 0.5) + (Math.random() - 0.5) * rect.width * 0.3;
-				const nearbyY = rect.y + (rect.height * 0.5) + (Math.random() - 0.5) * rect.height * 0.3;
+				const nearbyX = rect.x + rect.width * 0.5 + (Math.random() - 0.5) * rect.width * 0.3;
+				const nearbyY = rect.y + rect.height * 0.5 + (Math.random() - 0.5) * rect.height * 0.3;
 
 				// Ensure click stays within viewport bounds
 				const bounded = boundClickPosition(nearbyX, nearbyY, page.viewport());
 				await page.mouse.click(bounded.x, bounded.y);
-				log(`    ├─ 👆 <span style="color: #DA6B16;">Rapid click ${i + 1}/${additionalClicks}</span> near target (frustrated/double-tap behavior)`);
+				log(
+					`    ├─ 👆 <span style="color: #DA6B16;">Rapid click ${i + 1}/${additionalClicks}</span> near target (frustrated/double-tap behavior)`
+				);
 			}
 		}
 
@@ -820,7 +851,8 @@ export async function intelligentScroll(page, hotZones = [], log = console.log) 
 
 			sections.forEach(section => {
 				const rect = section.getBoundingClientRect();
-				if (rect.height > 100) { // Only substantial content
+				if (rect.height > 100) {
+					// Only substantial content
 					targets.push({
 						top: section.offsetTop,
 						height: rect.height
@@ -855,35 +887,37 @@ export async function intelligentScroll(page, hotZones = [], log = console.log) 
 				// Scroll towards a high-priority hot zone
 				const sortedZones = targetZones.sort((a, b) => b.priority - a.priority);
 				const targetZone = sortedZones[Math.floor(Math.random() * Math.min(3, sortedZones.length))]; // Pick from top 3
-				targetScroll = targetZone.y - (scrollInfo.viewportHeight * 0.3); // Center zone in viewport
-				log(`    └─ 📜 <span style="color: #F8BC3B;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`);
+				targetScroll = targetZone.y - scrollInfo.viewportHeight * 0.3; // Center zone in viewport
+				log(
+					`    └─ 📜 <span style="color: #F8BC3B;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`
+				);
 			} else {
 				// All hot zones visible, do regular content scroll
 				if (scrollInfo.targets.length > 0) {
 					const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
-					targetScroll = target.top - (scrollInfo.viewportHeight * 0.1);
+					targetScroll = target.top - scrollInfo.viewportHeight * 0.1;
 				} else {
 					const scrollDirection = Math.random() < 0.8 ? 1 : -1;
 					const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7);
-					targetScroll = scrollInfo.currentScroll + (scrollDistance * scrollDirection);
+					targetScroll = scrollInfo.currentScroll + scrollDistance * scrollDirection;
 				}
 			}
 		} else if (scrollInfo.targets.length > 0 && Math.random() < 0.7) {
 			// 70% chance to scroll to content section
 			const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
-			targetScroll = target.top - (scrollInfo.viewportHeight * 0.1); // Leave some margin
+			targetScroll = target.top - scrollInfo.viewportHeight * 0.1; // Leave some margin
 		} else {
 			// Random scroll
 			const scrollDirection = Math.random() < 0.8 ? 1 : -1; // 80% down, 20% up
 			const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7); // 30-100% of viewport
-			targetScroll = scrollInfo.currentScroll + (scrollDistance * scrollDirection);
+			targetScroll = scrollInfo.currentScroll + scrollDistance * scrollDirection;
 		}
 
 		// Clamp to valid range
 		targetScroll = Math.max(0, Math.min(scrollInfo.maxScroll, targetScroll));
 
 		// Smooth scroll
-		await page.evaluate((target) => {
+		await page.evaluate(target => {
 			window.scrollTo({
 				top: target,
 				behavior: 'smooth'
@@ -893,7 +927,9 @@ export async function intelligentScroll(page, hotZones = [], log = console.log) 
 		// Wait for scroll to complete (more realistic timing)
 		await new Promise(resolve => setTimeout(resolve, Math.random() * 250 + 250)); // 250-500ms (was 400-750ms)
 
-		log(`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`);
+		log(
+			`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`
+		);
 		return true;
 	} catch (error) {
 		return false;
@@ -951,7 +987,8 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 		target.x = Math.max(50, Math.min(page.viewport().width - 50, target.x));
 		target.y = Math.max(50, Math.min(page.viewport().height - 50, target.y));
 
-		await moveMouse(page,
+		await moveMouse(
+			page,
 			Math.random() * page.viewport().width,
 			Math.random() * page.viewport().height,
 			target.x,
@@ -967,7 +1004,9 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 		// Track mouse movement for heatmap data
 		await trackMouseMovement(page, target, log);
 
-		log(`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span> - <span style="color: #4ECDC4;">heatmap tracked</span>`);
+		log(
+			`    └─ 🖱️ <span style="color: #80E1D9;">Mouse moved</span> to ${target.source} <span style="color: #888;">(reading/scanning behavior)</span> - <span style="color: #4ECDC4;">heatmap tracked</span>`
+		);
 		return true;
 	} catch (error) {
 		return false;
@@ -982,12 +1021,13 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 		let target;
 
 		// Return visit behavior - sometimes revisit previously hovered elements
-		if (hoverHistory.length > 0 && Math.random() < 0.25) { // 25% chance to return to previous element
+		if (hoverHistory.length > 0 && Math.random() < 0.25) {
+			// 25% chance to return to previous element
 			const recentElements = hoverHistory.slice(-5); // Consider last 5 hovered elements
 			const revisitTarget = recentElements[Math.floor(Math.random() * recentElements.length)];
 
 			// Check if the previous element is still valid and visible
-			const isValidForRevisit = await page.evaluate((prevTarget) => {
+			const isValidForRevisit = await page.evaluate(prevTarget => {
 				const element = document.querySelector(prevTarget.selector);
 				if (!element) return false;
 
@@ -1000,7 +1040,9 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 					...revisitTarget,
 					isRevisit: true
 				};
-				log(`    └─ 🔄 <span style="color: #7856FF;">Revisiting element</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(return visit)</span> - <span style="color: #4ECDC4;">realistic heatmap pattern</span>`);
+				log(
+					`    └─ 🔄 <span style="color: #7856FF;">Revisiting element</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(return visit)</span> - <span style="color: #4ECDC4;">realistic heatmap pattern</span>`
+				);
 			}
 		}
 
@@ -1021,13 +1063,15 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 				});
 
 				target = weightedZones[Math.floor(Math.random() * weightedZones.length)];
-				log(`    └─ 🎯 <span style="color: #F8BC3B;">Hovering hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`);
+				log(
+					`    └─ 🎯 <span style="color: #F8BC3B;">Hovering hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(priority: ${target.priority})</span>`
+				);
 			}
 		}
 
 		// Fallback: find regular hover targets
 		if (!target) {
-			const hoverTargets = await page.evaluate((selectors) => {
+			const hoverTargets = await page.evaluate(selectors => {
 				const elements = document.querySelectorAll(selectors.join(', '));
 				const targets = [];
 
@@ -1053,7 +1097,8 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 		}
 
 		// Move to element
-		await moveMouse(page,
+		await moveMouse(
+			page,
 			Math.random() * page.viewport().width,
 			Math.random() * page.viewport().height,
 			target.x + (Math.random() - 0.5) * 20,
@@ -1068,11 +1113,12 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 
 		// Enhanced logging for heatmap data generation
 		const durationSeconds = (hoverDuration / 1000).toFixed(1);
-		const dwellCategory = hoverDuration < 2000 ? 'quick' :
-			hoverDuration < 5000 ? 'medium' :
-				hoverDuration < 10000 ? 'long' : 'very_long';
+		const dwellCategory =
+			hoverDuration < 2000 ? 'quick' : hoverDuration < 5000 ? 'medium' : hoverDuration < 10000 ? 'long' : 'very_long';
 
-		log(`    ├─ 🔥 <span style="color: #FF6B6B;">Dwelling for ${durationSeconds}s</span> (${dwellCategory} dwell) - <span style="color: #4ECDC4;">generating heatmap data</span>`);
+		log(
+			`    ├─ 🔥 <span style="color: #FF6B6B;">Dwelling for ${durationSeconds}s</span> (${dwellCategory} dwell) - <span style="color: #4ECDC4;">generating heatmap data</span>`
+		);
 
 		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
 		await simulateReadingMovements(page, target, hoverDuration, persona, log);
@@ -1081,9 +1127,13 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 		await trackHoverDwellEvent(page, target, hoverDuration, persona, log);
 
 		if (!target.priority) {
-			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`);
+			log(
+				`    └─ 🎯 <span style="color: #FEDE9B;">Hovered</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms)</span>`
+			);
 		} else {
-			log(`    └─ 🎯 <span style="color: #FEDE9B;">Hovered hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms, priority: ${target.priority})</span>`);
+			log(
+				`    └─ 🎯 <span style="color: #FEDE9B;">Hovered hot zone</span> ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(${hoverDuration}ms, priority: ${target.priority})</span>`
+			);
 		}
 
 		// Add to hover history if not a revisit (to prevent infinite loops)
@@ -1108,7 +1158,9 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 				hoverHistory.shift();
 			}
 
-			log(`      └─ 📊 <span style="color: #4ECDC4;">Heatmap data captured:</span> dwell event + movement tracking + history (${hoverHistory.length}/10 entries)`);
+			log(
+				`      └─ 📊 <span style="color: #4ECDC4;">Heatmap data captured:</span> dwell event + movement tracking + history (${hoverHistory.length}/10 entries)`
+			);
 		}
 
 		return true;
@@ -1201,10 +1253,9 @@ function calculateHoverDuration(target, persona) {
 	return Math.max(250, Math.round(finalDuration)); // Minimum 250ms hover (was 400ms)
 }
 
-
 /**
  * Perform random mouse movement
- * @param {Page} page - Puppeteer page object  
+ * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
  * @returns {Promise<boolean>} - Success status
  */
@@ -1215,7 +1266,7 @@ export async function randomMouse(page, log = console.log) {
 		const startY = Math.random() * viewport.height;
 		const endX = Math.random() * viewport.width;
 		const endY = Math.random() * viewport.height;
-		
+
 		await moveMouse(page, startX, startY, endX, endY, 50, 50, log);
 		return true;
 	} catch (error) {
@@ -1227,13 +1278,13 @@ export async function randomMouse(page, log = console.log) {
 /**
  * Perform random scrolling on the page
  * @param {Page} page - Puppeteer page object
- * @param {Function} log - Logging function  
+ * @param {Function} log - Logging function
  * @returns {Promise<boolean>} - Success status
  */
 export async function randomScroll(page, log = console.log) {
 	try {
 		const scrollDistance = randomBetween(-500, 500);
-		await page.evaluate((distance) => {
+		await page.evaluate(distance => {
 			window.scrollBy(0, distance);
 		}, scrollDistance);
 		log(`📜 Random scroll: ${scrollDistance}px`);

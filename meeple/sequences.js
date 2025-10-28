@@ -21,7 +21,9 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 	const { description, temperature = 5, 'chaos-range': chaosRange = [1, 1], actions = [] } = sequenceSpec;
 
 	log(`🎯 <span style="color: #7856FF;">Sequence:</span> ${description}`);
-	log(`🌡️ <span style="color: #F39C12;">Temperature:</span> ${temperature}/10, Chaos: [${chaosRange[0]}-${chaosRange[1]}]`);
+	log(
+		`🌡️ <span style="color: #F39C12;">Temperature:</span> ${temperature}/10, Chaos: [${chaosRange[0]}-${chaosRange[1]}]`
+	);
 
 	// Calculate effective temperature with chaos multiplier
 	const chaosMultiplier = randomBetween(chaosRange[0], chaosRange[1]) / 10;
@@ -39,7 +41,9 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 			const followSequence = Math.random() * 10 < effectiveTemperature;
 
 			if (followSequence) {
-				log(`📋 <span style="color: #3498DB;">Action ${index + 1}/${actions.length}:</span> ${action.action} ${action.selector || ''}`);
+				log(
+					`📋 <span style="color: #3498DB;">Action ${index + 1}/${actions.length}:</span> ${action.action} ${action.selector || ''}`
+				);
 
 				const result = await executeSequenceAction(page, action, hotZones, log);
 				actionResults.push(result);
@@ -65,7 +69,6 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 
 			// Add realistic delays and non-state-changing actions between sequence actions
 			await addHumanBehavior(page, hotZones, persona, log);
-
 		} catch (error) {
 			log(`🚨 <span style="color: #E74C3C;">Sequence action error:</span> ${error.message}`);
 			actionResults.push({
@@ -171,7 +174,6 @@ async function executeSequenceAction(page, action, hotZones, log) {
 			duration,
 			timestamp: startTime
 		};
-
 	} catch (error) {
 		const duration = Date.now() - startTime;
 		return {
@@ -211,8 +213,7 @@ async function waitForElement(page, selector, log) {
 			const isVisible = await page.evaluate(el => {
 				const rect = el.getBoundingClientRect();
 				const style = window.getComputedStyle(el);
-				return rect.width > 0 && rect.height > 0 &&
-					style.visibility !== 'hidden' && style.display !== 'none';
+				return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
 			}, element);
 
 			if (isVisible) {
@@ -259,7 +260,6 @@ async function executeClick(page, element, selector, log) {
 
 		log(`🖱️ <span style="color: #2ECC71;">Clicked:</span> ${selector}`);
 		return { success: true };
-
 	} catch (error) {
 		log(`❌ <span style="color: #E74C3C;">Click failed:</span> ${selector} - ${error.message}`);
 		return { success: false, error: error.message };
@@ -291,7 +291,6 @@ async function executeType(page, element, selector, text, log) {
 
 		log(`⌨️ <span style="color: #3498DB;">Typed:</span> "${text}" into ${selector}`);
 		return { success: true };
-
 	} catch (error) {
 		log(`❌ <span style="color: #E74C3C;">Type failed:</span> ${selector} - ${error.message}`);
 		return { success: false, error: error.message };
@@ -319,7 +318,6 @@ async function executeSelect(page, element, selector, value, log) {
 
 		log(`🔽 <span style="color: #9B59B6;">Selected:</span> "${value}" in ${selector}`);
 		return { success: true };
-
 	} catch (error) {
 		log(`❌ <span style="color: #E74C3C;">Select failed:</span> ${selector} - ${error.message}`);
 		return { success: false, error: error.message };
@@ -374,7 +372,9 @@ async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
 				let success = false;
 
 				if (elementInfo.role === 'radiogroup') {
-					log(`🔘 <span style="color: #9B59B6;">Radio group ${index + 1}:</span> ${elementInfo.radioCount} options, clicking ${clicksPerGroup} times`);
+					log(
+						`🔘 <span style="color: #9B59B6;">Radio group ${index + 1}:</span> ${elementInfo.radioCount} options, clicking ${clicksPerGroup} times`
+					);
 					success = await fillRadioGroup(page, element, clicksPerGroup, log);
 				} else if (elementInfo.type === 'checkbox' || elementInfo.role === 'checkbox') {
 					success = await toggleCheckbox(page, element, log);
@@ -390,7 +390,6 @@ async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
 				if (success) {
 					successCount++;
 				}
-
 			} catch (elementError) {
 				log(`⚠️ <span style="color: #F39C12;">Error with element ${index + 1}:</span> ${elementError.message}`);
 			}
@@ -398,7 +397,6 @@ async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
 
 		log(`✅ <span style="color: #27AE60;">Form filled:</span> ${successCount}/${elements.length} elements processed`);
 		return { success: successCount > 0, elementsProcessed: successCount, totalElements: elements.length };
-
 	} catch (error) {
 		log(`❌ <span style="color: #E74C3C;">Fill form failed:</span> ${error.message}`);
 		return { success: false, error: error.message, elementsProcessed: 0 };
@@ -497,8 +495,12 @@ export function validateSequence(sequenceSpec) {
 
 	// Validate chaos-range
 	if (chaosRange !== undefined) {
-		if (!Array.isArray(chaosRange) || chaosRange.length !== 2 ||
-			typeof chaosRange[0] !== 'number' || typeof chaosRange[1] !== 'number') {
+		if (
+			!Array.isArray(chaosRange) ||
+			chaosRange.length !== 2 ||
+			typeof chaosRange[0] !== 'number' ||
+			typeof chaosRange[1] !== 'number'
+		) {
 			errors.push('Chaos-range must be an array of two numbers');
 		} else if (chaosRange[0] > chaosRange[1]) {
 			errors.push('Chaos-range first value must be less than or equal to second value');

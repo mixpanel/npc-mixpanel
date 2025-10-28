@@ -11,16 +11,12 @@ import { logger } from './utils/cloudLogger.js';
 import cookieParser from 'cookie-parser';
 import * as Mixpanel from 'mixpanel';
 import { Diagnostics } from 'ak-diagnostic';
-import { runMicrositesJob } from './microsites.js';
-
+import { runMicrositesJob, createProductionLogger } from './microsites.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const {
-	NODE_ENV = 'production',
-	MIXPANEL_TRACKING_TOKEN = '6c3bc01ddc1f16d01e4fda11d3a4d166'
-} = process.env;
+const { NODE_ENV = 'production', MIXPANEL_TRACKING_TOKEN = '6c3bc01ddc1f16d01e4fda11d3a4d166' } = process.env;
 let io = null;
 
 const app = express();
@@ -64,30 +60,38 @@ io = new Server(httpServer, {
 	}
 });
 
-io.on('connection', (socket) => {
+io.on('connection', socket => {
 	// Extract user from socket auth (passed from client)
 	const user = socket.handshake.auth?.user || 'anonymous';
 	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
 	const startTime = Date.now();
 
-	socket.on('start_job', async (data) => {
+	socket.on('start_job', async data => {
 		const diagnostics = new Diagnostics({
-			name: 'npc-mixpanel-server',
+			name: 'npc-mixpanel-server'
 		});
 		let coercedData;
 		try {
 			const jobId = uid(4);
 			coercedData = coerceTypes(data);
 
-
 			// Send initial status to general tab (no meepleId)
 			socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
-			socket.emit('job_update', { message: `📋 Configuration: ${coercedData.users} meeples, concurrency: ${Math.min(coercedData.users, coercedData.concurrency || 10)}, headless: ${coercedData.headless}`, meepleId: null });
+			socket.emit('job_update', {
+				message: `📋 Configuration: ${coercedData.users} meeples, concurrency: ${Math.min(coercedData.users, coercedData.concurrency || 10)}, headless: ${coercedData.headless}`,
+				meepleId: null
+			});
 			socket.emit('job_update', { message: `🎯 Target: ${coercedData.url}`, meepleId: null });
-			socket.emit('job_update', { message: `💉 Mixpanel injection: ${coercedData.inject ? 'enabled' : 'disabled'}`, meepleId: null });
+			socket.emit('job_update', {
+				message: `💉 Mixpanel injection: ${coercedData.inject ? 'enabled' : 'disabled'}`,
+				meepleId: null
+			});
 			socket.emit('job_update', { message: `⏰ Job started at ${new Date().toLocaleTimeString()}`, meepleId: null });
 			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
-			socket.emit('job_update', { message: `👀 Watch individual meeple progress in their dedicated tabs`, meepleId: null });
+			socket.emit('job_update', {
+				message: `👀 Watch individual meeple progress in their dedicated tabs`,
+				meepleId: null
+			});
 			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
 
 			// Server-side analytics: Track job start
@@ -116,7 +120,11 @@ io.on('connection', (socket) => {
 				log(message, meepleId, socket);
 
 				// Track meeple completions for general tab progress updates (only on first completion message per meeple)
-				if (meepleId && !completedMeeples.has(meepleId) && (message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))) {
+				if (
+					meepleId &&
+					!completedMeeples.has(meepleId) &&
+					(message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))
+				) {
 					completedMeeples.add(meepleId);
 					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
 					const progress = ((completedMeeples.size / totalMeeples) * 100).toFixed(1);
@@ -138,10 +146,10 @@ io.on('connection', (socket) => {
 					if (match) {
 						const spawnNumber = parseInt(match[1]);
 						const totalFromMessage = parseInt(match[2]);
-						
+
 						// Use the total from the message to ensure consistency
 						const actualTotal = totalFromMessage || totalMeeples;
-						
+
 						// Validate spawn number is within expected range
 						if (spawnNumber <= actualTotal) {
 							socket.emit('job_update', {
@@ -183,7 +191,6 @@ io.on('connection', (socket) => {
 				report
 			});
 
-
 			// Mixpanel server-side tracking
 			mp.track('server: job finish', {
 				distinct_id: userId,
@@ -203,7 +210,6 @@ io.on('connection', (socket) => {
 			socket.emit('job_update', { message: `📊 Check the detailed summary below for results`, meepleId: null });
 			socket.emit('job_update', { message: `✅ Job completed: ${jobId}`, meepleId: null });
 			socket.emit('job_complete', result);
-
 		} catch (error) {
 			// Server-side analytics: Track job error
 			logger.error(`/SIMULATE ERROR`, {
@@ -236,7 +242,6 @@ io.on('connection', (socket) => {
 	});
 });
 
-
 // Serve static files (UI)
 app.use(express.static('ui'));
 app.use(cookieParser());
@@ -262,8 +267,6 @@ app.use((req, res, next) => {
 	next();
 });
 
-
-
 // API routes
 app.get('/ping', (req, res) => {
 	res.json({
@@ -278,7 +281,6 @@ app.get('/ping', (req, res) => {
 app.get('/', (_req, res) => {
 	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
 });
-
 
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
@@ -350,7 +352,6 @@ app.post('/simulate', async (req, res) => {
 		});
 
 		res.status(200).json(result);
-
 	} catch (error) {
 		// Server-side analytics: Track API job error
 		logger.error(`ERROR: ${req.path}`, {
@@ -407,10 +408,8 @@ app.post('/microsites', async (req, res) => {
 		});
 
 		// Run the microsites job (no WebSocket, returns aggregated results)
-		const result = await runMicrositesJob(mergedParams, (message) => {
-			// Log to console for CRON job output
-			console.log(message);
-		});
+		// Use production logger to filter verbose meeple logs in GCP
+		const result = await runMicrositesJob(mergedParams, createProductionLogger());
 
 		const endTime = Date.now();
 		const duration = (endTime - startTime) / 1000;
@@ -434,7 +433,6 @@ app.post('/microsites', async (req, res) => {
 		});
 
 		res.status(200).json(result);
-
 	} catch (error) {
 		// Server-side analytics: Track microsites job error
 		logger.error(`ERROR: ${req.path}`, {
@@ -490,10 +488,8 @@ app.get('/microsites', async (req, res) => {
 		});
 
 		// Run the microsites job (no WebSocket, returns aggregated results)
-		const result = await runMicrositesJob(mergedParams, (message) => {
-			// Log to console for CRON job output
-			console.log(message);
-		});
+		// Use production logger to filter verbose meeple logs in GCP
+		const result = await runMicrositesJob(mergedParams, createProductionLogger());
 
 		const endTime = Date.now();
 		const duration = (endTime - startTime) / 1000;
@@ -517,7 +513,6 @@ app.get('/microsites', async (req, res) => {
 		});
 
 		res.status(200).json(result);
-
 	} catch (error) {
 		// Server-side analytics: Track microsites job error
 		logger.error(`ERROR: ${req.path}`, {

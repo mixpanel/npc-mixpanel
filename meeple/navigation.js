@@ -16,7 +16,8 @@
 export async function navigateBack(page, log = console.log) {
 	try {
 		const canGoBack = await page.evaluate(() => window.history.length > 1);
-		if (canGoBack && Math.random() < 0.7) { // 70% chance to actually go back if possible
+		if (canGoBack && Math.random() < 0.7) {
+			// 70% chance to actually go back if possible
 			await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
 			log(`    └─ ⬅️ <span style="color: #80E1D9;">Navigated back</span> in browser history`);
 			return true;
@@ -37,7 +38,8 @@ export async function navigateBack(page, log = console.log) {
 export async function navigateForward(page, log = console.log) {
 	try {
 		const canGoForward = await page.evaluate(() => window.history.length > 1);
-		if (canGoForward && Math.random() < 0.7) { // 70% chance to actually go forward if possible
+		if (canGoForward && Math.random() < 0.7) {
+			// 70% chance to actually go forward if possible
 			await page.goForward({ waitUntil: 'domcontentloaded', timeout: 5000 });
 			log(`    └─ ➡️ <span style="color: #80E1D9;">Navigated forward</span> in browser history`);
 			return true;

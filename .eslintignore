@@ -5,6 +5,7 @@ dist/
 build/
 coverage/
 *.min.js
+*.d.ts
 .env
 .env.*
 *.log

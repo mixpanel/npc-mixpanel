@@ -1,4 +1,3 @@
-
 // @ts-nocheck - This file heavily manipulates browser DOM elements with runtime types --- IGNORE ---
 import dotenv from 'dotenv';
 dotenv.config();
@@ -10,16 +9,25 @@ import u from 'ak-tools';
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
 // Import from new modular structure
-import { ensurePageSetup, } from './security.js';
+import { ensurePageSetup } from './security.js';
 import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
-import { wait, exploratoryClick, rageClick, clickStuff, intelligentScroll, naturalMouseMovement, hoverOverElements, randomMouse, randomScroll } from './interactions.js';
+import {
+	wait,
+	exploratoryClick,
+	rageClick,
+	clickStuff,
+	intelligentScroll,
+	naturalMouseMovement,
+	hoverOverElements,
+	randomMouse,
+	randomScroll
+} from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
 import { executeSequence } from './sequences.js';
 import { randomBetween, sleep } from './utils.js';
-
 
 const { NODE_ENV = '' } = process.env;
 let { MIXPANEL_TOKEN = '' } = process.env;
@@ -33,7 +41,7 @@ if (!NODE_ENV) throw new Error('NODE_ENV is required');
  */
 export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
-	const log = logFunction || ((message) => console.log(message));
+	const log = logFunction || (message => console.log(message));
 	let {
 		url = 'https://ak--47.github.io/fixpanel/',
 		users = 10,
@@ -58,10 +66,14 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	let sequenceNames = [];
 	if (sequences && typeof sequences === 'object') {
 		sequenceNames = Object.keys(sequences);
-		log(`🎯 <span style="color: #7856FF;">Deterministic sequences detected:</span> ${sequenceNames.length} sequence(s) available`);
+		log(
+			`🎯 <span style="color: #7856FF;">Deterministic sequences detected:</span> ${sequenceNames.length} sequence(s) available`
+		);
 		sequenceNames.forEach(name => {
 			const seq = sequences[name];
-			log(`  ├─ "${name}": ${seq.description || 'No description'} (temp: ${seq.temperature || 5}, ${seq.actions?.length || 0} actions)`);
+			log(
+				`  ├─ "${name}": ${seq.description || 'No description'} (temp: ${seq.temperature || 5}, ${seq.actions?.length || 0} actions)`
+			);
 		});
 	}
 
@@ -77,35 +89,64 @@ export default async function main(PARAMS = {}, logFunction = null) {
 				// Distribute sequences evenly among users, with cycling if more users than sequences
 				selectedSequenceName = sequenceNames[i % sequenceNames.length];
 				selectedSequence = sequences[selectedSequenceName];
-				log(`🎯 <span style="color: #9B59B6;">${usersHandle} assigned sequence:</span> "${selectedSequenceName}"`, usersHandle);
+				log(
+					`🎯 <span style="color: #9B59B6;">${usersHandle} assigned sequence:</span> "${selectedSequenceName}"`,
+					usersHandle
+				);
 			}
 
-			log(`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`, usersHandle);
+			log(
+				`🚀 <span style="color: #7856FF; font-weight: bold;">Spawning ${usersHandle}</span> (${i + 1}/${users}) on <span style="color: #80E1D9;">${url}</span>...`,
+				usersHandle
+			);
 
 			// Return the promise directly from simulateUser, handling success/error cases
-			return simulateUser(url, headless, inject, past, maxActions, usersHandle, {
-				masking,
-				sequence: selectedSequence,
-				sequenceName: selectedSequenceName
-			}, log).then(result => {
-				if (result && !result.error && !result.timedOut) {
-					log(`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`, usersHandle);
-					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-				} else if (result && result.timedOut) {
-					log(`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`, usersHandle);
-					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-				} else {
-					log(`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`, usersHandle);
-					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-				}
+			return simulateUser(
+				url,
+				headless,
+				inject,
+				past,
+				maxActions,
+				usersHandle,
+				{
+					masking,
+					sequence: selectedSequence,
+					sequenceName: selectedSequenceName
+				},
+				log
+			)
+				.then(result => {
+					if (result && !result.error && !result.timedOut) {
+						log(
+							`✅ <span style="color: #07B096;">${usersHandle} completed!</span> Session data captured.`,
+							usersHandle
+						);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+					} else if (result && result.timedOut) {
+						log(
+							`⏰ <span style="color: #F8BC3B;">${usersHandle} timed out</span> - but simulation continues`,
+							usersHandle
+						);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+					} else {
+						log(
+							`⚠️ <span style="color: #F8BC3B;">${usersHandle} completed with issues</span> - but simulation continues`,
+							usersHandle
+						);
+						log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+					}
 
-				return result || { error: 'Unknown error', user: i + 1 };
-			}).catch(e => {
-				const errorMsg = e.message || 'Unknown error';
-				log(`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`, usersHandle);
-				log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
-				return { error: errorMsg, user: i + 1, crashed: true };
-			});
+					return result || { error: 'Unknown error', user: i + 1 };
+				})
+				.catch(e => {
+					const errorMsg = e.message || 'Unknown error';
+					log(
+						`❌ <span style="color: #CC332B;">${usersHandle} failed:</span> ${errorMsg} - <span style="color: #888;">continuing with other users</span>`,
+						usersHandle
+					);
+					log(`🔚 ${usersHandle} simulation complete.`, usersHandle); // Final completion message for tab closure
+					return { error: errorMsg, user: i + 1, crashed: true };
+				});
 		});
 	});
 
@@ -114,7 +155,9 @@ export default async function main(PARAMS = {}, logFunction = null) {
 
 	// Process results and provide summary
 	// @ts-ignore
-	const successful = results.filter(r => r.status === 'fulfilled' && r.value && !r.value.error && !r.value.crashed).length;
+	const successful = results.filter(
+		r => r.status === 'fulfilled' && r.value && !r.value.error && !r.value.crashed
+	).length;
 	// @ts-ignore
 	const timedOut = results.filter(r => r.status === 'fulfilled' && r.value && r.value.timedOut).length;
 	// @ts-ignore
@@ -122,33 +165,40 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	const failed = results.filter(r => r.status === 'rejected').length;
 
 	// Enhanced simulation summary for general tab
-	log(`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`);
+	log(
+		`📊 <span style="color: #7856FF;">Simulation Summary:</span> ${successful}/${users} successful, ${timedOut} timed out, ${crashed} crashed, ${failed} rejected`
+	);
 
 	// Calculate total actions performed
 	let totalActions = 0;
 	let totalSuccessfulActions = 0;
 
 	// Return the actual results, filtering out any undefined values
-	const finalResults = results.map(r => {
-		if (r.status === 'fulfilled') {
-			const result = r.value;
-			if (result && result.actions) {
-				totalActions += result.actions.length;
-				totalSuccessfulActions += result.actions.filter(action => action.success !== false).length;
+	const finalResults = results
+		.map(r => {
+			if (r.status === 'fulfilled') {
+				const result = r.value;
+				if (result && result.actions) {
+					totalActions += result.actions.length;
+					totalSuccessfulActions += result.actions.filter(action => action.success !== false).length;
+				}
+				return result;
+			} else {
+				log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
+				return { error: r.reason?.message || 'Promise rejected', crashed: true };
 			}
-			return result;
-		} else {
-			log(`⚠️ <span style="color: #CC332B;">Promise rejected:</span> ${r.reason?.message || 'Unknown error'}`);
-			return { error: r.reason?.message || 'Promise rejected', crashed: true };
-		}
-	}).filter(Boolean);
+		})
+		.filter(Boolean);
 
 	// Send detailed summary to general tab (null meepleId)
 	log(``, null); // Empty line
 	log(`🎯 <span style="color: #07B096;">Mission Accomplished!</span>`, null);
 	log(`📈 Total Actions Performed: ${totalActions}`, null);
 	log(`✅ Successful Actions: ${totalSuccessfulActions}`, null);
-	log(`📊 Action Success Rate: ${totalActions > 0 ? ((totalSuccessfulActions / totalActions) * 100).toFixed(1) : 0}%`, null);
+	log(
+		`📊 Action Success Rate: ${totalActions > 0 ? ((totalSuccessfulActions / totalActions) * 100).toFixed(1) : 0}%`,
+		null
+	);
 	log(`🤖 Meeple Performance:`, null);
 	log(`  ├─ ✅ Completed successfully: ${successful}`, null);
 	if (timedOut > 0) log(`  ├─ ⏰ Timed out: ${timedOut}`, null);
@@ -172,22 +222,31 @@ export default async function main(PARAMS = {}, logFunction = null) {
  * @param {import('../index.js').LogFunction} [logFunction=console.log] - Logging function
  * @returns {Promise<import('../index.js').SimulationResult>} Simulation result
  */
-export async function simulateUser(url, headless = true, inject = true, _past = false, maxActions = null, usersHandle = null, opts = {}, logFunction = console.log) {
+export async function simulateUser(
+	url,
+	headless = true,
+	inject = true,
+	_past = false,
+	maxActions = null,
+	usersHandle = null,
+	opts = {},
+	logFunction = console.log
+) {
 	// Create user-specific logger that automatically includes the usersHandle
-	const log = usersHandle ? (message) => logFunction(message, usersHandle) : logFunction;
+	const log = usersHandle ? message => logFunction(message, usersHandle) : logFunction;
 
 	// Generate a unique location for this meeple
 	function generateLocation() {
 		const cities = [
-			[40.7128, -74.0060], // New York
-			[51.5074, -0.1278],  // London
+			[40.7128, -74.006], // New York
+			[51.5074, -0.1278], // London
 			[35.6762, 139.6503], // Tokyo
-			[48.8566, 2.3522],   // Paris
+			[48.8566, 2.3522], // Paris
 			[34.0522, -118.2437], // Los Angeles
 			[-33.8688, 151.2093], // Sydney
-			[55.7558, 37.6173],  // Moscow
+			[55.7558, 37.6173], // Moscow
 			[39.9042, 116.4074], // Beijing
-			[19.0760, 72.8777],  // Mumbai
+			[19.076, 72.8777], // Mumbai
 			[-23.5505, -46.6333] // São Paulo
 		];
 
@@ -209,8 +268,8 @@ export async function simulateUser(url, headless = true, inject = true, _past = 
 	// Add location to opts for this meeple
 	const meepleOpts = { ...opts, location: meepleLocation };
 
-	const totalTimeout = 10 * 60 * 1000;  // max 10 min / user
-	const timeoutPromise = new Promise((resolve) =>
+	const totalTimeout = 10 * 60 * 1000; // max 10 min / user
+	const timeoutPromise = new Promise(resolve =>
 		setTimeout(() => {
 			resolve({ timedOut: true, error: 'Session timeout' });
 		}, totalTimeout)
@@ -224,7 +283,6 @@ export async function simulateUser(url, headless = true, inject = true, _past = 
 			browser = await launchBrowser(headless, log);
 			const page = await createPage(browser, log);
 			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN;
-
 
 			// Validate and navigate to URL
 			try {
@@ -256,13 +314,29 @@ export async function simulateUser(url, headless = true, inject = true, _past = 
 				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona} (for fallback actions)`);
 
 				// Execute the deterministic sequence
-				actionResults = await executeSequence(page, meepleOpts.sequence, hotZones, persona, usersHandle, meepleOpts, log);
+				actionResults = await executeSequence(
+					page,
+					meepleOpts.sequence,
+					hotZones,
+					persona,
+					usersHandle,
+					meepleOpts,
+					log
+				);
 			} else {
 				// Fall back to regular persona-based behavior
 				const actionSequence = generatePersonaActionSequence(persona, maxActions);
 				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona}, ${actionSequence.length} actions planned`);
 
-				actionResults = await simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, meepleOpts, log);
+				actionResults = await simulateUserSession(
+					page,
+					actionSequence,
+					hotZones,
+					persona,
+					usersHandle,
+					meepleOpts,
+					log
+				);
 			}
 
 			await closeBrowser(browser);
@@ -277,7 +351,6 @@ export async function simulateUser(url, headless = true, inject = true, _past = 
 				sequence: meepleOpts.sequenceName || null,
 				success: true
 			};
-
 		} catch (error) {
 			if (browser) {
 				await closeBrowser(browser);
@@ -341,8 +414,11 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		const action = getContextAwareAction(actionHistory, originalAction, log);
 
 		const emoji = actionEmojis[action] || '🎯';
-		const contextNote = action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
-		log(`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${actionSequence.length}</span>: ${action}${contextNote}`);
+		const contextNote =
+			action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
+		log(
+			`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${actionSequence.length}</span>: ${action}${contextNote}`
+		);
 
 		let funcToPerform;
 		// Check for URL changes and re-identify hot zones if needed
@@ -406,9 +482,7 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 			await ensurePageSetup(page, usersHandle, opts.inject !== false, opts, log);
 
 			// Execute action with timeout
-			const actionTimeout = new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Action timeout')), 30000)
-			);
+			const actionTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Action timeout')), 30000));
 
 			await Promise.race([funcToPerform(), actionTimeout]);
 
@@ -419,7 +493,6 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 				success: true,
 				timestamp: Date.now()
 			});
-
 		} catch (actionError) {
 			consecutiveFailures++;
 			log(`    ├─ ⚠️ <span style="color: #F8BC3B;">Action failed:</span> ${actionError.message}`);
@@ -433,7 +506,9 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 
 			// Circuit breaker: stop if too many consecutive failures
 			if (consecutiveFailures >= maxConsecutiveFailures) {
-				log(`    └─ 🚨 <span style="color: #CC332B;">Too many consecutive failures (${consecutiveFailures}), terminating session</span>`);
+				log(
+					`    └─ 🚨 <span style="color: #CC332B;">Too many consecutive failures (${consecutiveFailures}), terminating session</span>`
+				);
 				break;
 			}
 		}

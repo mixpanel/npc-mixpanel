@@ -1,7 +1,7 @@
 /**
  * Injects Mixpanel SDK into the page with configuration options for session replay and user tracking.
  * Handles multiple injection strategies with CSP workarounds and fallback mechanisms.
- * 
+ *
  * @param {string} token - Mixpanel project token
  * @param {string} [userId=""] - User identifier for tracking and identification
  * @param {Object} [opts={}] - Configuration options
@@ -9,24 +9,23 @@
  *   - false: Disables masking with "nope" selectors (record_mask_text_selector, record_block_selector, record_block_class)
  *   - true: Uses Mixpanel's default masking behavior (recommended for production)
  * @param {{lat: number, lon: number}|null} [opts.location=null] - User location coordinates for geo-spoofing (lat/lon)
- * 
+ *
  * @example
  * // Basic injection with no masking
  * injectMixpanel('your-token', 'user-123');
- * 
+ *
  * @example
  * // With masking enabled and custom location
  * injectMixpanel('your-token', 'user-456', {
  *   masking: true,
  *   location: { lat: 40.7128, lon: -74.0060 }
  * });
- * 
+ *
  * @example
  * // Server-provided location (typical usage from headless.js)
  * injectMixpanel(token, userId, { masking: false, location: sessionLocation });
  */
-export default function injectMixpanel(token, userId = "", opts = {}) {
-
+export default function injectMixpanel(token, userId = '', opts = {}) {
 	// Helper function for resetting Mixpanel (currently unused but available for debugging)
 	// @ts-expect-error - Function reserved for debugging, intentionally unused
 	function _reset() {
@@ -34,8 +33,7 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 		if (mixpanel) {
 			if (mixpanel.headless) {
 				mixpanel.headless.reset();
-			}
-			else {
+			} else {
 				mixpanel.reset();
 			}
 		}
@@ -43,15 +41,15 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 
 	function generateLocation() {
 		const cities = [
-			[40.7128, -74.0060], // New York
-			[51.5074, -0.1278],  // London
+			[40.7128, -74.006], // New York
+			[51.5074, -0.1278], // London
 			[35.6762, 139.6503], // Tokyo
-			[48.8566, 2.3522],   // Paris
+			[48.8566, 2.3522], // Paris
 			[34.0522, -118.2437], // Los Angeles
 			[-33.8688, 151.2093], // Sydney
-			[55.7558, 37.6173],  // Moscow
+			[55.7558, 37.6173], // Moscow
 			[39.9042, 116.4074], // Beijing
-			[19.0760, 72.8777],  // Mumbai
+			[19.076, 72.8777], // Mumbai
 			[-23.5505, -46.6333] // São Paulo
 		];
 
@@ -71,10 +69,10 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 	const { masking = false, location = null } = opts;
 
 	const PARAMS = qsToObj(window.location.search);
-	let { user = "", project_token = "", ...restParams } = PARAMS;
+	let { user = '', project_token = '', ...restParams } = PARAMS;
 	if (!restParams) restParams = {};
 	if (!project_token) project_token = token;
-	if (!project_token) throw new Error("Project token is required when injecting mixpanel.");
+	if (!project_token) throw new Error('Project token is required when injecting mixpanel.');
 
 	// Function that contains the code to run after the script is loaded
 	function EMBED_TRACKING() {
@@ -95,8 +93,7 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 						}
 
 						return event_data;
-					},
-
+					}
 				},
 				loaded: function (mp) {
 					console.log('[NPC] MIXPANEL LOADED\n\n');
@@ -112,12 +109,11 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 					if (userId) mp.people.set({ $name: userId, $email: userId, $latitude: latitude, $longitude: longitude });
 					mp.start_session_recording();
 					console.log('[NPC] STARTED SESSION RECORDING\n\n');
-
 				},
 
 				//autocapture
 				autocapture: {
-					pageview: "full-url",
+					pageview: 'full-url',
 					click: true,
 					input: true,
 					scroll: true,
@@ -135,29 +131,28 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 				//normal mixpanel
 				ignore_dnt: true,
 				batch_flush_interval_ms: 0,
-				api_host: "https://express-proxy-lmozz6xkha-uc.a.run.app",
+				api_host: 'https://express-proxy-lmozz6xkha-uc.a.run.app',
 				api_transport: 'XHR',
-				persistence: "localStorage",
+				persistence: 'localStorage',
 				api_payload_format: 'json',
 				debug: true
-
 			};
 
 			// Only add masking options when masking is OFF (false)
 			if (!masking) {
-				mixpanelConfig.record_mask_text_selector = "nope";
-				mixpanelConfig.record_block_selector = "nope";
-				mixpanelConfig.record_block_class = "nope";
+				mixpanelConfig.record_mask_text_selector = 'nope';
+				mixpanelConfig.record_block_selector = 'nope';
+				mixpanelConfig.record_block_class = 'nope';
 			}
 
 			if (masking) {
 				// mixpanelConfig.record_mask_text_selector = "input, textarea, div, p, [type='password'], [type='email'], [type='tel'], [type='number'], [type='search']";
-				mixpanelConfig.record_block_selector = "still nope";
-				mixpanelConfig.record_mask_text_selector = "*";
+				mixpanelConfig.record_block_selector = 'still nope';
+				mixpanelConfig.record_mask_text_selector = '*';
 			}
 
-			mixpanel.init(project_token, mixpanelConfig, "headless");
-		};
+			mixpanel.init(project_token, mixpanelConfig, 'headless');
+		}
 	}
 
 	function qsToObj(queryString) {
@@ -165,15 +160,10 @@ export default function injectMixpanel(token, userId = "", opts = {}) {
 			const parsedQs = new URLSearchParams(queryString);
 			const params = Object.fromEntries(parsedQs);
 			return params;
-		}
-
-		catch (e) {
+		} catch (e) {
 			return {};
 		}
 	}
-
-	
-
 
 	var MIXPANEL_CUSTOM_LIB_URL = 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js';
 	//prettier-ignore

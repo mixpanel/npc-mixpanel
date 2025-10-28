@@ -5,8 +5,6 @@ import { puppeteerArgs } from './entities.js';
 // @ts-expect-error - Reserved for environment-specific configuration
 const { NODE_ENV = '' } = process.env;
 
-
-
 const agents = await u.load('./meeple/agents.json', true);
 
 /**
@@ -104,9 +102,9 @@ export async function createPage(browser, log = console.log) {
 		const realisticHeaders = {
 			'Accept-Language': 'en-US,en;q=0.9',
 			'Accept-Encoding': 'gzip, deflate, br',
-			'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+			Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
 			'Cache-Control': 'no-cache',
-			'Pragma': 'no-cache',
+			Pragma: 'no-cache',
 			'Sec-Fetch-Dest': 'document',
 			'Sec-Fetch-Mode': 'navigate',
 			'Sec-Fetch-Site': 'none',
@@ -114,7 +112,6 @@ export async function createPage(browser, log = console.log) {
 			'Upgrade-Insecure-Requests': '1',
 			...headers
 		};
-
 
 		// Set additional headers for realism
 		await page.setExtraHTTPHeaders(realisticHeaders);
@@ -179,10 +176,11 @@ export async function navigateToUrl(page, url, log = console.log) {
 			log(`❌ Navigation attempt ${attempt} failed: ${error.message}`);
 
 			// Check if it's a network error that might be retryable
-			if (error.message.includes('net::ERR_INVALID_ARGUMENT') ||
+			if (
+				error.message.includes('net::ERR_INVALID_ARGUMENT') ||
 				error.message.includes('net::ERR_FAILED') ||
-				error.message.includes('Navigation timeout')) {
-
+				error.message.includes('Navigation timeout')
+			) {
 				if (attempt < maxRetries) {
 					log(`⏳ Retrying navigation in 2 seconds...`);
 					await new Promise(resolve => setTimeout(resolve, 2000));

@@ -70,7 +70,7 @@ export function generatePersonaActionSequence(persona, maxActions = null) {
 
 	const actionTypes = Object.keys(personaWeights);
 	const weights = Object.values(personaWeights);
-	
+
 	return generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions);
 }
 
@@ -108,28 +108,28 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, _pers
 		do {
 			selectedAction = weightedRandom(actionTypes, weights);
 			attempts++;
-			
+
 			// If we're running out of actions and need more clicks
 			if (i >= totalActions - (minClicks - clickCount) && selectedAction !== 'click') {
 				selectedAction = 'click';
 			}
-			
+
 			// Check consecutive action limits
-			const consecutiveCount = actionHistory.slice(-maxConsecutive[selectedAction] || 2)
+			const consecutiveCount = actionHistory
+				.slice(-maxConsecutive[selectedAction] || 2)
 				.filter(action => action === selectedAction).length;
-				
+
 			if (consecutiveCount < (maxConsecutive[selectedAction] || 2)) {
 				break; // Action is acceptable
 			}
-			
 		} while (attempts < maxAttempts);
 
 		// Apply context-aware modifications
 		const contextAwareAction = getContextAwareAction(actionHistory, selectedAction);
-		
+
 		sequence.push(contextAwareAction);
 		actionHistory.push(contextAwareAction);
-		
+
 		if (contextAwareAction === 'click') {
 			clickCount++;
 		}

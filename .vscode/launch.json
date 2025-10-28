@@ -13,33 +13,29 @@
 			"restart": true,
 			"console": "integratedTerminal",
 			"internalConsoleOptions": "neverOpen",
-			"args": [
-				"--ignore",
-				"/tmp/",				
-			],
+			"args": ["--ignore", "/tmp/"],
 			"env": {
 				"NODE_ENV": "dev"
 			}
 		},
 		{
-            "type": "node",
-            "request": "launch",
-            "name": "local",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": ["run", "local"],
-            "restart": true,
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "env": {
-                "NODE_ENV": "dev"
-            }
-        },
+			"type": "node",
+			"request": "launch",
+			"name": "local",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "local"],
+			"restart": true,
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"env": {
+				"NODE_ENV": "dev"
+			}
+		},
 		{
 			"command": "npm run fire",
 			"name": "FIRE",
 			"request": "launch",
-			"type": "node-terminal",
+			"type": "node-terminal"
 		}
-		
 	]
 }

@@ -1,4 +1,3 @@
-
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
@@ -6,11 +5,11 @@ import { formTestData } from './entities.js';
 
 // Click fuzziness configuration for form interactions
 export const CLICK_FUZZINESS = {
-	FORM_FIELD: 0.35     // ±35% for form field clicks
+	FORM_FIELD: 0.35 // ±35% for form field clicks
 };
 
 // Sleep utility for consistency
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 /**
@@ -32,11 +31,14 @@ export async function fillTextInput(page, element, text = null, log = console.lo
 		await sleep(randomBetween(100, 300));
 
 		// Get element info for test data selection
-		const elementInfo = await page.evaluate(el => ({
-			type: el.type || 'text',
-			placeholder: el.placeholder || '',
-			tagName: el.tagName.toLowerCase()
-		}), element);
+		const elementInfo = await page.evaluate(
+			el => ({
+				type: el.type || 'text',
+				placeholder: el.placeholder || '',
+				tagName: el.tagName.toLowerCase()
+			}),
+			element
+		);
 
 		// Use provided text or select from test data
 		let textToType = text;
@@ -69,7 +71,6 @@ export async function fillTextInput(page, element, text = null, log = console.lo
 
 		await sleep(randomBetween(100, 300));
 		return true;
-
 	} catch (error) {
 		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Text input failed:</span> ${error.message}`);
 		return false;
@@ -105,7 +106,6 @@ export async function fillSelectDropdown(page, element, value = null, log = cons
 
 		await sleep(randomBetween(100, 300));
 		return true;
-
 	} catch (error) {
 		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Select dropdown failed:</span> ${error.message}`);
 		return false;
@@ -142,7 +142,6 @@ export async function toggleCheckbox(page, element, log = console.log) {
 		await sleep(randomBetween(200, 400));
 
 		return true;
-
 	} catch (error) {
 		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Checkbox toggle failed:</span> ${error.message}`);
 		return false;
@@ -206,7 +205,6 @@ export async function fillRadioGroup(page, radioGroupElement, clicksCount = 2, l
 		}
 
 		return true;
-
 	} catch (error) {
 		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Radio group interaction failed:</span> ${error.message}`);
 		return false;
@@ -243,7 +241,6 @@ export async function fillFormElement(page, element, options = {}, log = console
 		}
 
 		return false;
-
 	} catch (error) {
 		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Form element fill failed:</span> ${error.message}`);
 		return false;
@@ -261,46 +258,55 @@ export async function interactWithForms(page, log = console.log) {
 
 		const formElements = await page.evaluate(() => {
 			// ENHANCED: Now includes checkboxes, radio groups, and all interactive form elements
-			const allElements = Array.from(document.querySelectorAll(`
+			const allElements = Array.from(
+				document.querySelectorAll(`
 				input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="hidden"]),
 				textarea,
 				select,
 				[role="radiogroup"],
 				[role="checkbox"]
-			`));
+			`)
+			);
 
-			return allElements.filter(el => {
-				const rect = el.getBoundingClientRect();
-				const style = window.getComputedStyle(el);
-				const role = el.getAttribute('role');
+			return allElements
+				.filter(el => {
+					const rect = el.getBoundingClientRect();
+					const style = window.getComputedStyle(el);
+					const role = el.getAttribute('role');
 
-				// Radio groups and checkboxes have special handling
-				if (role === 'radiogroup' || role === 'checkbox') {
-					return rect.width > 0 && rect.height > 0 &&
-						style.visibility !== 'hidden' && style.display !== 'none';
-				}
+					// Radio groups and checkboxes have special handling
+					if (role === 'radiogroup' || role === 'checkbox') {
+						return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+					}
 
-				// Standard visibility check for other form elements
-				return rect.width > 0 && rect.height > 0 &&
-					!el.disabled && !el.readOnly &&
-					style.visibility !== 'hidden' && style.display !== 'none' &&
-					(rect.bottom > 0 && rect.top < document.documentElement.scrollHeight);
-			}).map((el, index) => {
-				const rect = el.getBoundingClientRect();
-				const role = el.getAttribute('role');
+					// Standard visibility check for other form elements
+					return (
+						rect.width > 0 &&
+						rect.height > 0 &&
+						!el.disabled &&
+						!el.readOnly &&
+						style.visibility !== 'hidden' &&
+						style.display !== 'none' &&
+						rect.bottom > 0 &&
+						rect.top < document.documentElement.scrollHeight
+					);
+				})
+				.map((el, index) => {
+					const rect = el.getBoundingClientRect();
+					const role = el.getAttribute('role');
 
-				return {
-					selector: el.tagName.toLowerCase() + (el.type ? `[type="${el.type}"]` : ''),
-					type: el.type || el.tagName.toLowerCase(),
-					role: role,
-					placeholder: el.placeholder || '',
-					name: el.name || '',
-					id: el.id || '',
-					rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-					isInViewport: rect.top >= 0 && rect.top < window.innerHeight,
-					index: index
-				};
-			});
+					return {
+						selector: el.tagName.toLowerCase() + (el.type ? `[type="${el.type}"]` : ''),
+						type: el.type || el.tagName.toLowerCase(),
+						role: role,
+						placeholder: el.placeholder || '',
+						name: el.name || '',
+						id: el.id || '',
+						rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+						isInViewport: rect.top >= 0 && rect.top < window.innerHeight,
+						index: index
+					};
+				});
 		});
 
 		if (formElements.length === 0) {
@@ -314,7 +320,7 @@ export async function interactWithForms(page, log = console.log) {
 		const target = formElements[Math.floor(Math.random() * formElements.length)];
 
 		// Get the actual element handle using robust selector strategies
-		const element = await page.evaluateHandle((targetInfo) => {
+		const element = await page.evaluateHandle(targetInfo => {
 			let el = null;
 
 			// Strategy 1: Try ID selector (if valid)
@@ -322,7 +328,9 @@ export async function interactWithForms(page, log = console.log) {
 				try {
 					el = document.getElementById(targetInfo.id);
 					if (el) return el;
-				} catch (e) { /* continue */ }
+				} catch (e) {
+					/* continue */
+				}
 			}
 
 			// Strategy 2: Try name selector
@@ -330,7 +338,9 @@ export async function interactWithForms(page, log = console.log) {
 				try {
 					el = document.querySelector(`${targetInfo.selector}[name="${targetInfo.name}"]`);
 					if (el) return el;
-				} catch (e) { /* continue */ }
+				} catch (e) {
+					/* continue */
+				}
 			}
 
 			// Strategy 3: Try role selector for special elements
@@ -338,14 +348,18 @@ export async function interactWithForms(page, log = console.log) {
 				try {
 					const roleElements = Array.from(document.querySelectorAll(`[role="${targetInfo.role}"]`));
 					if (roleElements[targetInfo.index]) return roleElements[targetInfo.index];
-				} catch (e) { /* continue */ }
+				} catch (e) {
+					/* continue */
+				}
 			}
 
 			// Strategy 4: Use index-based selection as fallback
 			try {
 				const elements = Array.from(document.querySelectorAll(targetInfo.selector));
 				if (elements[targetInfo.index]) return elements[targetInfo.index];
-			} catch (e) { /* continue */ }
+			} catch (e) {
+				/* continue */
+			}
 
 			return null;
 		}, target);
