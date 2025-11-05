@@ -22,7 +22,8 @@ steps:
       - '--timeout=3600'
       - '--max-instances=10'
       - '--min-instances=0'
-      - '--concurrency=1'
+      - '--concurrency=10'
+      - '--session-affinity'
       - '--port=8080'
       - '--env-vars-file=.env.yaml'
 

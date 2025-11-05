@@ -52,12 +52,19 @@ function coerceTypes(obj) {
 	return coerced;
 }
 
-// Initialize Socket.IO server
+// Initialize Socket.IO server with Cloud Run optimizations
 io = new Server(httpServer, {
 	cors: {
 		origin: '*', // Adjust in production for security
 		methods: ['GET', 'POST']
-	}
+	},
+	// Cloud Run optimizations
+	transports: ['websocket', 'polling'], // Allow both but prefer WebSocket
+	allowEIO3: true, // Allow different Engine.IO versions
+	pingTimeout: 60000, // 60 seconds (Cloud Run timeout)
+	pingInterval: 25000, // 25 seconds
+	upgradeTimeout: 30000, // 30 seconds for upgrade
+	maxHttpBufferSize: 1e6 // 1MB max buffer
 });
 
 io.on('connection', socket => {

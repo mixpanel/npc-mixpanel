@@ -564,6 +564,11 @@ form.addEventListener('submit', async e => {
 	// Connect to WebSocket (same server for Cloud Run) with user info
 	const socket = io({
 		reconnection: true,
+		reconnectionAttempts: 5,
+		reconnectionDelay: 1000,
+		timeout: 20000,
+		// Force WebSocket transport for Cloud Run
+		transports: ['websocket', 'polling'],
 		auth: {
 			user: user
 		}
