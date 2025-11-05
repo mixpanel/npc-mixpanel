@@ -84,32 +84,32 @@ async function loadSequence(filename) {
 const MICROSITES = [
 	{
 		name: 'iBank',
-		url: 'https://ak--47.github.io/fixpanel/financial/',
+		url: 'https://mixpanel.github.io/fixpanel/financial',
 		sequenceFiles: ['financial-sequence-kyc.json', 'financial-sequence-product-demo.json']
 	},
 	{
-		name: 'theyBuy',
-		url: 'https://ak--47.github.io/fixpanel/checkout/',
+		name: 'weBuy',
+		url: 'https://mixpanel.github.io/fixpanel/checkout',
 		sequenceFiles: []
 	},
 	{
 		name: 'meTube',
-		url: 'https://ak--47.github.io/fixpanel/streaming/',
+		url: 'https://mixpanel.github.io/fixpanel/streaming',
 		sequenceFiles: []
 	},
 	{
 		name: 'youAdmin',
-		url: 'https://ak--47.github.io/fixpanel/admin/',
+		url: 'https://mixpanel.github.io/fixpanel/admin',
 		sequenceFiles: []
 	},
 	{
 		name: 'ourHeart',
-		url: 'https://ak--47.github.io/fixpanel/wellness/',
+		url: 'https://mixpanel.github.io/fixpanel/wellness',
 		sequenceFiles: []
 	},
 	{
-		name: 'weRead',
-		url: 'https://ak--47.github.io/fixpanel/lifestyle/',
+		name: 'theyRead',
+		url: 'https://mixpanel.github.io/fixpanel/lifestyle',
 		sequenceFiles: []
 	}
 ];
@@ -183,6 +183,7 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 		}
 
 		// Build meeple parameters
+		// Note: URL params (IS_MEEPLE, MEEPLE_ID, SEQUENCE) are added per-meeple in headless.js
 		const meepleParams = {
 			...DEFAULT_MEEPLE_PARAMS,
 			...overrideParams,

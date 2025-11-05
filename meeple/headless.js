@@ -43,7 +43,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	// Guard against missing logger for tests - fallback to console.log
 	const log = logFunction || (message => console.log(message));
 	let {
-		url = 'https://ak--47.github.io/fixpanel/',
+		url = 'https://mixpanel.github.io/fixpanel/',
 		users = 10,
 		concurrency = 10,
 		headless = true,
@@ -55,7 +55,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
 		sequences = null
 	} = PARAMS;
 
-	if (url === 'fixpanel') url = `https://ak--47.github.io/fixpanel/`;
+	if (url === 'fixpanel') url = `https://mixpanel.github.io/fixpanel/`;
 	const limit = pLimit(concurrency);
 	if (users > 25) users = 25;
 	if (concurrency > 10) concurrency = 10;
@@ -285,13 +285,23 @@ export async function simulateUser(
 			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN;
 
 			// Validate and navigate to URL
+			let navigationUrl;
 			try {
-				new URL(url); // This will throw if URL is invalid
+				const urlObj = new URL(url);
+
+				// Add meeple tracking parameters for Mixpanel analytics
+				urlObj.searchParams.set('IS_MEEPLE', 'true');
+				urlObj.searchParams.set('MEEPLE_ID', usersHandle);
+				if (opts.sequenceName) {
+					urlObj.searchParams.set('SEQUENCE', opts.sequenceName);
+				}
+
+				navigationUrl = urlObj.toString();
 			} catch (urlError) {
 				throw new Error(`Invalid URL provided: ${url} - ${urlError.message}`);
 			}
 
-			await navigateToUrl(page, url, log);
+			await navigateToUrl(page, navigationUrl, log);
 			// Set up page environment
 			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
 			await sleep(randomBetween(50, 250)); // Random sleep to simulate human behavior (was 100-500ms)
