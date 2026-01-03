@@ -16,3 +16,4 @@ CLAUDE.md
 vscode-profile-*
 spec-*.jsonc
 service-account.json
+gcp-service-account-key.json

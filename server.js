@@ -12,11 +12,13 @@ import cookieParser from 'cookie-parser';
 import * as Mixpanel from 'mixpanel';
 import { Diagnostics } from 'ak-diagnostic';
 import { runMicrositesJob, createProductionLogger } from './microsites.js';
+import { createRuntimeGuard, authenticateApi, isApiContext } from './middleware/runtimeGuard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const { NODE_ENV = 'production', MIXPANEL_TRACKING_TOKEN = '6c3bc01ddc1f16d01e4fda11d3a4d166' } = process.env;
+const RUNTIME_CONTEXT = process.env.RUNTIME_CONTEXT || 'npc-ui';
 let io = null;
 
 const app = express();
@@ -52,22 +54,23 @@ function coerceTypes(obj) {
 	return coerced;
 }
 
-// Initialize Socket.IO server with Cloud Run optimizations
-io = new Server(httpServer, {
-	cors: {
-		origin: '*', // Adjust in production for security
-		methods: ['GET', 'POST']
-	},
-	// Cloud Run optimizations
-	transports: ['websocket', 'polling'], // Allow both but prefer WebSocket
-	allowEIO3: true, // Allow different Engine.IO versions
-	pingTimeout: 60000, // 60 seconds (Cloud Run timeout)
-	pingInterval: 25000, // 25 seconds
-	upgradeTimeout: 30000, // 30 seconds for upgrade
-	maxHttpBufferSize: 1e6 // 1MB max buffer
-});
+// Initialize Socket.IO server with Cloud Run optimizations (UI only, not API)
+if (!isApiContext) {
+	io = new Server(httpServer, {
+		cors: {
+			origin: '*', // Adjust in production for security
+			methods: ['GET', 'POST']
+		},
+		// Cloud Run optimizations
+		transports: ['websocket', 'polling'], // Allow both but prefer WebSocket
+		allowEIO3: true, // Allow different Engine.IO versions
+		pingTimeout: 60000, // 60 seconds (Cloud Run timeout)
+		pingInterval: 25000, // 25 seconds
+		upgradeTimeout: 30000, // 30 seconds for upgrade
+		maxHttpBufferSize: 1e6 // 1MB max buffer
+	});
 
-io.on('connection', socket => {
+	io.on('connection', socket => {
 	// Extract user from socket auth (passed from client)
 	const user = socket.handshake.auth?.user || 'anonymous';
 	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
@@ -248,9 +251,15 @@ io.on('connection', socket => {
 		// Jobs continue running even if client disconnects
 	});
 });
+} // End of if (!isApiContext) for WebSocket
 
-// Serve static files (UI)
-app.use(express.static('ui'));
+// Apply runtime guard middleware (must come before routes)
+app.use(createRuntimeGuard());
+
+// Serve static files (UI only, not API)
+if (!isApiContext) {
+	app.use(express.static('ui'));
+}
 app.use(cookieParser());
 
 app.use((req, res, next) => {
@@ -280,18 +289,185 @@ app.get('/ping', (req, res) => {
 		status: 'ok',
 		message: 'npc-mixpanel service is alive',
 		environment: NODE_ENV,
+		context: RUNTIME_CONTEXT,
 		echo: req.query.data
 	});
 });
 
-// Main UI route
-app.get('/', (_req, res) => {
-	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
+// API documentation endpoint
+app.get('/help', (_req, res) => {
+	res.json({
+		name: 'npc-mixpanel-api',
+		version: '1.0.0',
+		description: 'Cloud-based web automation service for simulating realistic user behavior on websites',
+		authentication: {
+			user_id: {
+				required: true,
+				type: 'string',
+				format: 'Must end with @mixpanel.com',
+				description: 'Your Mixpanel email address'
+			},
+			safe_word: {
+				required: true,
+				type: 'string',
+				description: 'Authentication password (contact admin for value)'
+			}
+		},
+		endpoints: {
+			'GET /help': {
+				auth: false,
+				description: 'Returns this API documentation'
+			},
+			'GET /ping': {
+				auth: false,
+				description: 'Health check endpoint'
+			},
+			'POST /simulate': {
+				auth: true,
+				description: 'Run a meeple simulation on a target website',
+				parameters: {
+					url: {
+						type: 'string',
+						required: true,
+						description: 'Target URL to simulate user behavior on'
+					},
+					users: {
+						type: 'number',
+						default: 10,
+						max: 25,
+						description: 'Number of meeples (simulated users) to spawn'
+					},
+					concurrency: {
+						type: 'number',
+						default: 10,
+						max: 10,
+						description: 'Maximum concurrent meeples running at once'
+					},
+					headless: {
+						type: 'boolean',
+						default: true,
+						description: 'Run browser in headless mode (no visible window)'
+					},
+					inject: {
+						type: 'boolean',
+						default: true,
+						description: 'Inject Mixpanel analytics tracking into the page'
+					},
+					past: {
+						type: 'boolean',
+						default: false,
+						description: 'Simulate past timestamps for analytics events'
+					},
+					token: {
+						type: 'string',
+						optional: true,
+						description: 'Override Mixpanel token for tracking'
+					},
+					maxActions: {
+						type: 'number',
+						optional: true,
+						description: 'Maximum number of actions per meeple session'
+					},
+					masking: {
+						type: 'boolean',
+						default: false,
+						description: 'Enable element masking for autocapture'
+					},
+					sequences: {
+						type: 'object',
+						optional: true,
+						description: 'Deterministic sequences for reproducible user journeys',
+						schema: {
+							'[sequenceName]': {
+								description: { type: 'string', optional: true },
+								temperature: {
+									type: 'number',
+									range: [0, 10],
+									default: 5,
+									description: '0=random, 10=strict sequence following'
+								},
+								'chaos-range': {
+									type: '[number, number]',
+									optional: true,
+									description: 'Multiplier range for temperature variability'
+								},
+								actions: {
+									type: 'array',
+									description: 'Array of actions to perform',
+									items: {
+										action: {
+											type: 'string',
+											enum: ['click', 'type', 'select', 'fillOutForm']
+										},
+										selector: { type: 'string', required: true },
+										text: { type: 'string', requiredFor: 'type' },
+										value: { type: 'string', requiredFor: 'select' }
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			'POST /microsites': {
+				auth: true,
+				description: 'Run simulations across all 6 Mixpanel microsites sequentially',
+				parameters: {
+					users: {
+						type: 'number',
+						default: 5,
+						description: 'Meeples per microsite'
+					},
+					concurrency: {
+						type: 'number',
+						default: 5,
+						description: 'Concurrent meeples per microsite'
+					},
+					headless: {
+						type: 'boolean',
+						default: true,
+						description: 'Run browser in headless mode'
+					}
+				}
+			}
+		},
+		responseFormats: {
+			success: {
+				results: 'SimulationResult[]',
+				duration: 'number (seconds)'
+			},
+			error: {
+				error: 'string',
+				details: 'string[] (optional)'
+			},
+			authError: {
+				error: 'string',
+				code: 401
+			}
+		}
+	});
 });
+
+// Main UI route (UI only, not API - blocked by middleware)
+if (!isApiContext) {
+	app.get('/', (_req, res) => {
+		res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
+	});
+}
 
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
 	const runId = uid();
+
+	// API context requires authentication
+	if (isApiContext) {
+		const auth = authenticateApi(req);
+		if (!auth.ok) {
+			logger.notice(`/SIMULATE auth failed`, { error: auth.error, ip: req.ip });
+			return res.status(401).json({ error: auth.error, code: 401 });
+		}
+	}
+
 	// Extract user from IAP header (URL decode first, then parse)
 	const rawUser = req.headers['x-goog-authenticated-user-email'];
 	let user, userId;
@@ -299,7 +475,8 @@ app.post('/simulate', async (req, res) => {
 		const decodedUser = decodeURIComponent(rawUser);
 		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
 	} catch (error) {
-		user = 'CRON';
+		// For API context, use the authenticated user_id
+		user = isApiContext ? (req.body?.user_id || req.query?.user_id || 'API') : 'CRON';
 	}
 
 	try {
@@ -381,9 +558,19 @@ app.post('/simulate', async (req, res) => {
 	}
 });
 
-// Microsites endpoint - runs all 6 microsites sequentially
+// Microsites endpoint - runs all 6 microsites sequentially (API only)
 app.post('/microsites', async (req, res) => {
 	const jobId = uid();
+
+	// API context requires authentication (UI is blocked by middleware anyway)
+	if (isApiContext) {
+		const auth = authenticateApi(req);
+		if (!auth.ok) {
+			logger.notice(`/MICROSITES auth failed`, { error: auth.error, ip: req.ip });
+			return res.status(401).json({ error: auth.error, code: 401 });
+		}
+	}
+
 	// Extract user from IAP header (URL decode first, then parse)
 	const rawUser = req.headers['x-goog-authenticated-user-email'];
 	let user, userId;
@@ -391,7 +578,8 @@ app.post('/microsites', async (req, res) => {
 		const decodedUser = decodeURIComponent(rawUser);
 		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
 	} catch (error) {
-		user = 'CRON';
+		// For API context, use the authenticated user_id
+		user = isApiContext ? (req.body?.user_id || req.query?.user_id || 'API') : 'CRON';
 	}
 
 	try {
@@ -542,19 +730,31 @@ app.get('/microsites', async (req, res) => {
 	}
 });
 
-// Catch-all for SPA routing
-app.get('*', (_req, res) => {
-	res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
-});
+// Catch-all for SPA routing (UI only)
+if (!isApiContext) {
+	app.get('*', (_req, res) => {
+		res.sendFile(path.join(__dirname, 'ui', 'ui.html'));
+	});
+} else {
+	// API context: return 404 for unknown routes
+	app.use((_req, res) => {
+		res.status(404).json({
+			error: 'Not found',
+			message: 'Unknown endpoint. Use GET /help for API documentation.'
+		});
+	});
+}
 
 // Only start the server if this file is run directly (not imported)
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
 	const port = process.env.PORT || 8080;
 	httpServer.listen(port, () => {
+		const contextLabel = isApiContext ? 'API' : 'UI';
 		if (NODE_ENV === 'dev') {
-			console.log(`\n[DEV]\nExpress server listening on port ${port}\nhttp://localhost:${port}`);
+			console.log(`\n[DEV - ${contextLabel}]\nExpress server listening on port ${port}\nhttp://localhost:${port}`);
+			console.log(`Runtime context: ${RUNTIME_CONTEXT}`);
 		} else {
-			console.log(`${NODE_ENV}: npc-mixpanel server running on port ${port}`);
+			console.log(`${NODE_ENV} [${contextLabel}]: npc-mixpanel server running on port ${port}`);
 		}
 	});
 } else {

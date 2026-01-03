@@ -14,6 +14,7 @@ scripts
 .claude
 .prettierrc
 service-account.json
+gcp-service-account-key.json
 
 # Ignore node_modules (generated during npm install)
 node_modules
