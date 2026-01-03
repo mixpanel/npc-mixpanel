@@ -6,14 +6,13 @@ on:
       - main
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
   UI_SERVICE_NAME: npc-mixpanel
   API_SERVICE_NAME: npc-mixpanel-api
 
 jobs:
   deploy:
-    name: Build and Deploy
+    name: Build and Deploy via Cloud Build
     runs-on: ubuntu-latest
 
     permissions:
@@ -32,65 +31,39 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ secrets.GCP_PROJECT }}
 
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker
-
-      # Build container image once
-      - name: Build and push container image
+      # Deploy UI service via Cloud Build (builds and deploys in one step)
+      - name: Deploy UI to Cloud Run via Cloud Build
         run: |
-          echo "Building container image..."
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/npc-mixpanel:${{ github.sha }} .
-          docker push gcr.io/${{ env.PROJECT_ID }}/npc-mixpanel:${{ github.sha }}
-          echo "Container image pushed successfully"
-
-      # Deploy UI service (private, behind IAP)
-      - name: Deploy UI to Cloud Run
-        run: |
-          echo "Deploying UI service to Cloud Run..."
-          gcloud run deploy ${{ env.UI_SERVICE_NAME }} \
-            --image gcr.io/${{ env.PROJECT_ID }}/npc-mixpanel:${{ github.sha }} \
+          echo "Deploying UI service via Cloud Build..."
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --substitutions _SERVICE_NAME=${{ env.UI_SERVICE_NAME }},_REGION=${{ env.REGION }} \
             --region ${{ env.REGION }} \
-            --platform managed \
-            --no-allow-unauthenticated \
-            --memory 8Gi \
-            --cpu 4 \
-            --timeout 3600 \
-            --max-instances 10 \
-            --min-instances 0 \
-            --concurrency 10 \
-            --session-affinity \
-            --port 8080 \
-            --set-env-vars "NODE_ENV=production,RUNTIME_CONTEXT=npc-ui"
+            --project ${{ secrets.GCP_PROJECT }}
 
-      # Deploy API service (public, allow-unauthenticated)
-      - name: Deploy API to Cloud Run
+      # Deploy API service via Cloud Build (builds and deploys in one step)
+      - name: Deploy API to Cloud Run via Cloud Build
         run: |
-          echo "Deploying API service to Cloud Run..."
-          gcloud run deploy ${{ env.API_SERVICE_NAME }} \
-            --image gcr.io/${{ env.PROJECT_ID }}/npc-mixpanel:${{ github.sha }} \
+          echo "Deploying API service via Cloud Build..."
+          gcloud builds submit \
+            --config cloudbuild-api.yaml \
+            --substitutions _SERVICE_NAME=${{ env.API_SERVICE_NAME }},_REGION=${{ env.REGION }} \
             --region ${{ env.REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --memory 8Gi \
-            --cpu 4 \
-            --timeout 3600 \
-            --max-instances 10 \
-            --min-instances 0 \
-            --concurrency 1 \
-            --port 8080 \
-            --set-env-vars "NODE_ENV=production,RUNTIME_CONTEXT=npc-api"
+            --project ${{ secrets.GCP_PROJECT }}
 
       # Deployment summary
       - name: Deployment Summary
         run: |
           UI_URL=$(gcloud run services describe ${{ env.UI_SERVICE_NAME }} \
             --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT }} \
             --format='value(status.url)' 2>/dev/null || echo "")
 
           API_URL=$(gcloud run services describe ${{ env.API_SERVICE_NAME }} \
             --region ${{ env.REGION }} \
+            --project ${{ secrets.GCP_PROJECT }} \
             --format='value(status.url)' 2>/dev/null || echo "")
 
           echo "## Deployment Complete!" >> $GITHUB_STEP_SUMMARY

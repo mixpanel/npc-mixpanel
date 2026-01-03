@@ -380,25 +380,27 @@ export async function ensureStorageBypass(page, log = console.log) {
 		}
 
 		// First check if bypass was already applied
-		const bypassStatus = await page.evaluate(() => {
-			// Wrap in try-catch to handle SecurityError when accessing localStorage
-			try {
-				return {
-					// @ts-ignore - Custom property
-					applied: window.STORAGE_BYPASS_APPLIED === true,
-					canAccessStorage: (() => {
-						try {
-							// Try to access localStorage without using it
-							return typeof window.localStorage === 'object';
-						} catch (e) {
-							return false;
-						}
-					})()
-				};
-			} catch (e) {
-				return { applied: false, canAccessStorage: false };
-			}
-		}).catch(() => ({ applied: false, canAccessStorage: false }));
+		const bypassStatus = await page
+			.evaluate(() => {
+				// Wrap in try-catch to handle SecurityError when accessing localStorage
+				try {
+					return {
+						// @ts-ignore - Custom property
+						applied: window.STORAGE_BYPASS_APPLIED === true,
+						canAccessStorage: (() => {
+							try {
+								// Try to access localStorage without using it
+								return typeof window.localStorage === 'object';
+							} catch (e) {
+								return false;
+							}
+						})()
+					};
+				} catch (e) {
+					return { applied: false, canAccessStorage: false };
+				}
+			})
+			.catch(() => ({ applied: false, canAccessStorage: false }));
 
 		// If bypass already applied, skip
 		if (bypassStatus.applied) {
@@ -416,19 +418,19 @@ export async function ensureStorageBypass(page, log = console.log) {
 				const createStorage = () => {
 					const storage = {};
 					return {
-						getItem: function(key) {
+						getItem: function (key) {
 							return storage[key] || null;
 						},
-						setItem: function(key, value) {
+						setItem: function (key, value) {
 							storage[key] = String(value);
 						},
-						removeItem: function(key) {
+						removeItem: function (key) {
 							delete storage[key];
 						},
-						clear: function() {
+						clear: function () {
 							Object.keys(storage).forEach(key => delete storage[key]);
 						},
-						key: function(index) {
+						key: function (index) {
 							return Object.keys(storage)[index] || null;
 						},
 						get length() {
@@ -438,7 +440,7 @@ export async function ensureStorageBypass(page, log = console.log) {
 				};
 
 				// Function to safely check if storage is accessible
-				const isStorageAccessible = (storageType) => {
+				const isStorageAccessible = storageType => {
 					try {
 						// @ts-ignore - Dynamic property access
 						const storage = window[storageType];
@@ -506,7 +508,6 @@ export async function ensureStorageBypass(page, log = console.log) {
 				// Mark successful bypass
 				// @ts-ignore - Custom property
 				window.STORAGE_BYPASS_SUCCESS = true;
-
 			} catch (error) {
 				// Even if we fail, mark as applied to avoid repeated attempts
 				// @ts-ignore - Custom property
@@ -517,21 +518,22 @@ export async function ensureStorageBypass(page, log = console.log) {
 		});
 
 		// Only log success once per page
-		const result = await page.evaluate(() => {
-			return {
-				// @ts-ignore - Custom property
-				success: window.STORAGE_BYPASS_SUCCESS === true,
-				// @ts-ignore - Custom property
-				error: window.STORAGE_BYPASS_ERROR
-			};
-		}).catch(() => ({ success: false, error: 'Could not verify bypass status' }));
+		const result = await page
+			.evaluate(() => {
+				return {
+					// @ts-ignore - Custom property
+					success: window.STORAGE_BYPASS_SUCCESS === true,
+					// @ts-ignore - Custom property
+					error: window.STORAGE_BYPASS_ERROR
+				};
+			})
+			.catch(() => ({ success: false, error: 'Could not verify bypass status' }));
 
 		if (result.success) {
 			log('✅ Storage polyfill installed successfully');
 		} else if (result.error) {
 			// Silently continue - we don't want to spam logs
 		}
-
 	} catch (storageError) {
 		// Silently continue - storage bypass is best effort
 		// We don't want to spam the logs with repeated errors
@@ -689,7 +691,7 @@ export async function relaxCSP(page, log = console.log) {
 				meta.setAttribute('http-equiv', 'Content-Security-Policy');
 				meta.setAttribute('content', cspPolicy);
 				document.head.appendChild(meta);
-				
+
 				console.log('✅ Relaxed CSP policy applied via meta tag');
 			}, relaxedCSP);
 		} catch (cspError) {
@@ -700,17 +702,17 @@ export async function relaxCSP(page, log = console.log) {
 				try {
 					// Strategy 1: Try to modify document CSP if possible
 					console.log('⚙️ Applying CSP bypass strategies...');
-					
+
 					// Remove existing CSP restrictions by clearing meta tags
 					const cspMetas = document.querySelectorAll('meta[http-equiv*="Content-Security-Policy" i]');
 					cspMetas.forEach(meta => meta.remove());
-					
+
 					// Try to override any CSP via meta tag
 					const newMeta = document.createElement('meta');
 					newMeta.setAttribute('http-equiv', 'Content-Security-Policy');
 					newMeta.setAttribute('content', cspPolicy);
 					document.head.appendChild(newMeta);
-					
+
 					return { success: true, method: 'metaTagCSP' };
 				} catch (error) {
 					return { success: false, error: error.message };

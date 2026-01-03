@@ -128,8 +128,12 @@ export async function createPage(browser, log = console.log) {
 			// Override document.domain to allow cross-origin access
 			try {
 				Object.defineProperty(document, 'domain', {
-					get() { return window.location.hostname; },
-					set(val) { return val; },
+					get() {
+						return window.location.hostname;
+					},
+					set(val) {
+						return val;
+					},
 					configurable: true
 				});
 			} catch (e) {}

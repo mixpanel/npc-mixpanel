@@ -71,186 +71,186 @@ if (!isApiContext) {
 	});
 
 	io.on('connection', socket => {
-	// Extract user from socket auth (passed from client)
-	const user = socket.handshake.auth?.user || 'anonymous';
-	logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
-	const startTime = Date.now();
+		// Extract user from socket auth (passed from client)
+		const user = socket.handshake.auth?.user || 'anonymous';
+		logger.info(`SOCKET CONNECTED: ${socket.id}`, { socketId: socket.id, user });
+		const startTime = Date.now();
 
-	socket.on('start_job', async data => {
-		const diagnostics = new Diagnostics({
-			name: 'npc-mixpanel-server'
-		});
-		let coercedData;
-		try {
-			const jobId = uid(4);
-			coercedData = coerceTypes(data);
-
-			// Send initial status to general tab (no meepleId)
-			socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
-			socket.emit('job_update', {
-				message: `📋 Configuration: ${coercedData.users} meeples, concurrency: ${Math.min(coercedData.users, coercedData.concurrency || 10)}, headless: ${coercedData.headless}`,
-				meepleId: null
+		socket.on('start_job', async data => {
+			const diagnostics = new Diagnostics({
+				name: 'npc-mixpanel-server'
 			});
-			socket.emit('job_update', { message: `🎯 Target: ${coercedData.url}`, meepleId: null });
-			socket.emit('job_update', {
-				message: `💉 Mixpanel injection: ${coercedData.inject ? 'enabled' : 'disabled'}`,
-				meepleId: null
-			});
-			socket.emit('job_update', { message: `⏰ Job started at ${new Date().toLocaleTimeString()}`, meepleId: null });
-			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
-			socket.emit('job_update', {
-				message: `👀 Watch individual meeple progress in their dedicated tabs`,
-				meepleId: null
-			});
-			socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
+			let coercedData;
+			try {
+				const jobId = uid(4);
+				coercedData = coerceTypes(data);
 
-			// Server-side analytics: Track job start
-			logger.notice(`/SIMULATE START`, { ...coercedData, user, jobId });
-			diagnostics.start();
-
-			// Mixpanel server-side tracking
-			const userId = user || 'unauthenticated';
-			mp.track('server: job start', {
-				distinct_id: userId,
-				jobId,
-				url: coercedData.url,
-				users: coercedData.users,
-				concurrency: coercedData.concurrency,
-				headless: coercedData.headless,
-				inject: coercedData.inject
-			});
-
-			// Enhanced job logger with periodic progress updates
-			const jobStartTime = Date.now();
-			const completedMeeples = new Set();
-			const totalMeeples = coercedData.users;
-
-			const jobLogger = (message, meepleId) => {
-				// Send all messages through the existing log function
-				log(message, meepleId, socket);
-
-				// Track meeple completions for general tab progress updates (only on first completion message per meeple)
-				if (
-					meepleId &&
-					!completedMeeples.has(meepleId) &&
-					(message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))
-				) {
-					completedMeeples.add(meepleId);
-					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
-					const progress = ((completedMeeples.size / totalMeeples) * 100).toFixed(1);
-
-					socket.emit('job_update', {
-						message: `📈 Progress: ${completedMeeples.size}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`,
-						meepleId: null
-					});
-
-					if (completedMeeples.size === totalMeeples) {
-						socket.emit('job_update', { message: ``, meepleId: null });
-						socket.emit('job_update', { message: `🎯 All meeples have finished their missions!`, meepleId: null });
-					}
-				}
-
-				// Track meeple spawns for general tab
-				if (meepleId && message.includes('Spawning')) {
-					const match = message.match(/\((\d+)\/(\d+)\)/);
-					if (match) {
-						const spawnNumber = parseInt(match[1]);
-						const totalFromMessage = parseInt(match[2]);
-
-						// Use the total from the message to ensure consistency
-						const actualTotal = totalFromMessage || totalMeeples;
-
-						// Validate spawn number is within expected range
-						if (spawnNumber <= actualTotal) {
-							socket.emit('job_update', {
-								message: `🎬 Meeple ${spawnNumber}/${actualTotal} spawned: <span style="color: #FF7557;">${meepleId}</span>`,
-								meepleId: null
-							});
-						}
-					}
-				}
-			};
-
-			// Send periodic time updates
-			const progressInterval = setInterval(() => {
-				const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
+				// Send initial status to general tab (no meepleId)
+				socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
 				socket.emit('job_update', {
-					message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples.size}`,
+					message: `📋 Configuration: ${coercedData.users} meeples, concurrency: ${Math.min(coercedData.users, coercedData.concurrency || 10)}, headless: ${coercedData.headless}`,
 					meepleId: null
 				});
-			}, 30000); // Every 30 seconds
+				socket.emit('job_update', { message: `🎯 Target: ${coercedData.url}`, meepleId: null });
+				socket.emit('job_update', {
+					message: `💉 Mixpanel injection: ${coercedData.inject ? 'enabled' : 'disabled'}`,
+					meepleId: null
+				});
+				socket.emit('job_update', { message: `⏰ Job started at ${new Date().toLocaleTimeString()}`, meepleId: null });
+				socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
+				socket.emit('job_update', {
+					message: `👀 Watch individual meeple progress in their dedicated tabs`,
+					meepleId: null
+				});
+				socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
 
-			const result = await main(coercedData, jobLogger);
+				// Server-side analytics: Track job start
+				logger.notice(`/SIMULATE START`, { ...coercedData, user, jobId });
+				diagnostics.start();
 
-			// Clear the progress interval
-			clearInterval(progressInterval);
+				// Mixpanel server-side tracking
+				const userId = user || 'unauthenticated';
+				mp.track('server: job start', {
+					distinct_id: userId,
+					jobId,
+					url: coercedData.url,
+					users: coercedData.users,
+					concurrency: coercedData.concurrency,
+					headless: coercedData.headless,
+					inject: coercedData.inject
+				});
 
-			const endTime = Date.now();
-			const duration = (endTime - startTime) / 1000;
-			diagnostics.stop();
-			const report = diagnostics.report();
+				// Enhanced job logger with periodic progress updates
+				const jobStartTime = Date.now();
+				const completedMeeples = new Set();
+				const totalMeeples = coercedData.users;
 
-			// Server-side analytics: Track job completion
-			logger.notice(`/SIMULATE END in ${duration} seconds`, {
-				...coercedData,
-				user,
-				jobId,
-				duration,
-				completedMeeples,
-				totalMeeples,
-				report
-			});
+				const jobLogger = (message, meepleId) => {
+					// Send all messages through the existing log function
+					log(message, meepleId, socket);
 
-			// Mixpanel server-side tracking
-			mp.track('server: job finish', {
-				distinct_id: userId,
-				jobId,
-				duration,
-				completedMeeples,
-				totalMeeples,
-				url: coercedData.url,
-				users: coercedData.users,
-				diagnostics: report
-			});
+					// Track meeple completions for general tab progress updates (only on first completion message per meeple)
+					if (
+						meepleId &&
+						!completedMeeples.has(meepleId) &&
+						(message.includes('completed!') || message.includes('timed out') || message.includes('failed:'))
+					) {
+						completedMeeples.add(meepleId);
+						const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
+						const progress = ((completedMeeples.size / totalMeeples) * 100).toFixed(1);
 
-			// Enhanced completion summary for general tab
-			socket.emit('job_update', { message: ``, meepleId: null });
-			socket.emit('job_update', { message: `🏁 Simulation Complete!`, meepleId: null });
-			socket.emit('job_update', { message: `⏱️ Total duration: ${duration.toFixed(2)} seconds`, meepleId: null });
-			socket.emit('job_update', { message: `📊 Check the detailed summary below for results`, meepleId: null });
-			socket.emit('job_update', { message: `✅ Job completed: ${jobId}`, meepleId: null });
-			socket.emit('job_complete', result);
-		} catch (error) {
-			// Server-side analytics: Track job error
-			logger.error(`/SIMULATE ERROR`, {
-				user,
-				error: error.message,
-				stack: error.stack,
-				data: coercedData
-			});
+						socket.emit('job_update', {
+							message: `📈 Progress: ${completedMeeples.size}/${totalMeeples} meeples completed (${progress}%) | Elapsed: ${elapsed}s`,
+							meepleId: null
+						});
 
-			// Mixpanel server-side tracking
-			const userId = user || 'unauthenticated';
-			diagnostics.stop();
-			const report = diagnostics.report();
-			mp.track('server: job error', {
-				distinct_id: userId,
-				jobId: coercedData.jobId,
-				error: error.message,
-				url: coercedData.url,
-				users: coercedData.users,
-				diagnostics: report
-			});
+						if (completedMeeples.size === totalMeeples) {
+							socket.emit('job_update', { message: ``, meepleId: null });
+							socket.emit('job_update', { message: `🎯 All meeples have finished their missions!`, meepleId: null });
+						}
+					}
 
-			socket.emit('error', `❌ Job failed: ${error.message}`);
-		}
+					// Track meeple spawns for general tab
+					if (meepleId && message.includes('Spawning')) {
+						const match = message.match(/\((\d+)\/(\d+)\)/);
+						if (match) {
+							const spawnNumber = parseInt(match[1]);
+							const totalFromMessage = parseInt(match[2]);
+
+							// Use the total from the message to ensure consistency
+							const actualTotal = totalFromMessage || totalMeeples;
+
+							// Validate spawn number is within expected range
+							if (spawnNumber <= actualTotal) {
+								socket.emit('job_update', {
+									message: `🎬 Meeple ${spawnNumber}/${actualTotal} spawned: <span style="color: #FF7557;">${meepleId}</span>`,
+									meepleId: null
+								});
+							}
+						}
+					}
+				};
+
+				// Send periodic time updates
+				const progressInterval = setInterval(() => {
+					const elapsed = ((Date.now() - jobStartTime) / 1000).toFixed(1);
+					socket.emit('job_update', {
+						message: `⏱️ Job running for ${elapsed}s | Active meeples: ${totalMeeples - completedMeeples.size}`,
+						meepleId: null
+					});
+				}, 30000); // Every 30 seconds
+
+				const result = await main(coercedData, jobLogger);
+
+				// Clear the progress interval
+				clearInterval(progressInterval);
+
+				const endTime = Date.now();
+				const duration = (endTime - startTime) / 1000;
+				diagnostics.stop();
+				const report = diagnostics.report();
+
+				// Server-side analytics: Track job completion
+				logger.notice(`/SIMULATE END in ${duration} seconds`, {
+					...coercedData,
+					user,
+					jobId,
+					duration,
+					completedMeeples,
+					totalMeeples,
+					report
+				});
+
+				// Mixpanel server-side tracking
+				mp.track('server: job finish', {
+					distinct_id: userId,
+					jobId,
+					duration,
+					completedMeeples,
+					totalMeeples,
+					url: coercedData.url,
+					users: coercedData.users,
+					diagnostics: report
+				});
+
+				// Enhanced completion summary for general tab
+				socket.emit('job_update', { message: ``, meepleId: null });
+				socket.emit('job_update', { message: `🏁 Simulation Complete!`, meepleId: null });
+				socket.emit('job_update', { message: `⏱️ Total duration: ${duration.toFixed(2)} seconds`, meepleId: null });
+				socket.emit('job_update', { message: `📊 Check the detailed summary below for results`, meepleId: null });
+				socket.emit('job_update', { message: `✅ Job completed: ${jobId}`, meepleId: null });
+				socket.emit('job_complete', result);
+			} catch (error) {
+				// Server-side analytics: Track job error
+				logger.error(`/SIMULATE ERROR`, {
+					user,
+					error: error.message,
+					stack: error.stack,
+					data: coercedData
+				});
+
+				// Mixpanel server-side tracking
+				const userId = user || 'unauthenticated';
+				diagnostics.stop();
+				const report = diagnostics.report();
+				mp.track('server: job error', {
+					distinct_id: userId,
+					jobId: coercedData.jobId,
+					error: error.message,
+					url: coercedData.url,
+					users: coercedData.users,
+					diagnostics: report
+				});
+
+				socket.emit('error', `❌ Job failed: ${error.message}`);
+			}
+		});
+
+		socket.on('disconnect', () => {
+			logger.info(`SOCKET DISCONNECTED: ${socket.id}`, { socketId: socket.id });
+			// Jobs continue running even if client disconnects
+		});
 	});
-
-	socket.on('disconnect', () => {
-		logger.info(`SOCKET DISCONNECTED: ${socket.id}`, { socketId: socket.id });
-		// Jobs continue running even if client disconnects
-	});
-});
 } // End of if (!isApiContext) for WebSocket
 
 // Apply runtime guard middleware (must come before routes)
@@ -476,7 +476,7 @@ app.post('/simulate', async (req, res) => {
 		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
 	} catch (error) {
 		// For API context, use the authenticated user_id
-		user = isApiContext ? (req.body?.user_id || req.query?.user_id || 'API') : 'CRON';
+		user = isApiContext ? req.body?.user_id || req.query?.user_id || 'API' : 'CRON';
 	}
 
 	try {
@@ -579,7 +579,7 @@ app.post('/microsites', async (req, res) => {
 		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
 	} catch (error) {
 		// For API context, use the authenticated user_id
-		user = isApiContext ? (req.body?.user_id || req.query?.user_id || 'API') : 'CRON';
+		user = isApiContext ? req.body?.user_id || req.query?.user_id || 'API' : 'CRON';
 	}
 
 	try {

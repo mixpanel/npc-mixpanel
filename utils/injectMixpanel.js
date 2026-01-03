@@ -116,8 +116,18 @@ export default function injectMixpanel(token, userId = '', opts = {}) {
 					console.log('[NPC] STARTED SESSION RECORDING\n\n');
 
 					// Log autocapture initialization (these logs should appear if autocapture is working)
-					const features = ['pageview', 'click', 'dead click', 'input', 'scroll', 'submit', 'rage click', 'page visibility', 'scroll depth'];
-					features.forEach(function(feature) {
+					const features = [
+						'pageview',
+						'click',
+						'dead click',
+						'input',
+						'scroll',
+						'submit',
+						'rage click',
+						'page visibility',
+						'scroll depth'
+					];
+					features.forEach(function (feature) {
 						console.log('[autocapture] Initializing', feature, 'tracking');
 					});
 				},
@@ -230,18 +240,18 @@ export default function injectMixpanel(token, userId = '', opts = {}) {
 	}
 
 	// Since the script element won't load on some sites, immediately try to fetch and inject
-	setTimeout(function() {
+	setTimeout(function () {
 		if (!window.mixpanel || typeof window.mixpanel.init !== 'function') {
 			console.log('[NPC] Script did not load naturally, fetching and injecting inline...');
 
 			fetch('https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js')
-				.then(function(response) {
+				.then(function (response) {
 					if (!response.ok) {
 						throw new Error('HTTP ' + response.status);
 					}
 					return response.text();
 				})
-				.then(function(scriptContent) {
+				.then(function (scriptContent) {
 					console.log('[NPC] Fetched Mixpanel library, size:', scriptContent.length);
 					// Create and execute script inline
 					var scriptEl = document.createElement('script');
@@ -252,7 +262,7 @@ export default function injectMixpanel(token, userId = '', opts = {}) {
 					// Now call EMBED_TRACKING since library should be loaded
 					EMBED_TRACKING();
 				})
-				.catch(function(error) {
+				.catch(function (error) {
 					console.error('[NPC] Failed to fetch and inject Mixpanel library:', error);
 					// Try EMBED_TRACKING anyway in case it partially loaded
 					EMBED_TRACKING();
