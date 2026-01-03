@@ -7,7 +7,10 @@
 	"scripts": {
 		"local": "./scripts/local.sh",
 		"fire": "./scripts/fire.sh",
-		"deploy": "./scripts/deploy.sh",
+		"deploy": "./scripts/deploy-all.sh",
+		"deploy:ui": "./scripts/deploy-run.sh",
+		"deploy:api": "./scripts/deploy-api.sh",
+		"deploy:legacy": "./scripts/deploy.sh",
 		"perms": "chmod +x ./scripts/*.sh",
 		"prune": "rm -rf tmp/*",
 		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js",

@@ -263,9 +263,66 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 				log(`⚠️ Trusted Types bypass failed for ${username}, trying external script injection...`);
 
 				try {
+					// First try the standard approach
 					await page.addScriptTag({
 						url: 'https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js'
 					});
+
+					// Wait a bit for it to load
+					await new Promise(resolve => setTimeout(resolve, 1000));
+
+					// Check if it loaded
+					const scriptLoaded = await page.evaluate(() => {
+						return typeof window.mixpanel !== 'undefined' && typeof window.mixpanel.init === 'function';
+					});
+
+					if (!scriptLoaded) {
+						log(`⚠️ External script didn't load for ${username}, fetching and injecting inline...`);
+
+						// Try to fetch and inject the script content directly from within the page context
+						const inlineResult = await page.evaluate(async () => {
+							let scriptContent = '';
+							try {
+								// Fetch the script from within the browser
+								const response = await fetch('https://express-proxy-lmozz6xkha-uc.a.run.app/lib.min.js', {
+									mode: 'cors',
+									credentials: 'omit'
+								});
+
+								if (!response.ok) {
+									throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+								}
+
+								scriptContent = await response.text();
+								console.log('[NPC] Fetched Mixpanel library, size:', scriptContent.length);
+
+								// Create and execute script inline
+								const scriptEl = document.createElement('script');
+								scriptEl.textContent = scriptContent;
+								document.head.appendChild(scriptEl);
+								console.log('[NPC] Mixpanel library injected inline via fetch');
+								return { success: true, method: 'fetch-inline' };
+							} catch (e) {
+								console.error('[NPC] Failed to fetch and inject script:', e.message);
+								// If we have the script content, try eval as last resort
+								if (scriptContent) {
+									try {
+										console.log('[NPC] Attempting eval injection as final fallback...');
+										// eslint-disable-next-line no-eval
+										eval(scriptContent);
+										return { success: true, method: 'eval' };
+									} catch (evalError) {
+										console.error('[NPC] Eval injection also failed:', evalError.message);
+									}
+								}
+								return { success: false, error: e.message };
+							}
+						});
+
+						if (inlineResult && inlineResult.success) {
+							log(`✅ Mixpanel injected inline for ${username} (method: ${inlineResult.method})`);
+						}
+					}
 
 					// Initialize Mixpanel after external script loads
 					const externalResult = await page.evaluate(
@@ -307,6 +364,178 @@ export async function jamMixpanelIntoBrowser(page, username, opts = {}, log = co
 		2,
 		500
 	);
+}
+
+/**
+ * Ensure localStorage and sessionStorage are accessible by applying bypasses
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ */
+export async function ensureStorageBypass(page, log = console.log) {
+	try {
+		// Skip on about:blank pages to avoid SecurityErrors
+		const currentUrl = page.url();
+		if (currentUrl === 'about:blank' || currentUrl.startsWith('about:')) {
+			return; // Skip storage bypass on about: pages
+		}
+
+		// First check if bypass was already applied
+		const bypassStatus = await page.evaluate(() => {
+			// Wrap in try-catch to handle SecurityError when accessing localStorage
+			try {
+				return {
+					// @ts-ignore - Custom property
+					applied: window.STORAGE_BYPASS_APPLIED === true,
+					canAccessStorage: (() => {
+						try {
+							// Try to access localStorage without using it
+							return typeof window.localStorage === 'object';
+						} catch (e) {
+							return false;
+						}
+					})()
+				};
+			} catch (e) {
+				return { applied: false, canAccessStorage: false };
+			}
+		}).catch(() => ({ applied: false, canAccessStorage: false }));
+
+		// If bypass already applied, skip
+		if (bypassStatus.applied) {
+			return;
+		}
+
+		// Apply storage polyfill
+		await page.evaluate(() => {
+			try {
+				// Mark that we're attempting bypass
+				// @ts-ignore - Custom property
+				window.STORAGE_BYPASS_APPLIED = true;
+
+				// Create in-memory storage implementations
+				const createStorage = () => {
+					const storage = {};
+					return {
+						getItem: function(key) {
+							return storage[key] || null;
+						},
+						setItem: function(key, value) {
+							storage[key] = String(value);
+						},
+						removeItem: function(key) {
+							delete storage[key];
+						},
+						clear: function() {
+							Object.keys(storage).forEach(key => delete storage[key]);
+						},
+						key: function(index) {
+							return Object.keys(storage)[index] || null;
+						},
+						get length() {
+							return Object.keys(storage).length;
+						}
+					};
+				};
+
+				// Function to safely check if storage is accessible
+				const isStorageAccessible = (storageType) => {
+					try {
+						// @ts-ignore - Dynamic property access
+						const storage = window[storageType];
+						const testKey = '__test__';
+						// @ts-ignore - Storage methods
+						storage.setItem(testKey, 'test');
+						// @ts-ignore - Storage methods
+						storage.removeItem(testKey);
+						return true;
+					} catch (e) {
+						return false;
+					}
+				};
+
+				// Apply localStorage polyfill if needed
+				if (!isStorageAccessible('localStorage')) {
+					const localStoragePolyfill = createStorage();
+
+					// Try to override localStorage
+					try {
+						Object.defineProperty(window, 'localStorage', {
+							value: localStoragePolyfill,
+							writable: false,
+							configurable: true
+						});
+					} catch (e) {
+						// Fallback: direct assignment
+						try {
+							// @ts-ignore - Assigning to read-only property
+							window.localStorage = localStoragePolyfill;
+						} catch (e2) {
+							// If even that fails, we'll just mark it as applied
+						}
+					}
+
+					// Also expose as backup
+					// @ts-ignore - Custom property
+					window.__localStoragePolyfill = localStoragePolyfill;
+				}
+
+				// Apply sessionStorage polyfill if needed
+				if (!isStorageAccessible('sessionStorage')) {
+					const sessionStoragePolyfill = createStorage();
+
+					try {
+						Object.defineProperty(window, 'sessionStorage', {
+							value: sessionStoragePolyfill,
+							writable: false,
+							configurable: true
+						});
+					} catch (e) {
+						try {
+							// @ts-ignore - Assigning to read-only property
+							window.sessionStorage = sessionStoragePolyfill;
+						} catch (e2) {
+							// If even that fails, we'll just mark it as applied
+						}
+					}
+
+					// Also expose as backup
+					// @ts-ignore - Custom property
+					window.__sessionStoragePolyfill = sessionStoragePolyfill;
+				}
+
+				// Mark successful bypass
+				// @ts-ignore - Custom property
+				window.STORAGE_BYPASS_SUCCESS = true;
+
+			} catch (error) {
+				// Even if we fail, mark as applied to avoid repeated attempts
+				// @ts-ignore - Custom property
+				window.STORAGE_BYPASS_APPLIED = true;
+				// @ts-ignore - Custom property
+				window.STORAGE_BYPASS_ERROR = error.message;
+			}
+		});
+
+		// Only log success once per page
+		const result = await page.evaluate(() => {
+			return {
+				// @ts-ignore - Custom property
+				success: window.STORAGE_BYPASS_SUCCESS === true,
+				// @ts-ignore - Custom property
+				error: window.STORAGE_BYPASS_ERROR
+			};
+		}).catch(() => ({ success: false, error: 'Could not verify bypass status' }));
+
+		if (result.success) {
+			log('✅ Storage polyfill installed successfully');
+		} else if (result.error) {
+			// Silently continue - we don't want to spam logs
+		}
+
+	} catch (storageError) {
+		// Silently continue - storage bypass is best effort
+		// We don't want to spam the logs with repeated errors
+	}
 }
 
 /**
@@ -448,78 +677,49 @@ export async function relaxCSP(page, log = console.log) {
 			window.TRUSTED_TYPES_BYPASS = true;
 		});
 
-		// Inject the relaxed CSP script with Trusted Types bypass
+		// Inject the relaxed CSP as a meta tag
 		try {
-			await page.addScriptTag({ content: relaxedCSP });
-		} catch (trustedScriptError) {
-			log(`⚠️ Direct CSP script injection failed due to Trusted Types, trying bypass...`);
+			await page.evaluate(cspPolicy => {
+				// Remove existing CSP meta tags
+				const existingCSPTags = document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
+				existingCSPTags.forEach(tag => tag.remove());
 
-			// Try Trusted Types bypass for CSP relaxation script
-			await page.evaluate(scriptContent => {
+				// Add new relaxed CSP meta tag
+				const meta = document.createElement('meta');
+				meta.setAttribute('http-equiv', 'Content-Security-Policy');
+				meta.setAttribute('content', cspPolicy);
+				document.head.appendChild(meta);
+				
+				console.log('✅ Relaxed CSP policy applied via meta tag');
+			}, relaxedCSP);
+		} catch (cspError) {
+			log(`⚠️ CSP meta tag injection failed, trying alternative bypass...`);
+
+			// Try alternative approach - set CSP via document modification
+			await page.evaluate(cspPolicy => {
 				try {
-					// Strategy 1: Create permissive policy for CSP script
-					if (window.trustedTypes && window.trustedTypes.createPolicy) {
-						try {
-							const policy = window.trustedTypes.createPolicy('csp-relaxation-' + Date.now(), {
-								createScript: input => input,
-								createScriptURL: input => input,
-								createHTML: input => input
-							});
-
-							const script = document.createElement('script');
-							script.textContent = policy.createScript(scriptContent);
-							document.head.appendChild(script);
-							return { success: true, method: 'trustedTypesCSP' };
-						} catch (e) {
-							// Policy creation failed
-						}
-					}
-
-					// Strategy 2: Use existing policies
-					if (window.trustedTypes && window.trustedTypes.getPolicyNames) {
-						const policies = window.trustedTypes.getPolicyNames();
-						for (const policyName of policies) {
-							try {
-								const existingPolicy = window.trustedTypes.getPolicy(policyName);
-								if (existingPolicy && existingPolicy.createScript) {
-									const script = document.createElement('script');
-									script.textContent = existingPolicy.createScript(scriptContent);
-									document.head.appendChild(script);
-									return { success: true, method: 'existingPolicyCSP' };
-								}
-							} catch (e) {
-								// Continue trying other policies
-							}
-						}
-					}
-
-					// Strategy 3: Function constructor bypass
-					try {
-						const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
-						const executeScript = new AsyncFunction(
-							'scriptContent',
-							`
-							try {
-								const fn = new Function(scriptContent);
-								fn();
-								return { success: true, method: 'functionConstructorCSP' };
-							} catch (e) {
-								throw e;
-							}
-						`
-						);
-
-						return executeScript(scriptContent);
-					} catch (e) {
-						// Function constructor failed
-					}
-
-					return { success: false, error: 'All CSP bypass strategies failed' };
+					// Strategy 1: Try to modify document CSP if possible
+					console.log('⚙️ Applying CSP bypass strategies...');
+					
+					// Remove existing CSP restrictions by clearing meta tags
+					const cspMetas = document.querySelectorAll('meta[http-equiv*="Content-Security-Policy" i]');
+					cspMetas.forEach(meta => meta.remove());
+					
+					// Try to override any CSP via meta tag
+					const newMeta = document.createElement('meta');
+					newMeta.setAttribute('http-equiv', 'Content-Security-Policy');
+					newMeta.setAttribute('content', cspPolicy);
+					document.head.appendChild(newMeta);
+					
+					return { success: true, method: 'metaTagCSP' };
 				} catch (error) {
 					return { success: false, error: error.message };
 				}
 			}, relaxedCSP);
 		}
+
+		// Apply localStorage bypass for this page
+		await ensureStorageBypass(page, log);
 
 		// Set permissions for the current URL and common variations
 		const context = page.browser().defaultBrowserContext();
@@ -564,6 +764,15 @@ export async function relaxCSP(page, log = console.log) {
  */
 export async function ensurePageSetup(page, username, inject = true, opts = {}, log = console.log) {
 	try {
+		// Skip setup on about:blank pages entirely
+		const currentUrl = page.url();
+		if (currentUrl === 'about:blank' || currentUrl.startsWith('about:')) {
+			return; // Skip all setup on about: pages
+		}
+
+		// Always ensure localStorage bypass is in place (critical for each navigation)
+		await ensureStorageBypass(page, log);
+
 		// Check if CSP is already relaxed
 		const cspStatus = await page.evaluate(() => {
 			return {
@@ -592,9 +801,16 @@ export async function ensurePageSetup(page, username, inject = true, opts = {}, 
 			await ensureMixpanelInjected(page, username, opts, log);
 		}
 
-		log(`✅ Page setup complete for ${username} (inject: ${inject})`);
+		// Only log success for real pages
+		if (!currentUrl.startsWith('chrome') && !currentUrl.startsWith('data:')) {
+			log(`✅ Page setup complete for ${username} (inject: ${inject})`);
+		}
 	} catch (error) {
-		log(`⚠️ Page setup error for ${username}: ${error.message}`);
+		// Only log errors for non-blank pages
+		const currentUrl = page.url();
+		if (currentUrl && !currentUrl.startsWith('about:') && !currentUrl.startsWith('chrome')) {
+			log(`⚠️ Page setup error for ${username}: ${error.message}`);
+		}
 		// Don't throw - let the session continue
 	}
 }

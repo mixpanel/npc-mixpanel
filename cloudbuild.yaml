@@ -7,7 +7,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest']
 
-  # Deploy to Cloud Run
+  # Deploy to Cloud Run (UI service - private, behind IAP)
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
@@ -25,7 +25,7 @@ steps:
       - '--concurrency=10'
       - '--session-affinity'
       - '--port=8080'
-      - '--env-vars-file=.env.yaml'
+      - '--set-env-vars=NODE_ENV=production,RUNTIME_CONTEXT=npc-ui'
 
 # Substitution variables
 substitutions:

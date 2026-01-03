@@ -46,16 +46,32 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}, log 
 
 /**
  * Launch a new browser instance with proper configuration
+ *
+ * DevTools Debugging:
+ * - Set NODE_ENV=dev and headless=false to auto-open DevTools
+ * - Use 'debugger' statements in injected code to pause execution
+ * - Example: NODE_ENV=dev npm run local (with headless: false in config)
+ *
  * @param {boolean} headless - Whether to run in headless mode
  * @param {Function} log - Logging function
  * @returns {Promise<Browser>} - Browser instance
  */
 export async function launchBrowser(headless = true, log = console.log) {
 	try {
+		// Auto-open DevTools in development mode when not headless
+		const isDev = process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'development';
+		const shouldOpenDevTools = isDev && !headless;
+
+		if (shouldOpenDevTools) {
+			log('🔧 Opening DevTools automatically (NODE_ENV=dev, headless=false)');
+		}
+
 		const browser = await puppeteer.launch({
 			// @ts-ignore
 			headless: headless ? 'new' : false,
 			args: puppeteerArgs,
+			// Auto-open DevTools for debugging
+			devtools: shouldOpenDevTools,
 			// No userDataDir - don't persist data for cloud functions
 			defaultViewport: {
 				width: 1366 + Math.floor(Math.random() * 200),
@@ -72,6 +88,19 @@ export async function launchBrowser(headless = true, log = console.log) {
 		});
 
 		// Browser-level security setup (URL-specific permissions will be set per page)
+
+		// Close the initial blank page that Puppeteer creates automatically
+		// This prevents the "multiple about:blank pages" issue in headful mode
+		try {
+			const pages = await browser.pages();
+			if (pages.length > 0 && pages[0].url() === 'about:blank') {
+				await pages[0].close();
+				log('🧹 Closed initial blank page');
+			}
+		} catch (err) {
+			// Non-critical error, just log and continue
+			log(`⚠️ Could not close initial blank page: ${err.message}`);
+		}
 
 		log(`🚀 Browser launched (headless: ${headless})`);
 		return browser;
@@ -91,8 +120,20 @@ export async function createPage(browser, log = console.log) {
 	try {
 		const page = await browser.newPage();
 
-		// CRITICAL: Enable CSP bypass at page level immediately
+		// CRITICAL: Enable ALL security bypasses at page level immediately
 		await page.setBypassCSP(true);
+
+		// Disable JavaScript domain security
+		await page.evaluateOnNewDocument(() => {
+			// Override document.domain to allow cross-origin access
+			try {
+				Object.defineProperty(document, 'domain', {
+					get() { return window.location.hostname; },
+					set(val) { return val; },
+					configurable: true
+				});
+			} catch (e) {}
+		});
 
 		// Set random realistic user agent
 		const randomAgent = agents[Math.floor(Math.random() * agents.length)];

@@ -32,7 +32,7 @@ import { navigateBack, navigateForward } from '../meeple/navigation.js';
 import { identifyHotZones, calculateVisualProminence, rectsOverlap } from '../meeple/hotzones.js';
 import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from '../meeple/browser.js';
 import { randomBetween, sleep, clamp, randomFloat, lerp, distance, shuffle, weightedRandom } from '../meeple/utils.js';
-import { retry, ensureCSPRelaxed, ensurePageSetup } from '../meeple/security.js';
+import { retry, ensureCSPRelaxed, ensurePageSetup, ensureStorageBypass } from '../meeple/security.js';
 import { executeSequence, validateSequence, validateSequences } from '../meeple/sequences.js';
 
 // Set test environment
