@@ -33,7 +33,7 @@
 	"license": "ISC",
 	"description": "puppeteer in the cloud!",
 	"dependencies": {
-		"@google-cloud/storage": "^7.12.0",
+		"@google-cloud/storage": "^7.19.0",
 		"ak-diagnostic": "^1.0.0",
 		"ak-fetch": "^1.0.6",
 		"ak-tools": "^1.0.66",
