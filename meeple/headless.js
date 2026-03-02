@@ -20,12 +20,14 @@ import {
 	naturalMouseMovement,
 	hoverOverElements,
 	randomMouse,
-	randomScroll
+	randomScroll,
+	deadClick,
+	confusedBehavior
 } from './interactions.js';
 import { interactWithForms } from './forms.js';
 import { navigateBack, navigateForward } from './navigation.js';
 import { identifyHotZones } from './hotzones.js';
-import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser } from './browser.js';
+import { launchBrowser, createPage, navigateToUrl, getPageInfo, closeBrowser, applyNetworkThrottling, enableChaosMode } from './browser.js';
 import { executeSequence } from './sequences.js';
 import { randomBetween, sleep } from './utils.js';
 
@@ -52,7 +54,12 @@ export default async function main(PARAMS = {}, logFunction = null) {
 		token = '',
 		maxActions = null,
 		masking = false,
-		sequences = null
+		sequences = null,
+		// Friction behaviors
+		networkProfile = 'fast',
+		chaosMode = false,
+		chaosFailRate = 0.15,
+		formMistakes = false
 	} = PARAMS;
 
 	if (url === 'fixpanel') url = `https://mixpanel.github.io/fixpanel/`;
@@ -111,7 +118,11 @@ export default async function main(PARAMS = {}, logFunction = null) {
 				{
 					masking,
 					sequence: selectedSequence,
-					sequenceName: selectedSequenceName
+					sequenceName: selectedSequenceName,
+					networkProfile,
+					chaosMode,
+					chaosFailRate,
+					formMistakes
 				},
 				log
 			)
@@ -284,6 +295,14 @@ export async function simulateUser(
 			const page = await createPage(browser, log);
 			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN;
 
+			// Apply friction behaviors if configured
+			if (meepleOpts.networkProfile && meepleOpts.networkProfile !== 'fast') {
+				await applyNetworkThrottling(page, meepleOpts.networkProfile, log);
+			}
+			if (meepleOpts.chaosMode) {
+				await enableChaosMode(page, meepleOpts.chaosFailRate || 0.15, log);
+			}
+
 			// Validate and navigate to URL
 			let navigationUrl;
 			try {
@@ -301,7 +320,7 @@ export async function simulateUser(
 				throw new Error(`Invalid URL provided: ${url} - ${urlError.message}`);
 			}
 
-			await navigateToUrl(page, navigationUrl, log);
+			await navigateToUrl(page, navigationUrl, log, meepleOpts);
 			// Set up page environment
 			await ensurePageSetup(page, usersHandle, inject, meepleOpts, log);
 			await sleep(randomBetween(50, 250)); // Random sleep to simulate human behavior (was 100-500ms)
@@ -416,12 +435,25 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		wait: '⏸️',
 		form: '📝',
 		back: '⬅️',
-		forward: '➡️'
+		forward: '➡️',
+		deadClick: '💀',
+		confusedBehavior: '🤔'
 	};
 
 	for (const [index, originalAction] of actionSequence.entries()) {
+		// Chaos mode: randomly inject friction behaviors (10% dead clicks, 5% confused behavior)
+		let chaosAction = originalAction;
+		if (opts.chaosMode) {
+			const roll = Math.random();
+			if (roll < 0.10) {
+				chaosAction = 'deadClick';
+			} else if (roll < 0.15) {
+				chaosAction = 'confusedBehavior';
+			}
+		}
+
 		// Apply context-aware action selection
-		const action = getContextAwareAction(actionHistory, originalAction, log);
+		const action = getContextAwareAction(actionHistory, chaosAction, log);
 
 		const emoji = actionEmojis[action] || '🎯';
 		const contextNote =
@@ -471,7 +503,13 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
 				break;
 			case 'form':
-				funcToPerform = () => interactWithForms(page, log);
+				funcToPerform = () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
+				break;
+			case 'deadClick':
+				funcToPerform = () => deadClick(page, hotZones, log);
+				break;
+			case 'confusedBehavior':
+				funcToPerform = () => confusedBehavior(page, log);
 				break;
 			case 'back':
 				funcToPerform = () => navigateBack(page, log);

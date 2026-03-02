@@ -230,6 +230,23 @@
 
 					<label> <input type="checkbox" id="past" name="past" /> Simulate time in past </label>
 
+					<div id="friction-section" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+						<p style="margin: 4px 0; font-size: 0.85em; color: #888;"><b>Friction Behaviors</b></p>
+						<div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+							<label style="font-size: 0.9em;">
+								Network:
+								<select id="networkProfile" name="networkProfile" style="margin-left: 4px; padding: 2px 4px; background: #1a1a2e; color: #fff; border: 1px solid #333; border-radius: 4px;">
+									<option value="fast">Fast (default)</option>
+									<option value="moderate">Moderate (2 Mbps)</option>
+									<option value="slow4g">Slow 4G</option>
+									<option value="slow3g">Slow 3G</option>
+								</select>
+							</label>
+							<label style="font-size: 0.9em;"> <input type="checkbox" id="chaosMode" name="chaosMode" /> Chaos Mode </label>
+							<label style="font-size: 0.9em;"> <input type="checkbox" id="formMistakes" name="formMistakes" /> Form Mistakes </label>
+						</div>
+					</div>
+
 					<button type="submit">nom nom!</button>
 				</form>
 				<div class="loading">Simulating...</div>
