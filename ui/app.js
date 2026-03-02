@@ -539,6 +539,11 @@ form.addEventListener('submit', async e => {
 	data.past = /** @type {HTMLInputElement} */ (form.querySelector('#past')).checked;
 	data.masking = /** @type {HTMLInputElement} */ (form.querySelector('#masking')).checked;
 
+	// Friction behaviors
+	data.networkProfile = /** @type {HTMLSelectElement} */ (form.querySelector('#networkProfile')).value;
+	data.chaosMode = /** @type {HTMLInputElement} */ (form.querySelector('#chaosMode')).checked;
+	data.formMistakes = /** @type {HTMLInputElement} */ (form.querySelector('#formMistakes')).checked;
+
 	// Show terminal with animation
 	const terminal = document.getElementById('terminal');
 	const terminalContent = document.getElementById('terminal-content');
@@ -651,9 +656,15 @@ form.addEventListener('submit', async e => {
 	overview.innerHTML = `<div class="config-status">🎭 Meeples are meepling...</div>`;
 	formLine1.innerHTML = `<div class="config-row"><span class="config-label">URL:</span> <code class="config-value">${data.url}</code></div>`;
 	formLine2.innerHTML = `<div class="config-row"><span class="config-label">Token:</span> <code class="config-value">${data.token || '(not injecting)'}</code></div>`;
+	const frictionFlags = [];
+	if (data.networkProfile && data.networkProfile !== 'fast') frictionFlags.push(`network: ${data.networkProfile}`);
+	if (data.chaosMode) frictionFlags.push('chaos: ✓');
+	if (data.formMistakes) frictionFlags.push('form mistakes: ✓');
+	const frictionStr = frictionFlags.length > 0 ? ` | ${frictionFlags.join(' | ')}` : '';
+
 	formLine3.innerHTML = `<div class="config-row">
 		<span class="config-label">${data.users} meeple${data.users > 1 ? 's' : ''}</span>
-		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${data.past ? '✓' : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}</span>
+		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${data.past ? '✓' : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}${frictionStr}</span>
 		${data.inject && data.token === '7127e52d6d61ee30a4d7fb4555277f87' ? `<a href="https://mixpanel.com/project/3769788/view/4266856/app/events" target="_blank" class="default-project-link">→ view project</a>` : ''}
 	</div>`;
 

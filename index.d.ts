@@ -124,6 +124,17 @@ export interface MeepleParams {
 	sequences?: SequencesSpec | null;
 	/** Unique identifier for this simulation run */
 	runId?: string;
+
+	// ── Friction Behaviors ──
+
+	/** Simulate poor network conditions via CDP throttling */
+	networkProfile?: 'fast' | 'moderate' | 'slow3g' | 'slow4g' | 'offline';
+	/** Enable Chaos Mode: randomly sabotage POST/PUT/PATCH requests + dead clicks */
+	chaosMode?: boolean;
+	/** Probability (0-1) that a data request will fail in chaos mode. Default: 0.15 */
+	chaosFailRate?: number;
+	/** Enable intentional form mistakes: meeples submit wrong data, trigger validation, then correct */
+	formMistakes?: boolean;
 }
 
 export interface SequencesSpec {
@@ -251,6 +262,17 @@ export interface MeepleOptions {
 	sequence?: SequenceSpec;
 	/** Name of the assigned sequence */
 	sequenceName?: string;
+
+	// ── Friction Behaviors ──
+
+	/** Network throttling profile */
+	networkProfile?: 'fast' | 'moderate' | 'slow3g' | 'slow4g' | 'offline';
+	/** Enable Chaos Mode */
+	chaosMode?: boolean;
+	/** Chaos mode fail rate (0-1) */
+	chaosFailRate?: number;
+	/** Enable intentional form mistakes */
+	formMistakes?: boolean;
 }
 
 export type LogFunction = (message: string, meepleId?: string | null) => void;

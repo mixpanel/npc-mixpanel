@@ -1294,3 +1294,139 @@ export async function randomScroll(page, log = console.log) {
 		return false;
 	}
 }
+
+/**
+ * Simulate a "dead click" - clicking just outside a button's bounding box so the JS handler doesn't fire.
+ * This produces a click event in Session Replay that leads to no navigation or action.
+ * @param {Page} page - Puppeteer page object
+ * @param {Array} hotZones - Available hot zones
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function deadClick(page, hotZones = [], log = console.log) {
+	try {
+		// Find a clickable element (button/link) to "miss"
+		const targets = await page.evaluate(() => {
+			const elements = document.querySelectorAll('button, a, [role="button"], input[type="submit"]');
+			const results = [];
+			elements.forEach(el => {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 20 && rect.height > 20 && rect.top > 0 && rect.top < window.innerHeight) {
+					results.push({
+						x: rect.x,
+						y: rect.y,
+						width: rect.width,
+						height: rect.height,
+						text: el.textContent?.trim().substring(0, 40) || '',
+						tag: el.tagName.toLowerCase()
+					});
+				}
+			});
+			return results.slice(0, 10);
+		});
+
+		if (targets.length === 0) return false;
+
+		const target = targets[Math.floor(Math.random() * targets.length)];
+
+		// Click 2-4 pixels OUTSIDE the element boundary (enough to miss, close enough to look intentional)
+		const missOffset = randomBetween(2, 4);
+		const side = Math.floor(Math.random() * 4); // 0=above, 1=below, 2=left, 3=right
+		let clickX, clickY;
+
+		switch (side) {
+			case 0: // above
+				clickX = target.x + target.width / 2;
+				clickY = target.y - missOffset;
+				break;
+			case 1: // below
+				clickX = target.x + target.width / 2;
+				clickY = target.y + target.height + missOffset;
+				break;
+			case 2: // left
+				clickX = target.x - missOffset;
+				clickY = target.y + target.height / 2;
+				break;
+			default: // right
+				clickX = target.x + target.width + missOffset;
+				clickY = target.y + target.height / 2;
+				break;
+		}
+
+		// Clamp to viewport
+		const viewport = page.viewport();
+		clickX = Math.max(0, Math.min(viewport.width - 1, clickX));
+		clickY = Math.max(0, Math.min(viewport.height - 1, clickY));
+
+		// Move mouse naturally then click
+		await moveMouse(page, Math.random() * viewport.width, Math.random() * viewport.height, clickX, clickY, 20, 20, log);
+		await new Promise(resolve => setTimeout(resolve, randomBetween(50, 150)));
+		await page.mouse.click(clickX, clickY);
+
+		log(
+			`🖱️ <span style="color: #CC332B;">Dead click</span> near ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(missed by ${missOffset}px)</span>`
+		);
+
+		// Meeple pauses in confusion (nothing happened)
+		await new Promise(resolve => setTimeout(resolve, randomBetween(800, 2000)));
+
+		// Then click the actual element
+		const realX = target.x + target.width / 2;
+		const realY = target.y + target.height / 2;
+		await page.mouse.click(realX, realY);
+		log(`    └─ 👆 <span style="color: #07B096;">Retry click</span> (corrected aim)`);
+
+		return true;
+	} catch (error) {
+		log(`⚠️ Dead click error: ${error.message}`);
+		return false;
+	}
+}
+
+/**
+ * Simulate confused user behavior: rapid jittery mouse movements and frantic scrolling.
+ * Triggered when a meeple encounters friction (failed action, timeout, etc.)
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function confusedBehavior(page, log = console.log) {
+	try {
+		log(`🤔 <span style="color: #F8BC3B;">Meeple is confused</span> (friction detected)`);
+		const viewport = page.viewport();
+
+		// Phase 1: Rapid, jittery mouse movements across the screen
+		const jitterMoves = randomBetween(4, 8);
+		for (let i = 0; i < jitterMoves; i++) {
+			const x = Math.random() * viewport.width;
+			const y = Math.random() * viewport.height;
+			await page.mouse.move(x, y, { steps: randomBetween(1, 3) }); // low steps = jerky
+			await new Promise(resolve => setTimeout(resolve, randomBetween(50, 150)));
+		}
+
+		// Phase 2: Frantic scroll up and down
+		const scrollBursts = randomBetween(2, 4);
+		for (let i = 0; i < scrollBursts; i++) {
+			const dir = Math.random() < 0.5 ? 1 : -1;
+			await page.evaluate(d => window.scrollBy(0, d * 300), dir);
+			await new Promise(resolve => setTimeout(resolve, randomBetween(100, 300)));
+		}
+
+		// Phase 3: Sometimes highlight/select random text (frustrated user trait)
+		if (Math.random() < 0.3) {
+			const startX = Math.random() * viewport.width * 0.8 + viewport.width * 0.1;
+			const startY = Math.random() * viewport.height * 0.6 + viewport.height * 0.2;
+			await page.mouse.move(startX, startY);
+			await page.mouse.down();
+			await page.mouse.move(startX + randomBetween(50, 200), startY, { steps: 5 });
+			await page.mouse.up();
+			log(`    └─ 📝 <span style="color: #F8BC3B;">Text selected in frustration</span>`);
+		}
+
+		log(`    └─ 🤔 <span style="color: #888;">Confused behavior complete</span>`);
+		return true;
+	} catch (error) {
+		log(`⚠️ Confused behavior error: ${error.message}`);
+		return false;
+	}
+}

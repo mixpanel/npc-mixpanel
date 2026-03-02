@@ -212,10 +212,110 @@ export async function fillRadioGroup(page, radioGroupElement, clicksCount = 2, l
 }
 
 /**
+ * Fill a text input with an intentional mistake, trigger validation, then correct it.
+ * Simulates real users making typos in email/URL fields and hitting validation errors.
+ * @param {Page} page - Puppeteer page object
+ * @param {ElementHandle} element - The input/textarea element
+ * @param {string} text - Correct text to ultimately type
+ * @param {Function} log - Logging function
+ * @returns {Promise<boolean>} Success status
+ */
+export async function fillTextInputWithMistake(page, element, text = null, log = console.log) {
+	try {
+		await element.scrollIntoViewIfNeeded();
+		await sleep(randomBetween(100, 300));
+
+		// Get element info to decide what kind of mistake to make
+		const elementInfo = await page.evaluate(
+			el => ({
+				type: el.type || 'text',
+				placeholder: el.placeholder || '',
+				tagName: el.tagName.toLowerCase()
+			}),
+			element
+		);
+
+		// Use provided text or select from test data
+		let correctText = text;
+		if (!correctText) {
+			const termType = ['email', 'search', 'password', 'url', 'tel', 'number'].includes(elementInfo.type)
+				? elementInfo.type
+				: 'text';
+			const availableTerms = formTestData[termType] || formTestData.text;
+			correctText = availableTerms[Math.floor(Math.random() * availableTerms.length)];
+		}
+
+		// Generate a mistake based on the field type
+		let wrongText;
+		const mistakeType = Math.random();
+
+		if (elementInfo.type === 'email' && correctText.includes('@')) {
+			// Remove the @ from an email — triggers HTML5 validation
+			wrongText = correctText.replace('@', '');
+			log(`    └─ 🤦 <span style="color: #F8BC3B;">Intentional mistake:</span> missing @ in email`);
+		} else if (elementInfo.type === 'url' && correctText.startsWith('http')) {
+			// Drop the protocol — triggers validation
+			wrongText = correctText.replace(/^https?:\/\//, '');
+			log(`    └─ 🤦 <span style="color: #F8BC3B;">Intentional mistake:</span> missing protocol in URL`);
+		} else if (elementInfo.type === 'tel') {
+			// Add letters to a phone number
+			wrongText = correctText.replace(/\d{2}/, 'ab');
+			log(`    └─ 🤦 <span style="color: #F8BC3B;">Intentional mistake:</span> letters in phone number`);
+		} else if (mistakeType < 0.5) {
+			// Truncate the text (user didn't finish typing)
+			wrongText = correctText.substring(0, Math.max(2, Math.floor(correctText.length * 0.4)));
+			log(`    └─ 🤦 <span style="color: #F8BC3B;">Intentional mistake:</span> incomplete input`);
+		} else {
+			// Swap two adjacent characters
+			const swapIdx = Math.floor(Math.random() * (correctText.length - 1));
+			wrongText =
+				correctText.substring(0, swapIdx) +
+				correctText[swapIdx + 1] +
+				correctText[swapIdx] +
+				correctText.substring(swapIdx + 2);
+			log(`    └─ 🤦 <span style="color: #F8BC3B;">Intentional mistake:</span> transposed characters`);
+		}
+
+		// Type the wrong text
+		await element.click({ clickCount: 3 });
+		await sleep(randomBetween(50, 100));
+		for (const char of wrongText) {
+			await page.keyboard.type(char);
+			await sleep(randomBetween(25, 75));
+		}
+
+		// Try to submit to trigger validation error
+		await page.keyboard.press('Enter');
+		await sleep(randomBetween(500, 1500)); // Stare at the error
+
+		// Tab away and back (another common pattern to trigger blur validation)
+		await page.keyboard.press('Tab');
+		await sleep(randomBetween(300, 800));
+
+		log(`    └─ 😤 <span style="color: #CC332B;">Validation error triggered</span> — meeple correcting...`);
+
+		// Fix it — select all and retype correctly
+		await element.click({ clickCount: 3 });
+		await sleep(randomBetween(100, 200));
+		for (const char of correctText) {
+			await page.keyboard.type(char);
+			await sleep(randomBetween(25, 75));
+		}
+
+		await sleep(randomBetween(200, 500));
+		log(`    └─ ✅ <span style="color: #07B096;">Corrected input</span>`);
+		return true;
+	} catch (error) {
+		log(`    └─ ⚠️ <span style="color: #F8BC3B;">Form mistake simulation failed:</span> ${error.message}`);
+		return false;
+	}
+}
+
+/**
  * Intelligently fill any form element based on its type
  * @param {Page} page - Puppeteer page object
  * @param {ElementHandle} element - The form element
- * @param {Object} options - Options like {text, value, clicksPerGroup}
+ * @param {Object} options - Options like {text, value, clicksPerGroup, formMistakes}
  * @param {Function} log - Logging function
  * @returns {Promise<boolean>} Success status
  */
@@ -237,6 +337,10 @@ export async function fillFormElement(page, element, options = {}, log = console
 		} else if (elementInfo.tagName === 'select') {
 			return await fillSelectDropdown(page, element, options.value, log);
 		} else if (elementInfo.tagName === 'textarea' || elementInfo.tagName === 'input') {
+			// When formMistakes is enabled, 30% chance to make an intentional mistake
+			if (options.formMistakes && Math.random() < 0.3) {
+				return await fillTextInputWithMistake(page, element, options.text, log);
+			}
 			return await fillTextInput(page, element, options.text, log);
 		}
 
@@ -250,8 +354,11 @@ export async function fillFormElement(page, element, options = {}, log = console
 /**
  * Interact with forms - search boxes, email inputs, etc.
  * ENHANCED: Now supports ALL form element types including radios and checkboxes
+ * @param {Page} page - Puppeteer page object
+ * @param {Function} log - Logging function
+ * @param {Object} [opts] - Options like { formMistakes: boolean }
  */
-export async function interactWithForms(page, log = console.log) {
+export async function interactWithForms(page, log = console.log, opts = {}) {
 	try {
 		// Check if page is still responsive
 		await page.evaluate(() => document.readyState);
@@ -386,7 +493,11 @@ export async function interactWithForms(page, log = console.log) {
 			action = `🔽 <span style="color: #9B59B6;">Select option chosen</span>`;
 		} else {
 			// Text input, textarea, or other input types
-			success = await fillTextInput(page, elementHandle, null, log);
+			if (opts.formMistakes && Math.random() < 0.3) {
+				success = await fillTextInputWithMistake(page, elementHandle, null, log);
+			} else {
+				success = await fillTextInput(page, elementHandle, null, log);
+			}
 
 			// Sometimes submit (30%), sometimes just leave it
 			if (Math.random() < 0.3) {

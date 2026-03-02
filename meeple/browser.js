@@ -111,6 +111,96 @@ export async function launchBrowser(headless = true, log = console.log) {
 }
 
 /**
+ * Apply CDP network throttling to simulate poor network conditions
+ * @param {Page} page - Puppeteer page object
+ * @param {string} profile - Network profile: 'fast' | 'slow3g' | 'slow4g' | 'offline'
+ * @param {Function} log - Logging function
+ */
+export async function applyNetworkThrottling(page, profile = 'fast', log = console.log) {
+	if (!profile || profile === 'fast') return;
+
+	try {
+		const client = await page.createCDPSession();
+		await client.send('Network.enable');
+
+		const profiles = {
+			slow3g: {
+				offline: false,
+				downloadThroughput: ((500 * 1000) / 8) * 0.8, // 500 kbps
+				uploadThroughput: ((500 * 1000) / 8) * 0.8,
+				latency: 400 * 5 // 2000ms
+			},
+			slow4g: {
+				offline: false,
+				downloadThroughput: ((4000 * 1000) / 8) * 0.8, // 4 Mbps
+				uploadThroughput: ((3000 * 1000) / 8) * 0.8,
+				latency: 100 * 4 // 400ms
+			},
+			moderate: {
+				offline: false,
+				downloadThroughput: ((2000 * 1000) / 8) * 0.8, // 2 Mbps
+				uploadThroughput: ((1000 * 1000) / 8) * 0.8,
+				latency: 150 // 150ms
+			},
+			offline: {
+				offline: true,
+				downloadThroughput: 0,
+				uploadThroughput: 0,
+				latency: 0
+			}
+		};
+
+		const config = profiles[profile];
+		if (!config) {
+			log(`⚠️ Unknown network profile "${profile}", skipping throttling`);
+			return;
+		}
+
+		await client.send('Network.emulateNetworkConditions', config);
+		const labels = { slow3g: 'Slow 3G', slow4g: 'Slow 4G', moderate: 'Moderate (2 Mbps)', offline: 'Offline' };
+		const label = labels[profile] || profile;
+		log(`📶 <span style="color: #F8BC3B;">Network throttled to ${label}</span>`);
+	} catch (error) {
+		log(`⚠️ Network throttling failed: ${error.message}`);
+	}
+}
+
+/**
+ * Enable Chaos Mode: randomly sabotage POST/PUT/PATCH requests and intercept fetch/XHR
+ * @param {Page} page - Puppeteer page object
+ * @param {number} failRate - Probability (0-1) that a data request will be sabotaged
+ * @param {Function} log - Logging function
+ */
+export async function enableChaosMode(page, failRate = 0.15, log = console.log) {
+	try {
+		await page.setRequestInterception(true);
+		page.on('request', request => {
+			const isMixpanelRequest = request.url().includes('mixpanel') || request.url().includes('mxpnl') || request.url().includes('express-proxy-lmozz6xkha-uc.a.run.app');
+			const isDataRequest =
+				!isMixpanelRequest &&
+				['POST', 'PUT', 'PATCH'].includes(request.method()) &&
+				['xhr', 'fetch'].includes(request.resourceType());
+
+			if (isDataRequest && Math.random() < failRate) {
+				const statusCode = Math.random() < 0.5 ? 500 : 503;
+				const errorMsg = statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable';
+				log(`😈 <span style="color: #CC332B;">Chaos Meeple sabotaged:</span> ${request.method()} ${request.url().substring(0, 80)}`);
+				request.respond({
+					status: statusCode,
+					contentType: 'application/json',
+					body: JSON.stringify({ error: `Simulated ${errorMsg}` })
+				});
+			} else {
+				request.continue();
+			}
+		});
+		log(`😈 <span style="color: #FF7557;">Chaos Mode enabled</span> (${(failRate * 100).toFixed(0)}% fail rate on data requests)`);
+	} catch (error) {
+		log(`⚠️ Chaos mode setup failed: ${error.message}`);
+	}
+}
+
+/**
  * Create a new page with realistic user agent and configuration
  * @param {Browser} browser - Browser instance
  * @param {Function} log - Logging function
@@ -189,8 +279,9 @@ export async function createPage(browser, log = console.log) {
  * @param {Function} log - Logging function
  * @returns {Promise<any>} - Navigation response
  */
-export async function navigateToUrl(page, url, log = console.log) {
+export async function navigateToUrl(page, url, log = console.log, opts = {}) {
 	const maxRetries = 2;
+	const slowNetwork = opts.networkProfile && opts.networkProfile !== 'fast';
 	let lastError;
 
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -204,7 +295,7 @@ export async function navigateToUrl(page, url, log = console.log) {
 			const response = await page.goto(url, {
 				// @ts-ignore
 				waitUntil,
-				timeout: 30000 // 30 sec
+				timeout: slowNetwork ? 90000 : 30000
 			});
 
 			if (response && !response.ok()) {

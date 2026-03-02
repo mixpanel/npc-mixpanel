@@ -373,6 +373,28 @@ app.get('/help', (_req, res) => {
 						default: false,
 						description: 'Enable element masking for autocapture'
 					},
+					networkProfile: {
+						type: 'string',
+						enum: ['fast', 'slow3g', 'slow4g', 'offline'],
+						default: 'fast',
+						description: 'Simulate poor network conditions via CDP throttling'
+					},
+					chaosMode: {
+						type: 'boolean',
+						default: false,
+						description: 'Randomly sabotage POST/PUT/PATCH requests and inject dead clicks'
+					},
+					chaosFailRate: {
+						type: 'number',
+						range: [0, 1],
+						default: 0.15,
+						description: 'Probability of request failure in chaos mode'
+					},
+					formMistakes: {
+						type: 'boolean',
+						default: false,
+						description: 'Meeples make intentional form mistakes, trigger validation errors, then correct'
+					},
 					sequences: {
 						type: 'object',
 						optional: true,
