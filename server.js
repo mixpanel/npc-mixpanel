@@ -81,9 +81,11 @@ if (!isApiContext) {
 				name: 'npc-mixpanel-server'
 			});
 			let coercedData;
+			let clientId = 'meeple-ui';
 			try {
 				const jobId = uid(4);
 				coercedData = coerceTypes(data);
+				clientId = coercedData.client_id || 'meeple-ui';
 
 				// Send initial status to general tab (no meepleId)
 				socket.emit('job_update', { message: `🚀 Starting simulation job: ${jobId}`, meepleId: null });
@@ -105,7 +107,7 @@ if (!isApiContext) {
 				socket.emit('job_update', { message: ``, meepleId: null }); // Empty line for spacing
 
 				// Server-side analytics: Track job start
-				logger.notice(`/SIMULATE START`, { ...coercedData, user, jobId });
+				logger.notice(`/SIMULATE START`, { ...coercedData, user, jobId, clientId });
 				diagnostics.start();
 
 				// Mixpanel server-side tracking
@@ -117,7 +119,8 @@ if (!isApiContext) {
 					users: coercedData.users,
 					concurrency: coercedData.concurrency,
 					headless: coercedData.headless,
-					inject: coercedData.inject
+					inject: coercedData.inject,
+					client_id: clientId
 				});
 
 				// Enhanced job logger with periodic progress updates
@@ -198,7 +201,8 @@ if (!isApiContext) {
 					duration,
 					completedMeeples,
 					totalMeeples,
-					report
+					report,
+					clientId
 				});
 
 				// Mixpanel server-side tracking
@@ -210,7 +214,8 @@ if (!isApiContext) {
 					totalMeeples,
 					url: coercedData.url,
 					users: coercedData.users,
-					diagnostics: report
+					diagnostics: report,
+					client_id: clientId
 				});
 
 				// Enhanced completion summary for general tab
@@ -226,7 +231,8 @@ if (!isApiContext) {
 					user,
 					error: error.message,
 					stack: error.stack,
-					data: coercedData
+					data: coercedData,
+					clientId
 				});
 
 				// Mixpanel server-side tracking
@@ -239,7 +245,8 @@ if (!isApiContext) {
 					error: error.message,
 					url: coercedData.url,
 					users: coercedData.users,
-					diagnostics: report
+					diagnostics: report,
+					client_id: clientId
 				});
 
 				socket.emit('error', `❌ Job failed: ${error.message}`);
@@ -311,6 +318,11 @@ app.get('/help', (_req, res) => {
 				required: true,
 				type: 'string',
 				description: 'Authentication password (contact admin for value)'
+			},
+			client_id: {
+				required: false,
+				type: 'string',
+				description: 'Client identifier for tracking which service triggered the job (e.g. powertools-ui, mpTweaks)'
 			}
 		},
 		endpoints: {
@@ -480,6 +492,7 @@ if (!isApiContext) {
 // Simulate endpoint (alternative route)
 app.post('/simulate', async (req, res) => {
 	const runId = uid();
+	const clientId = req.body?.client_id || req.query?.client_id || 'unknown';
 
 	// API context requires authentication
 	if (isApiContext) {
@@ -512,7 +525,7 @@ app.post('/simulate', async (req, res) => {
 		if (mergedParams.sequences) {
 			const validation = validateSequences(mergedParams.sequences);
 			if (!validation.valid) {
-				logger.error(`/SIMULATE validation error`, { errors: validation.errors, user, rawUser });
+				logger.error(`/SIMULATE validation error`, { errors: validation.errors, user, rawUser, clientId });
 				return res.status(400).json({
 					error: 'Invalid sequences specification',
 					details: validation.errors
@@ -523,7 +536,7 @@ app.post('/simulate', async (req, res) => {
 		const startTime = Date.now();
 
 		// Server-side analytics: Track API job start
-		logger.notice(`/SIMULATE START`, { ...mergedParams, user, rawUser });
+		logger.notice(`/SIMULATE START`, { ...mergedParams, user, rawUser, clientId });
 
 		// Mixpanel server-side tracking
 		userId = user || 'unauthenticated';
@@ -532,7 +545,8 @@ app.post('/simulate', async (req, res) => {
 			runId,
 			url: mergedParams.url,
 			users: mergedParams.users,
-			source: 'api'
+			source: 'api',
+			client_id: clientId
 		});
 
 		const result = await main(mergedParams, log);
@@ -544,7 +558,8 @@ app.post('/simulate', async (req, res) => {
 			...mergedParams,
 			user,
 			duration,
-			rawUser
+			rawUser,
+			clientId
 		});
 
 		// Mixpanel server-side tracking
@@ -554,7 +569,8 @@ app.post('/simulate', async (req, res) => {
 			duration,
 			url: mergedParams.url,
 			users: mergedParams.users,
-			source: 'api'
+			source: 'api',
+			client_id: clientId
 		});
 
 		res.status(200).json(result);
@@ -565,7 +581,8 @@ app.post('/simulate', async (req, res) => {
 			user,
 			error: error.message,
 			stack: error.stack,
-			runId
+			runId,
+			clientId
 		});
 
 		// Mixpanel server-side tracking
@@ -573,7 +590,8 @@ app.post('/simulate', async (req, res) => {
 			distinct_id: userId,
 			runId,
 			error: error.message,
-			source: 'api'
+			source: 'api',
+			client_id: clientId
 		});
 
 		res.status(500).json({ error: error.message });

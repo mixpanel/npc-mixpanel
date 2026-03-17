@@ -135,6 +135,8 @@ export interface MeepleParams {
 	chaosFailRate?: number;
 	/** Enable intentional form mistakes: meeples submit wrong data, trigger validation, then correct */
 	formMistakes?: boolean;
+	/** Client identifier for tracking which service triggered the job (e.g. 'powertools-ui', 'mpTweaks') */
+	client_id?: string;
 }
 
 export interface SequencesSpec {
