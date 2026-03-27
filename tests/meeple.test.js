@@ -25,7 +25,6 @@ import {
   intelligentScroll,
   naturalMouseMovement,
   hoverOverElements,
-  CLICK_FUZZINESS,
 } from "../meeple/interactions.js";
 import {
   interactWithForms,
@@ -38,31 +37,21 @@ import {
 import { navigateBack, navigateForward } from "../meeple/navigation.js";
 import {
   identifyHotZones,
-  calculateVisualProminence,
   rectsOverlap,
 } from "../meeple/hotzones.js";
 import {
-  launchBrowser,
-  createPage,
   navigateToUrl,
   getPageInfo,
-  closeBrowser,
 } from "../meeple/browser.js";
 import {
   randomBetween,
-  sleep,
   clamp,
-  randomFloat,
-  lerp,
   distance,
   shuffle,
-  weightedRandom,
 } from "../meeple/utils.js";
 import {
-  retry,
   ensureCSPRelaxed,
   ensurePageSetup,
-  ensureStorageBypass,
 } from "../meeple/security.js";
 import {
   executeSequence,
@@ -305,20 +294,11 @@ describe("Meeple Modules - Unit Tests", () => {
     });
 
     test("identifyHotZones finds interactive elements", async () => {
-      const logMessages = [];
-      const consoleSpy = (message) => logMessages.push(message);
       const hotZones = await identifyHotZones(testPage);
 
       expect(Array.isArray(hotZones)).toBe(true);
       expect(hotZones.length).toBeGreaterThan(0);
 
-      // Should find some interactive elements (links, buttons, inputs, etc.)
-      const hasInteractive = hotZones.some((zone) =>
-        ["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(zone.tagName),
-      );
-
-      // Aktunes.com should have at least some interactive elements
-      expect(hotZones.length).toBeGreaterThan(0);
       console.log(
         "Found hot zones:",
         hotZones.map((z) => z.tagName),

@@ -275,7 +275,6 @@ async function executeSequenceAction(
     // Wait for element to be available with timeout
     const element = await waitForElement(page, selector, log, debug);
     if (!element) {
-      const reason = "selector_not_found";
       if (debug) {
         log(
           `❌ <span style="color: #E74C3C;">Debug: Element not found after timeout</span>`,
