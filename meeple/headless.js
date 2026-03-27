@@ -75,9 +75,9 @@ export default async function main(PARAMS = {}, logFunction = null) {
   } = PARAMS;
 
   if (url === "fixpanel") url = `https://mixpanel.github.io/fixpanel/`;
-  const limit = pLimit(concurrency);
   if (users > 25) users = 25;
   if (concurrency > 10) concurrency = 10;
+  const limit = pLimit(concurrency);
   if (token) MIXPANEL_TOKEN = token;
   if (NODE_ENV === "production") headless = true; // Always headless in production
 
@@ -357,7 +357,7 @@ export async function simulateUser(
       log(`📄 Page loaded: "${pageInfo.title}"`);
 
       // Identify hot zones for intelligent targeting
-      const hotZones = await identifyHotZones(page, log);
+      const hotZones = await identifyHotZones(page);
       log(
         `🎯 <span style="color: #7856FF;">Hot zones identified:</span> ${hotZones.length} priority elements`,
       );
@@ -540,7 +540,7 @@ async function simulateUserSession(
     if (newUrl !== currentUrl) {
       log(`🔄 URL changed, re-identifying hot zones...`);
       hotZones.length = 0; // Clear existing hot zones
-      const newHotZones = await identifyHotZones(page, log);
+      const newHotZones = await identifyHotZones(page);
       hotZones.push(...newHotZones);
       currentUrl = newUrl;
       log(`🎯 Updated: ${hotZones.length} hot zones identified`);

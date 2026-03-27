@@ -263,7 +263,7 @@ describe("Meeple Modules - Unit Tests", () => {
 
     test("wait function resolves after delay", async () => {
       const start = Date.now();
-      await wait(100);
+      await wait();
       const elapsed = Date.now() - start;
       expect(elapsed).toBeGreaterThanOrEqual(90); // Allow some timing variance
     });
@@ -307,7 +307,7 @@ describe("Meeple Modules - Unit Tests", () => {
     test("identifyHotZones finds interactive elements", async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
 
       expect(Array.isArray(hotZones)).toBe(true);
       expect(hotZones.length).toBeGreaterThan(0);
@@ -615,7 +615,7 @@ describe("Meeple Modules - Unit Tests", () => {
     test("clickStuff uses hot zones for intelligent clicking", async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
 
       await clickStuff(testPage, hotZones, consoleSpy);
 
@@ -631,7 +631,7 @@ describe("Meeple Modules - Unit Tests", () => {
     test("intelligentScroll works with hot zones", async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
 
       await intelligentScroll(testPage, hotZones, consoleSpy);
 
@@ -642,7 +642,7 @@ describe("Meeple Modules - Unit Tests", () => {
     test.skip("hoverOverElements uses persona and history", async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
       const hoverHistory = [];
 
       await hoverOverElements(
@@ -660,7 +660,7 @@ describe("Meeple Modules - Unit Tests", () => {
     test("naturalMouseMovement targets hot zones", async () => {
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
 
       await naturalMouseMovement(testPage, hotZones, consoleSpy);
 
@@ -1143,7 +1143,7 @@ describe("Meeple Modules - Unit Tests", () => {
 
       const logMessages = [];
       const consoleSpy = (message) => logMessages.push(message);
-      const hotZones = await identifyHotZones(testPage, consoleSpy);
+      const hotZones = await identifyHotZones(testPage);
 
       expect(Array.isArray(hotZones)).toBe(true);
 
