@@ -858,6 +858,7 @@ if (window.mixpanel) {
 		record_mask_text_selector: 'nope',
 		record_block_selector: 'nope',
 		record_block_class: 'nope',
+		record_mask_all_inputs: false,
 		record_canvas: true,
 		record_heatmap_data: true,
 
