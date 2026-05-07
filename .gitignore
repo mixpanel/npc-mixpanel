@@ -10,9 +10,8 @@ logs/*
 .env.yaml
 env.yaml
 .cache
-.claude
+.claude/settings.local.json
 .prettierrc
-CLAUDE.md
 vscode-profile-*
 spec-*.jsonc
 service-account.json

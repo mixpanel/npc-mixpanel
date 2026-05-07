@@ -175,7 +175,10 @@ export async function enableChaosMode(page, failRate = 0.15, log = console.log) 
 	try {
 		await page.setRequestInterception(true);
 		page.on('request', request => {
-			const isMixpanelRequest = request.url().includes('mixpanel') || request.url().includes('mxpnl') || request.url().includes('express-proxy-lmozz6xkha-uc.a.run.app');
+			const isMixpanelRequest =
+				request.url().includes('mixpanel') ||
+				request.url().includes('mxpnl') ||
+				request.url().includes('express-proxy-lmozz6xkha-uc.a.run.app');
 			const isDataRequest =
 				!isMixpanelRequest &&
 				['POST', 'PUT', 'PATCH'].includes(request.method()) &&
@@ -184,7 +187,9 @@ export async function enableChaosMode(page, failRate = 0.15, log = console.log) 
 			if (isDataRequest && Math.random() < failRate) {
 				const statusCode = Math.random() < 0.5 ? 500 : 503;
 				const errorMsg = statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable';
-				log(`😈 <span style="color: #CC332B;">Chaos Meeple sabotaged:</span> ${request.method()} ${request.url().substring(0, 80)}`);
+				log(
+					`😈 <span style="color: #CC332B;">Chaos Meeple sabotaged:</span> ${request.method()} ${request.url().substring(0, 80)}`
+				);
 				request.respond({
 					status: statusCode,
 					contentType: 'application/json',
@@ -194,7 +199,9 @@ export async function enableChaosMode(page, failRate = 0.15, log = console.log) 
 				request.continue();
 			}
 		});
-		log(`😈 <span style="color: #FF7557;">Chaos Mode enabled</span> (${(failRate * 100).toFixed(0)}% fail rate on data requests)`);
+		log(
+			`😈 <span style="color: #FF7557;">Chaos Mode enabled</span> (${(failRate * 100).toFixed(0)}% fail rate on data requests)`
+		);
 	} catch (error) {
 		log(`⚠️ Chaos mode setup failed: ${error.message}`);
 	}
@@ -221,12 +228,12 @@ export async function createPage(browser, log = console.log) {
 					get() {
 						return window.location.hostname;
 					},
-					set(val) {
-						return val;
-					},
+					set() {},
 					configurable: true
 				});
-			} catch (e) {}
+			} catch {
+				/* intentional */
+			}
 		});
 
 		// Set random realistic user agent
