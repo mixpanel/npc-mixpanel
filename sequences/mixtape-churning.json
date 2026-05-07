@@ -1,0 +1,12 @@
+{
+	"churning": {
+		"description": "Churning: quick visit, play one track, leave immediately",
+		"temperature": 9,
+		"chaos-range": [9, 11],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "click", "selector": "#landingCta" },
+			{ "action": "click", "selector": ".track-card:nth-child(2)" }
+		]
+	}
+}
