@@ -77,27 +77,27 @@ The web interface provides an intuitive way to configure and monitor your simula
 ### Programmatic Access
 
 ```javascript
-import main from "./headless.js";
+import main from './headless.js';
 
 // Basic simulation
 const results = await main({
-  url: "https://your-website.com",
-  users: 10,
-  concurrency: 3,
-  headless: true,
-  inject: true,
+	url: 'https://your-website.com',
+	users: 10,
+	concurrency: 3,
+	headless: true,
+	inject: true
 });
 
 // Advanced configuration
 const results = await main({
-  url: "https://your-website.com",
-  users: 15,
-  concurrency: 5,
-  headless: false, // Watch the automation
-  inject: true, // Inject Mixpanel tracking
-  past: true, // Use historical timestamps
-  token: "your_token", // Custom Mixpanel token
-  maxActions: 20, // Limit actions per user
+	url: 'https://your-website.com',
+	users: 15,
+	concurrency: 5,
+	headless: false, // Watch the automation
+	inject: true, // Inject Mixpanel tracking
+	past: true, // Use historical timestamps
+	token: 'your_token', // Custom Mixpanel token
+	maxActions: 20 // Limit actions per user
 });
 ```
 
@@ -195,8 +195,8 @@ Adds run-to-run variability by multiplying temperature by a random value:
 
 ```json
 {
-  "temperature": 5,
-  "chaos-range": [0.5, 1.5]
+	"temperature": 5,
+	"chaos-range": [0.5, 1.5]
 }
 ```
 
@@ -224,11 +224,11 @@ Clicks on an element identified by CSS selector:
 
 ```json
 {
-  "action": "click",
-  "selector": "#submit-btn",
-  "requireActive": true, // Skip if element is disabled or inactive
-  "expectsNavigation": true, // Wait for page navigation after click
-  "navigationTimeout": 5000 // Max wait time for navigation (ms)
+	"action": "click",
+	"selector": "#submit-btn",
+	"requireActive": true, // Skip if element is disabled or inactive
+	"expectsNavigation": true, // Wait for page navigation after click
+	"navigationTimeout": 5000 // Max wait time for navigation (ms)
 }
 ```
 
@@ -272,9 +272,9 @@ The `requireActive` flag allows you to skip actions when elements are disabled, 
 
 ```json
 {
-  "action": "click",
-  "selector": "#optional-button",
-  "requireActive": true
+	"action": "click",
+	"selector": "#optional-button",
+	"requireActive": true
 }
 ```
 
@@ -297,10 +297,10 @@ Indicates that an action will trigger page navigation:
 
 ```json
 {
-  "action": "click",
-  "selector": "#next-page",
-  "expectsNavigation": true,
-  "navigationTimeout": 10000
+	"action": "click",
+	"selector": "#next-page",
+	"expectsNavigation": true,
+	"navigationTimeout": 10000
 }
 ```
 
@@ -407,14 +407,14 @@ Action results include detailed error information:
 
 ```json
 {
-  "action": "click",
-  "selector": "#missing-element",
-  "success": false,
-  "error": "Element not found: #missing-element",
-  "reason": "selector_not_found",
-  "page_url": "https://example.com/page",
-  "duration": 5234,
-  "timestamp": 1711543267890
+	"action": "click",
+	"selector": "#missing-element",
+	"success": false,
+	"error": "Element not found: #missing-element",
+	"reason": "selector_not_found",
+	"page_url": "https://example.com/page",
+	"duration": 5234,
+	"timestamp": 1711543267890
 }
 ```
 
@@ -432,58 +432,58 @@ Here's a comprehensive example using all the new features:
 
 ```json
 {
-  "url": "https://your-ecommerce-site.com",
-  "users": 5,
-  "sequences": {
-    "complete-purchase-flow": {
-      "description": "Full checkout funnel with error handling",
-      "temperature": 8,
-      "chaos-range": [0.8, 1.2],
-      "debug": false,
-      "circuitBreaker": {
-        "maxFailures": 5,
-        "resetOnSuccess": true,
-        "mode": "skip"
-      },
-      "actions": [
-        {
-          "action": "click",
-          "selector": "[data-testid='product-card']",
-          "requireActive": true
-        },
-        {
-          "action": "click",
-          "selector": "#add-to-cart"
-        },
-        {
-          "action": "click",
-          "selector": "#optional-upsell",
-          "requireActive": true
-        },
-        {
-          "action": "click",
-          "selector": "#checkout-button",
-          "expectsNavigation": true,
-          "navigationTimeout": 10000
-        },
-        {
-          "action": "type",
-          "selector": "#email",
-          "text": "customer@example.com"
-        },
-        {
-          "action": "type",
-          "selector": "#card-number",
-          "text": "4111111111111111"
-        },
-        {
-          "action": "click",
-          "selector": "#complete-order",
-          "expectsNavigation": true
-        }
-      ]
-    }
-  }
+	"url": "https://your-ecommerce-site.com",
+	"users": 5,
+	"sequences": {
+		"complete-purchase-flow": {
+			"description": "Full checkout funnel with error handling",
+			"temperature": 8,
+			"chaos-range": [0.8, 1.2],
+			"debug": false,
+			"circuitBreaker": {
+				"maxFailures": 5,
+				"resetOnSuccess": true,
+				"mode": "skip"
+			},
+			"actions": [
+				{
+					"action": "click",
+					"selector": "[data-testid='product-card']",
+					"requireActive": true
+				},
+				{
+					"action": "click",
+					"selector": "#add-to-cart"
+				},
+				{
+					"action": "click",
+					"selector": "#optional-upsell",
+					"requireActive": true
+				},
+				{
+					"action": "click",
+					"selector": "#checkout-button",
+					"expectsNavigation": true,
+					"navigationTimeout": 10000
+				},
+				{
+					"action": "type",
+					"selector": "#email",
+					"text": "customer@example.com"
+				},
+				{
+					"action": "type",
+					"selector": "#card-number",
+					"text": "4111111111111111"
+				},
+				{
+					"action": "click",
+					"selector": "#complete-order",
+					"expectsNavigation": true
+				}
+			]
+		}
+	}
 }
 ```
 
@@ -501,35 +501,35 @@ Here's a comprehensive example using all the new features:
 
 ```json
 {
-  "sequences": {
-    "abandoned-cart": {
-      "description": "Add to cart but abandon checkout",
-      "temperature": 6,
-      "chaos-range": [1, 3],
-      "actions": [
-        { "action": "click", "selector": ".product-item" },
-        { "action": "click", "selector": "#add-to-cart" },
-        { "action": "click", "selector": "#cart-icon" },
-        { "action": "click", "selector": "#remove-item" }
-      ]
-    },
-    "successful-purchase": {
-      "description": "Complete full purchase flow",
-      "temperature": 8,
-      "actions": [
-        { "action": "click", "selector": ".product-item" },
-        { "action": "click", "selector": "#add-to-cart" },
-        { "action": "click", "selector": "#checkout" },
-        {
-          "action": "type",
-          "selector": "#email",
-          "text": "customer@example.com"
-        },
-        { "action": "type", "selector": "#card", "text": "4111111111111111" },
-        { "action": "click", "selector": "#complete-order" }
-      ]
-    }
-  }
+	"sequences": {
+		"abandoned-cart": {
+			"description": "Add to cart but abandon checkout",
+			"temperature": 6,
+			"chaos-range": [1, 3],
+			"actions": [
+				{ "action": "click", "selector": ".product-item" },
+				{ "action": "click", "selector": "#add-to-cart" },
+				{ "action": "click", "selector": "#cart-icon" },
+				{ "action": "click", "selector": "#remove-item" }
+			]
+		},
+		"successful-purchase": {
+			"description": "Complete full purchase flow",
+			"temperature": 8,
+			"actions": [
+				{ "action": "click", "selector": ".product-item" },
+				{ "action": "click", "selector": "#add-to-cart" },
+				{ "action": "click", "selector": "#checkout" },
+				{
+					"action": "type",
+					"selector": "#email",
+					"text": "customer@example.com"
+				},
+				{ "action": "type", "selector": "#card", "text": "4111111111111111" },
+				{ "action": "click", "selector": "#complete-order" }
+			]
+		}
+	}
 }
 ```
 
@@ -537,29 +537,29 @@ Here's a comprehensive example using all the new features:
 
 ```json
 {
-  "sequences": {
-    "invalid-email-flow": {
-      "description": "Test email validation",
-      "temperature": 9,
-      "actions": [
-        { "action": "type", "selector": "#email", "text": "invalid-email" },
-        { "action": "click", "selector": "#submit" },
-        { "action": "type", "selector": "#email", "text": "valid@example.com" },
-        { "action": "click", "selector": "#submit" }
-      ]
-    },
-    "required-fields": {
-      "description": "Test required field validation",
-      "temperature": 8,
-      "actions": [
-        { "action": "click", "selector": "#submit" },
-        { "action": "type", "selector": "#name", "text": "John Doe" },
-        { "action": "click", "selector": "#submit" },
-        { "action": "type", "selector": "#email", "text": "john@example.com" },
-        { "action": "click", "selector": "#submit" }
-      ]
-    }
-  }
+	"sequences": {
+		"invalid-email-flow": {
+			"description": "Test email validation",
+			"temperature": 9,
+			"actions": [
+				{ "action": "type", "selector": "#email", "text": "invalid-email" },
+				{ "action": "click", "selector": "#submit" },
+				{ "action": "type", "selector": "#email", "text": "valid@example.com" },
+				{ "action": "click", "selector": "#submit" }
+			]
+		},
+		"required-fields": {
+			"description": "Test required field validation",
+			"temperature": 8,
+			"actions": [
+				{ "action": "click", "selector": "#submit" },
+				{ "action": "type", "selector": "#name", "text": "John Doe" },
+				{ "action": "click", "selector": "#submit" },
+				{ "action": "type", "selector": "#email", "text": "john@example.com" },
+				{ "action": "click", "selector": "#submit" }
+			]
+		}
+	}
 }
 ```
 
@@ -567,29 +567,29 @@ Here's a comprehensive example using all the new features:
 
 ```json
 {
-  "sequences": {
-    "variant-a-flow": {
-      "description": "Test variant A of signup flow",
-      "temperature": 7,
-      "actions": [
-        { "action": "click", "selector": "#signup-variant-a" },
-        { "action": "type", "selector": "#email", "text": "test@example.com" },
-        { "action": "type", "selector": "#password", "text": "password123" },
-        { "action": "click", "selector": "#create-account" }
-      ]
-    },
-    "variant-b-flow": {
-      "description": "Test variant B of signup flow",
-      "temperature": 7,
-      "actions": [
-        { "action": "click", "selector": "#signup-variant-b" },
-        { "action": "type", "selector": "#username", "text": "testuser" },
-        { "action": "type", "selector": "#email", "text": "test@example.com" },
-        { "action": "type", "selector": "#password", "text": "password123" },
-        { "action": "click", "selector": "#register" }
-      ]
-    }
-  }
+	"sequences": {
+		"variant-a-flow": {
+			"description": "Test variant A of signup flow",
+			"temperature": 7,
+			"actions": [
+				{ "action": "click", "selector": "#signup-variant-a" },
+				{ "action": "type", "selector": "#email", "text": "test@example.com" },
+				{ "action": "type", "selector": "#password", "text": "password123" },
+				{ "action": "click", "selector": "#create-account" }
+			]
+		},
+		"variant-b-flow": {
+			"description": "Test variant B of signup flow",
+			"temperature": 7,
+			"actions": [
+				{ "action": "click", "selector": "#signup-variant-b" },
+				{ "action": "type", "selector": "#username", "text": "testuser" },
+				{ "action": "type", "selector": "#email", "text": "test@example.com" },
+				{ "action": "type", "selector": "#password", "text": "password123" },
+				{ "action": "click", "selector": "#register" }
+			]
+		}
+	}
 }
 ```
 
@@ -599,35 +599,35 @@ Successful execution returns detailed results:
 
 ```json
 {
-  "results": [
-    {
-      "actions": [
-        {
-          "action": "click",
-          "selector": "#product",
-          "success": true,
-          "duration": 245,
-          "timestamp": 1647891234567,
-          "page_url": "https://example.com/products"
-        },
-        {
-          "action": "type",
-          "selector": "#email",
-          "text": "user@example.com",
-          "success": true,
-          "duration": 180,
-          "timestamp": 1647891234812,
-          "page_url": "https://example.com/checkout"
-        }
-      ],
-      "duration": 12,
-      "persona": "researcher",
-      "sequence": "checkout-flow",
-      "success": true,
-      "circuit_breaker_triggered": false,
-      "failed_actions": []
-    }
-  ]
+	"results": [
+		{
+			"actions": [
+				{
+					"action": "click",
+					"selector": "#product",
+					"success": true,
+					"duration": 245,
+					"timestamp": 1647891234567,
+					"page_url": "https://example.com/products"
+				},
+				{
+					"action": "type",
+					"selector": "#email",
+					"text": "user@example.com",
+					"success": true,
+					"duration": 180,
+					"timestamp": 1647891234812,
+					"page_url": "https://example.com/checkout"
+				}
+			],
+			"duration": 12,
+			"persona": "researcher",
+			"sequence": "checkout-flow",
+			"success": true,
+			"circuit_breaker_triggered": false,
+			"failed_actions": []
+		}
+	]
 }
 ```
 
@@ -661,12 +661,12 @@ Invalid sequences return detailed error messages:
 
 ```json
 {
-  "error": "Invalid sequences specification",
-  "details": [
-    "Sequence \"test\": Temperature must be a number between 0 and 10",
-    "Sequence \"test\": Action 1 has unsupported action type: invalid",
-    "Sequence \"test\": Action 2 (type) must have a text field"
-  ]
+	"error": "Invalid sequences specification",
+	"details": [
+		"Sequence \"test\": Temperature must be a number between 0 and 10",
+		"Sequence \"test\": Action 1 has unsupported action type: invalid",
+		"Sequence \"test\": Action 2 (type) must have a text field"
+	]
 }
 ```
 
@@ -722,15 +722,15 @@ When using sequences with Mixpanel Session Replay, be aware of buffer timing:
 
 ```json
 {
-  "actions": [
-    { "action": "click", "selector": "#page1-button" },
-    { "action": "wait", "duration": 10000 }, // Wait for buffer flush
-    {
-      "action": "click",
-      "selector": "#page2-button",
-      "expectsNavigation": true
-    }
-  ]
+	"actions": [
+		{ "action": "click", "selector": "#page1-button" },
+		{ "action": "wait", "duration": 10000 }, // Wait for buffer flush
+		{
+			"action": "click",
+			"selector": "#page2-button",
+			"expectsNavigation": true
+		}
+	]
 }
 ```
 
@@ -739,8 +739,8 @@ When using sequences with Mixpanel Session Replay, be aware of buffer timing:
 ```javascript
 // After sequence execution
 await page.evaluate(() => {
-  // Wait 10+ seconds for Mixpanel buffer to flush
-  return new Promise((resolve) => setTimeout(resolve, 10000));
+	// Wait 10+ seconds for Mixpanel buffer to flush
+	return new Promise(resolve => setTimeout(resolve, 10000));
 });
 ```
 
@@ -748,10 +748,10 @@ await page.evaluate(() => {
 
 ```javascript
 await page.evaluate(() => {
-  if (window.mixpanel?.persistence?.props?.__mps) {
-    // Force replay data flush
-    window.mixpanel.persistence.save();
-  }
+	if (window.mixpanel?.persistence?.props?.__mps) {
+		// Force replay data flush
+		window.mixpanel.persistence.save();
+	}
 });
 ```
 
@@ -833,17 +833,17 @@ Enable detailed logging by checking browser console for:
 Full TypeScript definitions are available in `index.d.ts`:
 
 ```typescript
-import { SequenceSpec, MeepleParams } from "./index";
+import { SequenceSpec, MeepleParams } from './index';
 
 const sequence: SequenceSpec = {
-  description: "Test sequence",
-  temperature: 7,
-  actions: [{ action: "click", selector: "#button" }],
+	description: 'Test sequence',
+	temperature: 7,
+	actions: [{ action: 'click', selector: '#button' }]
 };
 
 const params: MeepleParams = {
-  url: "https://example.com",
-  users: 5,
-  sequences: { test: sequence },
+	url: 'https://example.com',
+	users: 5,
+	sequences: { test: sequence }
 };
 ```

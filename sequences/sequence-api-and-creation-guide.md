@@ -88,34 +88,34 @@ The key is to get an ordered list of click events from your single walkthrough s
 
 ```json
 {
-  "my-funnel": {
-    "description": "Human-readable description of this funnel",
-    "temperature": 8,
-    "chaos-range": [1, 2],
-    "debug": false,
-    "circuitBreaker": {
-      "maxFailures": 5,
-      "resetOnSuccess": true,
-      "mode": "skip"
-    },
-    "actions": [
-      { "action": "click", "selector": "#addToCart" },
-      { "action": "type", "selector": "#email", "text": "user@example.com" },
-      { "action": "select", "selector": "#shipping", "value": "express" },
-      {
-        "action": "fillOutForm",
-        "selector": "[role=radiogroup]",
-        "clicksPerGroup": 2
-      },
-      {
-        "action": "click",
-        "selector": "#submit",
-        "requireActive": true,
-        "expectsNavigation": true,
-        "navigationTimeout": 10000
-      }
-    ]
-  }
+	"my-funnel": {
+		"description": "Human-readable description of this funnel",
+		"temperature": 8,
+		"chaos-range": [1, 2],
+		"debug": false,
+		"circuitBreaker": {
+			"maxFailures": 5,
+			"resetOnSuccess": true,
+			"mode": "skip"
+		},
+		"actions": [
+			{ "action": "click", "selector": "#addToCart" },
+			{ "action": "type", "selector": "#email", "text": "user@example.com" },
+			{ "action": "select", "selector": "#shipping", "value": "express" },
+			{
+				"action": "fillOutForm",
+				"selector": "[role=radiogroup]",
+				"clicksPerGroup": 2
+			},
+			{
+				"action": "click",
+				"selector": "#submit",
+				"requireActive": true,
+				"expectsNavigation": true,
+				"navigationTimeout": 10000
+			}
+		]
+	}
 }
 ```
 
@@ -144,17 +144,15 @@ This script reads a raw export file (newline-delimited JSON), filters to `$mp_cl
 // convert-autocapture-to-sequence.js
 // Usage: node convert-autocapture-to-sequence.js <exported-events.json> > my-sequence.json
 
-import { readFileSync } from "fs";
+import { readFileSync } from 'fs';
 
-const raw = readFileSync(process.argv[2], "utf-8").trim();
+const raw = readFileSync(process.argv[2], 'utf-8').trim();
 
 // Raw export is newline-delimited JSON (one object per line)
-const events = raw.split("\n").map((line) => JSON.parse(line));
+const events = raw.split('\n').map(line => JSON.parse(line));
 
 // Keep only $mp_click, skip page views, page leaves, rage clicks, session records
-const clicks = events
-  .filter((e) => e.event === "$mp_click")
-  .sort((a, b) => a.properties.time - b.properties.time);
+const clicks = events.filter(e => e.event === '$mp_click').sort((a, b) => a.properties.time - b.properties.time);
 
 /**
  * Build the best CSS selector from the $elements hierarchy.
@@ -166,45 +164,45 @@ const clicks = events
  *   4. Last resort: .class1.class2 or just the tag name
  */
 function buildSelector(elements) {
-  if (!elements || elements.length === 0) return null;
+	if (!elements || elements.length === 0) return null;
 
-  const target = elements[0];
+	const target = elements[0];
 
-  // 1. Target has an ID -- best case
-  if (target.$id) {
-    return `#${target.$id}`;
-  }
+	// 1. Target has an ID -- best case
+	if (target.$id) {
+		return `#${target.$id}`;
+	}
 
-  // 2. Target has a role attribute -- often more stable than classes
-  const targetRole = target["$attr-role"];
-  if (targetRole) {
-    // Walk up to find a scoping ancestor with an ID
-    for (let i = 1; i < elements.length; i++) {
-      if (elements[i].$id) {
-        return `#${elements[i].$id} [role="${targetRole}"]`;
-      }
-    }
-    return `[role="${targetRole}"]`;
-  }
+	// 2. Target has a role attribute -- often more stable than classes
+	const targetRole = target['$attr-role'];
+	if (targetRole) {
+		// Walk up to find a scoping ancestor with an ID
+		for (let i = 1; i < elements.length; i++) {
+			if (elements[i].$id) {
+				return `#${elements[i].$id} [role="${targetRole}"]`;
+			}
+		}
+		return `[role="${targetRole}"]`;
+	}
 
-  // 3. Target has classes -- scope under nearest ancestor with ID
-  const targetClasses = (target.$classes || []).filter((c) => c && c.trim());
-  const targetClassStr = targetClasses.map((c) => `.${c}`).join("");
+	// 3. Target has classes -- scope under nearest ancestor with ID
+	const targetClasses = (target.$classes || []).filter(c => c && c.trim());
+	const targetClassStr = targetClasses.map(c => `.${c}`).join('');
 
-  for (let i = 1; i < elements.length; i++) {
-    if (elements[i].$id) {
-      if (targetClassStr) {
-        return `#${elements[i].$id} ${targetClassStr}`;
-      }
-      return `#${elements[i].$id} ${target.$tag_name}`;
-    }
-  }
+	for (let i = 1; i < elements.length; i++) {
+		if (elements[i].$id) {
+			if (targetClassStr) {
+				return `#${elements[i].$id} ${targetClassStr}`;
+			}
+			return `#${elements[i].$id} ${target.$tag_name}`;
+		}
+	}
 
-  // 4. No ancestor ID found -- use classes or tag name
-  if (targetClassStr) {
-    return targetClassStr;
-  }
-  return target.$tag_name || null;
+	// 4. No ancestor ID found -- use classes or tag name
+	if (targetClassStr) {
+		return targetClassStr;
+	}
+	return target.$tag_name || null;
 }
 
 // Convert clicks to sequence actions, deduplicating consecutive identical selectors
@@ -212,26 +210,26 @@ const actions = [];
 let lastSelector = null;
 
 for (const event of clicks) {
-  const props = event.properties;
-  const elements = props.$elements || [];
-  const selector = buildSelector(elements);
+	const props = event.properties;
+	const elements = props.$elements || [];
+	const selector = buildSelector(elements);
 
-  if (!selector) continue;
+	if (!selector) continue;
 
-  // Skip consecutive duplicate selectors (rage click noise)
-  if (selector === lastSelector) continue;
-  lastSelector = selector;
+	// Skip consecutive duplicate selectors (rage click noise)
+	if (selector === lastSelector) continue;
+	lastSelector = selector;
 
-  actions.push({ action: "click", selector });
+	actions.push({ action: 'click', selector });
 }
 
 const sequence = {
-  "my-funnel": {
-    description: "Converted from autocapture recording",
-    temperature: 9,
-    "chaos-range": [9, 10],
-    actions,
-  },
+	'my-funnel': {
+		description: 'Converted from autocapture recording',
+		temperature: 9,
+		'chaos-range': [9, 10],
+		actions
+	}
 };
 
 console.log(JSON.stringify(sequence, null, 2));
@@ -252,28 +250,28 @@ Here's a real `$mp_click` event from an Amazon browsing session (trimmed for cla
 
 ```json
 {
-  "event": "$mp_click",
-  "properties": {
-    "time": 1773769629,
-    "$el_tag_name": "img",
-    "$el_classes": [""],
-    "$current_url": "https://www.amazon.com/",
-    "$elements": [
-      { "$tag_name": "img", "$classes": [""], "$nth_child": 1 },
-      {
-        "$tag_name": "a",
-        "$attr-href": "/ROSSO-CAFFE.../dp/B0F7S9H5YJ/...",
-        "$classes": ["a-link-normal", "heroBlock0", "a-text-normal"]
-      },
-      { "$tag_name": "div", "$classes": ["a-section", "a-spacing-small"] },
-      {
-        "$tag_name": "div",
-        "$classes": ["a-cardui"],
-        "$id": "CardInstance4jMpZl1aYjl7SdRCWBqtyA"
-      },
-      { "$tag_name": "div", "$id": "desktop-btf-grid-1" }
-    ]
-  }
+	"event": "$mp_click",
+	"properties": {
+		"time": 1773769629,
+		"$el_tag_name": "img",
+		"$el_classes": [""],
+		"$current_url": "https://www.amazon.com/",
+		"$elements": [
+			{ "$tag_name": "img", "$classes": [""], "$nth_child": 1 },
+			{
+				"$tag_name": "a",
+				"$attr-href": "/ROSSO-CAFFE.../dp/B0F7S9H5YJ/...",
+				"$classes": ["a-link-normal", "heroBlock0", "a-text-normal"]
+			},
+			{ "$tag_name": "div", "$classes": ["a-section", "a-spacing-small"] },
+			{
+				"$tag_name": "div",
+				"$classes": ["a-cardui"],
+				"$id": "CardInstance4jMpZl1aYjl7SdRCWBqtyA"
+			},
+			{ "$tag_name": "div", "$id": "desktop-btf-grid-1" }
+		]
+	}
 }
 ```
 
@@ -371,58 +369,58 @@ Create three sequences:
 
 ```json
 {
-  "full-purchase-1": {
-    "description": "Complete the full purchase funnel",
-    "temperature": 9,
-    "chaos-range": [9, 10],
-    "actions": [
-      { "action": "click", "selector": "#browse-products" },
-      { "action": "click", "selector": "#add-to-cart" },
-      { "action": "click", "selector": "#checkout" },
-      { "action": "type", "selector": "#email", "text": "buyer@example.com" },
-      { "action": "click", "selector": "#complete-purchase" }
-    ]
-  },
-  "full-purchase-2": {
-    "description": "Complete the full purchase funnel (copy for weighting)",
-    "temperature": 9,
-    "chaos-range": [9, 10],
-    "actions": [
-      { "action": "click", "selector": "#browse-products" },
-      { "action": "click", "selector": "#add-to-cart" },
-      { "action": "click", "selector": "#checkout" },
-      { "action": "type", "selector": "#email", "text": "buyer@example.com" },
-      { "action": "click", "selector": "#complete-purchase" }
-    ]
-  },
-  "checkout-dropout": {
-    "description": "Gets to checkout but abandons",
-    "temperature": 9,
-    "chaos-range": [8, 10],
-    "actions": [
-      { "action": "click", "selector": "#browse-products" },
-      { "action": "click", "selector": "#add-to-cart" },
-      { "action": "click", "selector": "#checkout" }
-    ]
-  },
-  "browse-only": {
-    "description": "Browses products but never adds to cart",
-    "temperature": 7,
-    "chaos-range": [8, 10],
-    "actions": [
-      { "action": "click", "selector": "#browse-products" },
-      { "action": "click", "selector": ".product-card" }
-    ]
-  },
-  "browse-only-2": {
-    "description": "Browses products but never adds to cart (copy for weighting)",
-    "temperature": 7,
-    "chaos-range": [8, 10],
-    "actions": [
-      { "action": "click", "selector": "#browse-products" },
-      { "action": "click", "selector": ".product-card" }
-    ]
-  }
+	"full-purchase-1": {
+		"description": "Complete the full purchase funnel",
+		"temperature": 9,
+		"chaos-range": [9, 10],
+		"actions": [
+			{ "action": "click", "selector": "#browse-products" },
+			{ "action": "click", "selector": "#add-to-cart" },
+			{ "action": "click", "selector": "#checkout" },
+			{ "action": "type", "selector": "#email", "text": "buyer@example.com" },
+			{ "action": "click", "selector": "#complete-purchase" }
+		]
+	},
+	"full-purchase-2": {
+		"description": "Complete the full purchase funnel (copy for weighting)",
+		"temperature": 9,
+		"chaos-range": [9, 10],
+		"actions": [
+			{ "action": "click", "selector": "#browse-products" },
+			{ "action": "click", "selector": "#add-to-cart" },
+			{ "action": "click", "selector": "#checkout" },
+			{ "action": "type", "selector": "#email", "text": "buyer@example.com" },
+			{ "action": "click", "selector": "#complete-purchase" }
+		]
+	},
+	"checkout-dropout": {
+		"description": "Gets to checkout but abandons",
+		"temperature": 9,
+		"chaos-range": [8, 10],
+		"actions": [
+			{ "action": "click", "selector": "#browse-products" },
+			{ "action": "click", "selector": "#add-to-cart" },
+			{ "action": "click", "selector": "#checkout" }
+		]
+	},
+	"browse-only": {
+		"description": "Browses products but never adds to cart",
+		"temperature": 7,
+		"chaos-range": [8, 10],
+		"actions": [
+			{ "action": "click", "selector": "#browse-products" },
+			{ "action": "click", "selector": ".product-card" }
+		]
+	},
+	"browse-only-2": {
+		"description": "Browses products but never adds to cart (copy for weighting)",
+		"temperature": 7,
+		"chaos-range": [8, 10],
+		"actions": [
+			{ "action": "click", "selector": "#browse-products" },
+			{ "action": "click", "selector": ".product-card" }
+		]
+	}
 }
 ```
 
@@ -488,10 +486,10 @@ Use `expectsNavigation: true` on actions that trigger page navigation (links, fo
 
 ```json
 {
-  "action": "click",
-  "selector": "#next-page-link",
-  "expectsNavigation": true,
-  "navigationTimeout": 10000
+	"action": "click",
+	"selector": "#next-page-link",
+	"expectsNavigation": true,
+	"navigationTimeout": 10000
 }
 ```
 
@@ -564,36 +562,36 @@ A 7-step checkout flow with dynamic autocomplete and lazy-loaded modals:
 
 ```json
 {
-  "checkout": {
-    "description": "Multi-page checkout with optional upsell modal",
-    "temperature": 8,
-    "circuitBreaker": {
-      "maxFailures": 5,
-      "resetOnSuccess": true,
-      "mode": "skip"
-    },
-    "actions": [
-      { "action": "click", "selector": ".product" },
-      { "action": "click", "selector": "#add-to-cart" },
-      {
-        "action": "click",
-        "selector": "#upsell-modal-accept",
-        "requireActive": true
-      },
-      { "action": "click", "selector": "#checkout", "expectsNavigation": true },
-      {
-        "action": "type",
-        "selector": "#email",
-        "text": "customer@example.com"
-      },
-      {
-        "action": "click",
-        "selector": "#autocomplete-suggestion",
-        "requireActive": true
-      },
-      { "action": "click", "selector": "#complete-order" }
-    ]
-  }
+	"checkout": {
+		"description": "Multi-page checkout with optional upsell modal",
+		"temperature": 8,
+		"circuitBreaker": {
+			"maxFailures": 5,
+			"resetOnSuccess": true,
+			"mode": "skip"
+		},
+		"actions": [
+			{ "action": "click", "selector": ".product" },
+			{ "action": "click", "selector": "#add-to-cart" },
+			{
+				"action": "click",
+				"selector": "#upsell-modal-accept",
+				"requireActive": true
+			},
+			{ "action": "click", "selector": "#checkout", "expectsNavigation": true },
+			{
+				"action": "type",
+				"selector": "#email",
+				"text": "customer@example.com"
+			},
+			{
+				"action": "click",
+				"selector": "#autocomplete-suggestion",
+				"requireActive": true
+			},
+			{ "action": "click", "selector": "#complete-order" }
+		]
+	}
 }
 ```
 
@@ -635,31 +633,31 @@ To let some meeples roam freely without following any funnel, add a sequence wit
 
 ```json
 {
-  "checkout-funnel": {
-    "description": "Complete checkout flow",
-    "temperature": 9,
-    "chaos-range": [9, 10],
-    "actions": [
-      { "action": "click", "selector": "#add-to-cart" },
-      { "action": "click", "selector": "#checkout" },
-      { "action": "click", "selector": "#purchase" }
-    ]
-  },
-  "explorer": {
-    "description": "Free exploration - meeple wanders the site randomly",
-    "temperature": 0,
-    "chaos-range": [1, 1],
-    "actions": [
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" },
-      { "action": "click", "selector": "body" }
-    ]
-  }
+	"checkout-funnel": {
+		"description": "Complete checkout flow",
+		"temperature": 9,
+		"chaos-range": [9, 10],
+		"actions": [
+			{ "action": "click", "selector": "#add-to-cart" },
+			{ "action": "click", "selector": "#checkout" },
+			{ "action": "click", "selector": "#purchase" }
+		]
+	},
+	"explorer": {
+		"description": "Free exploration - meeple wanders the site randomly",
+		"temperature": 0,
+		"chaos-range": [1, 1],
+		"actions": [
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" },
+			{ "action": "click", "selector": "body" }
+		]
+	}
 }
 ```
 
@@ -731,52 +729,52 @@ Open the meeple UI at `https://meeple.mixpanel.org`, paste your sequence JSON in
 
 ```json
 {
-  "results": [
-    {
-      "actions": [
-        {
-          "action": "click",
-          "selector": "#add-to-cart",
-          "success": true,
-          "duration": 245,
-          "timestamp": 1647891234567,
-          "page_url": "https://example.com/products"
-        },
-        {
-          "action": "click",
-          "selector": "#missing-element",
-          "success": false,
-          "error": "Element not found: #missing-element",
-          "reason": "selector_not_found",
-          "duration": 5234,
-          "timestamp": 1647891239801,
-          "page_url": "https://example.com/cart"
-        },
-        {
-          "action": "click",
-          "selector": "#disabled-button",
-          "success": true,
-          "skipped": true,
-          "duration": 123,
-          "timestamp": 1647891245035,
-          "page_url": "https://example.com/cart"
-        }
-      ],
-      "duration": 12,
-      "persona": "researcher",
-      "sequence": "my-funnel",
-      "success": true,
-      "circuit_breaker_triggered": false,
-      "failed_actions": [
-        {
-          "action": "click",
-          "selector": "#missing-element",
-          "reason": "selector_not_found",
-          "page_url": "https://example.com/cart"
-        }
-      ]
-    }
-  ]
+	"results": [
+		{
+			"actions": [
+				{
+					"action": "click",
+					"selector": "#add-to-cart",
+					"success": true,
+					"duration": 245,
+					"timestamp": 1647891234567,
+					"page_url": "https://example.com/products"
+				},
+				{
+					"action": "click",
+					"selector": "#missing-element",
+					"success": false,
+					"error": "Element not found: #missing-element",
+					"reason": "selector_not_found",
+					"duration": 5234,
+					"timestamp": 1647891239801,
+					"page_url": "https://example.com/cart"
+				},
+				{
+					"action": "click",
+					"selector": "#disabled-button",
+					"success": true,
+					"skipped": true,
+					"duration": 123,
+					"timestamp": 1647891245035,
+					"page_url": "https://example.com/cart"
+				}
+			],
+			"duration": 12,
+			"persona": "researcher",
+			"sequence": "my-funnel",
+			"success": true,
+			"circuit_breaker_triggered": false,
+			"failed_actions": [
+				{
+					"action": "click",
+					"selector": "#missing-element",
+					"reason": "selector_not_found",
+					"page_url": "https://example.com/cart"
+				}
+			]
+		}
+	]
 }
 ```
 
