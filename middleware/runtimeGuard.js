@@ -109,6 +109,14 @@ export function createRuntimeGuard() {
 					message: '/microsites is only available on the API service'
 				});
 			}
+
+			// Block POST /mixtape on UI service (API only)
+			if (path === '/mixtape' && method === 'POST') {
+				return res.status(403).json({
+					error: 'Endpoint not available',
+					message: 'POST /mixtape is only available on the API service'
+				});
+			}
 		}
 
 		next();

@@ -1,0 +1,32 @@
+{
+	"lofi-devotee": {
+		"description": "Lo-Fi Devotee: lo-fi heavy listening, subscribe via paywall, complete onboarding, keep listening",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "click", "selector": "#landingCta" },
+			{ "action": "click", "selector": ".track-card:nth-child(1)" },
+			{ "action": "click", "selector": ".track-card:nth-child(2)" },
+			{ "action": "click", "selector": ".track-card:nth-child(3)" },
+			{ "action": "type", "selector": "#paywallName", "text": "{{displayName}}" },
+			{ "action": "type", "selector": "#paywallEmail", "text": "{{email}}" },
+			{ "action": "click", "selector": "#btnSubscribeMonthly" },
+			{ "action": "click", "selector": ".genre-select-card:nth-child(1)" },
+			{ "action": "click", "selector": ".genre-select-card:nth-child(6)" },
+			{ "action": "click", "selector": "#onboarding1Continue" },
+			{ "action": "click", "selector": ".artist-item:nth-child(1)" },
+			{ "action": "click", "selector": ".artist-item:nth-child(2)" },
+			{ "action": "click", "selector": "#onboarding2Continue" },
+			{ "action": "click", "selector": "#startListeningBtn" },
+			{ "action": "click", "selector": ".nav-link[data-nav=\"browse\"]" },
+			{ "action": "click", "selector": ".genre-pill:nth-child(1)" },
+			{ "action": "click", "selector": ".track-card:nth-child(3)" },
+			{ "action": "click", "selector": ".track-card:nth-child(4)" },
+			{ "action": "click", "selector": ".track-save-btn" },
+			{ "action": "click", "selector": ".track-card:nth-child(5)" },
+			{ "action": "click", "selector": "#playerSaveBtn" },
+			{ "action": "click", "selector": ".track-card:nth-child(6)" }
+		]
+	}
+}

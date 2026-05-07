@@ -12,6 +12,7 @@ import cookieParser from 'cookie-parser';
 import * as Mixpanel from 'mixpanel';
 import { Diagnostics } from 'ak-diagnostic';
 import { runMicrositesJob, createProductionLogger } from './microsites.js';
+import { runMixtapeJob } from './mixtape.js';
 import { createRuntimeGuard, authenticateApi, isApiContext } from './middleware/runtimeGuard.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -463,6 +464,26 @@ app.get('/help', (_req, res) => {
 						description: 'Run browser in headless mode'
 					}
 				}
+			},
+			'GET /mixtape': {
+				auth: false,
+				description: 'Returns usage instructions for the mixtape endpoint'
+			},
+			'POST /mixtape': {
+				auth: true,
+				description: 'Run meeple simulations on the Mixtape music streaming demo with 5 persona types',
+				parameters: {
+					users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
+					concurrency: { type: 'number', default: 5, max: 10 },
+					headless: { type: 'boolean', default: true },
+					past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
+					bugRate: {
+						type: 'number',
+						range: [0, 1],
+						default: 0.15,
+						description: 'Fraction of meeples that visit with Chrome 124 bug mode'
+					}
+				}
 			}
 		},
 		responseFormats: {
@@ -764,6 +785,128 @@ app.get('/microsites', async (req, res) => {
 			jobId,
 			error: error.message,
 			source: 'api-get'
+		});
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Mixtape endpoint - GET returns usage instructions
+app.get('/mixtape', (_req, res) => {
+	res.json({
+		name: 'mixtape',
+		description: 'Run meeple simulations on the Mixtape music streaming demo site',
+		url: 'https://mixpanel.github.io/fixpanel/mixtape/',
+		authentication: {
+			user_id: { required: true, format: 'Must end with @mixpanel.com' },
+			safe_word: { required: true, description: 'Authentication password' }
+		},
+		parameters: {
+			users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
+			concurrency: { type: 'number', default: 5, max: 10, description: 'Max concurrent meeples' },
+			headless: { type: 'boolean', default: true, description: 'Run in headless mode' },
+			past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
+			bugRate: {
+				type: 'number',
+				range: [0, 1],
+				default: 0.15,
+				description: 'Fraction of meeples that visit with Chrome 124 bug mode (?bug=true)'
+			}
+		},
+		personas: {
+			'power-listener': {
+				weight: '10%',
+				description: 'Full funnel: signup → onboarding → heavy listening → subscribe annual'
+			},
+			'casual-browser': { weight: '30%', description: 'Browse genres, play a few tracks, hit paywall, dismiss, leave' },
+			'lofi-devotee': { weight: '8%', description: 'Lo-fi focused listening, subscribe via paywall, keep listening' },
+			'new-visitor': {
+				weight: '35%',
+				description: 'Brief visit, play 1 track, signup, partial onboarding (abandon at artist step)'
+			},
+			churning: { weight: '17%', description: 'Quick visit, play 1 track, leave immediately' }
+		},
+		example: 'POST /mixtape with { "user_id": "you@mixpanel.com", "safe_word": "pickles", "users": 10 }'
+	});
+});
+
+// Mixtape endpoint - POST runs the simulation (API only, blocked on UI by middleware)
+app.post('/mixtape', async (req, res) => {
+	const jobId = uid();
+
+	if (isApiContext) {
+		const auth = authenticateApi(req);
+		if (!auth.ok) {
+			logger.notice(`/MIXTAPE auth failed`, { error: auth.error, ip: req.ip });
+			return res.status(401).json({ error: auth.error, code: 401 });
+		}
+	}
+
+	const rawUser = req.headers['x-goog-authenticated-user-email'];
+	let user, userId;
+	try {
+		const decodedUser = decodeURIComponent(rawUser);
+		user = decodedUser.includes(':') ? decodedUser.split(':').pop() : decodedUser;
+	} catch (error) {
+		user = isApiContext ? req.body?.user_id || req.query?.user_id || 'API' : 'unknown';
+	}
+
+	try {
+		const mergedParams = {
+			...coerceTypes(req.query || {}),
+			...req.body,
+			jobId
+		};
+
+		const startTime = Date.now();
+
+		logger.notice(`/MIXTAPE START`, { ...mergedParams, user, rawUser });
+
+		userId = user || 'unauthenticated';
+		mp.track('server: mixtape job start', {
+			distinct_id: userId,
+			jobId,
+			users: mergedParams.users || 10,
+			bugRate: mergedParams.bugRate || 0.15,
+			source: 'api'
+		});
+
+		const result = await runMixtapeJob(mergedParams, createProductionLogger());
+
+		const endTime = Date.now();
+		const duration = (endTime - startTime) / 1000;
+
+		logger.notice(`/MIXTAPE END in ${duration} seconds`, {
+			...mergedParams,
+			user,
+			duration,
+			rawUser,
+			personaDistribution: result.personaDistribution
+		});
+
+		mp.track('server: mixtape job finish', {
+			distinct_id: userId,
+			jobId,
+			duration,
+			source: 'api',
+			...result.personaDistribution
+		});
+
+		res.status(200).json(result);
+	} catch (error) {
+		logger.error(`ERROR: ${req.path}`, {
+			path: req.path,
+			user,
+			error: error.message,
+			stack: error.stack,
+			jobId
+		});
+
+		mp.track('server: mixtape job error', {
+			distinct_id: userId,
+			jobId,
+			error: error.message,
+			source: 'api'
 		});
 
 		res.status(500).json({ error: error.message });
