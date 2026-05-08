@@ -44,7 +44,7 @@
 		"mixpanel": "^0.18.1",
 		"p-limit": "^7.3.0",
 		"puppeteer": "^23.6.1",
-		"socket.io": "^4.8.1"
+		"socket.io": "^4.8.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
