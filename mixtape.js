@@ -320,6 +320,12 @@ export async function runMixtapeJob(options = {}, logger = log) {
 	}
 }
 
+// node mixtape.js                                  # 3 meeples, visible browsers
+// node mixtape.js --users=5                         # 5 meeples, visible browsers
+// node mixtape.js --users=10 --headless=true        # 10 meeples, headless
+// node mixtape.js --users=3 --past=true             # past-time simulation
+// node mixtape.js --users=5 --bugRate=0.5           # 50% of meeples get ?bug=true
+// node mixtape.js --users=8 --headless=true --past=true --bugRate=0.15
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
 	const args = process.argv.slice(2);
 	const getArg = (name, fallback) => {
