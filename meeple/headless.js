@@ -37,6 +37,7 @@ import {
 	enableChaosMode
 } from './browser.js';
 import { executeSequence } from './sequences.js';
+import { forceSpoofTimeInBrowser } from './analytics.js';
 import { randomBetween, sleep } from './utils.js';
 
 const { NODE_ENV = '' } = process.env;
@@ -237,7 +238,7 @@ export default async function main(PARAMS = {}, logFunction = null) {
  * @param {string} url - Target URL
  * @param {boolean} [headless=true] - Run in headless mode
  * @param {boolean} [inject=true] - Inject Mixpanel
- * @param {boolean} [_past=false] - Simulate past time
+ * @param {boolean} [past=false] - Simulate past time
  * @param {number|null} [maxActions=null] - Maximum actions per session
  * @param {string|null} [usersHandle=null] - User identifier
  * @param {import('../index.js').MeepleOptions} [opts={}] - Additional options
@@ -248,7 +249,7 @@ export async function simulateUser(
 	url,
 	headless = true,
 	inject = true,
-	_past = false,
+	past = false,
 	maxActions = null,
 	usersHandle = null,
 	opts = {},
@@ -305,6 +306,12 @@ export async function simulateUser(
 			browser = await launchBrowser(headless, log);
 			const page = await createPage(browser, log);
 			page.MIXPANEL_TOKEN = MIXPANEL_TOKEN;
+
+			// Spoof Date.now() in browser BEFORE navigation so site's Mixpanel SDK
+			// uses past timestamps. Must run before navigateToUrl.
+			if (past) {
+				await forceSpoofTimeInBrowser(page, log);
+			}
 
 			// Apply friction behaviors if configured
 			if (meepleOpts.networkProfile && meepleOpts.networkProfile !== 'fast') {
