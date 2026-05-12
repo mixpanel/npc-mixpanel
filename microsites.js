@@ -1,20 +1,33 @@
 /**
  * Microsites Orchestrator
  *
- * Runs sequential simulations across 6 different microsites
- * Each microsite gets 5 meeples with concurrency 5
- * Meeples randomly select from available sequences per microsite
+ * Runs the 6 fixpanel industry-vertical microsites in batched parallel:
+ *   financial, checkout, streaming, admin, wellness, lifestyle
  *
- * Can be run standalone for testing:
- * node microsites.js
+ * Each vertical:
+ *   - 10 meeples, headless=true, past=false, inject=false
+ *   - Mixpanel is already loaded by the site itself; meeple super-props are
+ *     attached defensively via the page's own mixpanel.register
  *
- * Or imported and called from server:
- * import { runMicrositesJob } from './microsites.js';
- * const results = await runMicrositesJob(options);
+ * Verticals run in batches of MAX_PARALLEL_VERTICALS (default 3) — controlled
+ * parallelism to keep peak memory under ~1.5GB on Cloud Run.
+ *
+ * Cron triggered (existing GCP Scheduler hits the same endpoint).
+ *
+ * Standalone:
+ *   node microsites.js                       # all 6 verticals, default config
+ *   node microsites.js --no-headless         # visible browsers (slower)
+ *   node microsites.js --users=3             # smoke-test with 3 meeples per vertical
+ *   node microsites.js --vertical=financial  # single vertical
+ *
+ * Imported:
+ *   import { runMicrositesJob } from './microsites.js';
+ *   const results = await runMicrositesJob({ users: 10 });
  */
 
 import main from './meeple/headless.js';
 import { log } from './utils/logger.js';
+import pLimit from 'p-limit';
 import { uid } from 'ak-tools';
 import fs from 'fs/promises';
 import path from 'path';
@@ -26,51 +39,44 @@ const __dirname = path.dirname(__filename);
 const { NODE_ENV = 'production' } = process.env;
 
 /**
- * Create a production-safe logger that filters verbose meeple messages
- * @param {(message: any, meepleId?: any) => void} [baseLogger] - Base logging function
- * @returns {(message: any, meepleId?: any, socket?: any) => void} Filtered logging function
+ * Production-safe logger: passes job-level events through, suppresses per-meeple noise.
+ * @param {(message: any, meepleId?: any) => void} [baseLogger]
+ * @returns {(message: any, meepleId?: any, socket?: any) => void}
  */
 function createProductionLogger(baseLogger) {
 	const defaultLogger = (/** @type {any} */ msg) => console.log(msg);
 	const actualLogger = baseLogger || defaultLogger;
 
-	// In development, log everything
-	if (NODE_ENV !== 'production') {
-		return actualLogger;
-	}
+	if (NODE_ENV !== 'production') return actualLogger;
 
-	// In production, only log job-level events (not individual meeple actions)
 	return (message, meepleId = null, _socket = null) => {
-		// Only log messages that start with job/microsite markers
 		const isJobLevelLog =
-			message.includes('█') || // Job start/end blocks
-			message.includes('🚀') || // Job started
-			message.includes('🏁') || // Job completed
-			message.includes('🏢') || // Microsite starting
-			message.includes('✅') || // Microsite completed
-			message.includes('❌') || // Microsite/Job failed
-			message.includes('📍') || // Progress indicator
-			message.includes('⏸️') || // Pause between microsites
-			message.includes('🆔') || // Job ID
-			message.includes('⏰') || // Timestamps
-			message.includes('⏱️') || // Duration
-			message.includes('📊') || // Summary stats
-			message.includes('👥') || // User counts
-			message.includes('🎲') || // Drop-off chance
-			message.includes('🌡️') || // Temperature
-			/^={10,}/.test(message) || // Separator lines
-			message.trim().startsWith('Progress:'); // Progress messages
+			message.includes('█') ||
+			message.includes('🚀') ||
+			message.includes('🏁') ||
+			message.includes('🏢') ||
+			message.includes('✅') ||
+			message.includes('❌') ||
+			message.includes('📍') ||
+			message.includes('⏸️') ||
+			message.includes('🆔') ||
+			message.includes('⏰') ||
+			message.includes('⏱️') ||
+			message.includes('📊') ||
+			message.includes('👥') ||
+			message.includes('🎲') ||
+			message.includes('🌡️') ||
+			/^={10,}/.test(message) ||
+			message.trim().startsWith('Progress:');
 
-		if (isJobLevelLog) {
-			actualLogger(message, meepleId);
-		}
+		if (isJobLevelLog) actualLogger(message, meepleId);
 	};
 }
 
 /**
- * Load a sequence configuration from JSON file
- * @param {string} filename - Name of the sequence file (e.g., "financial-sequence-kyc.json")
- * @returns {Promise<Object>} Sequence specification object
+ * Load a sequence configuration from JSON file.
+ * @param {string} filename
+ * @returns {Promise<Object>}
  */
 async function loadSequence(filename) {
 	const filePath = path.join(__dirname, 'sequences', filename);
@@ -79,111 +85,126 @@ async function loadSequence(filename) {
 }
 
 /**
- * Microsite configurations
+ * The 6 industry-vertical microsites.
+ *
+ * URLs hit production at https://mixpanel.github.io/fixpanel/{vertical}/
+ * Source code lives at ~/code/fixpanel/app/{vertical}/ (Next.js).
+ *
+ * sequenceFiles is the list of *-sequence-*.json files in sequences/ to
+ * distribute among the 10 meeples for that vertical. Empty = no scripted
+ * sequences, meeples behave purely with persona-driven exploration.
+ *
+ * Implementor bot fills these in over time per MICROSITES_HANDOFF.md.
  */
 const MICROSITES = [
 	{
 		name: 'iBank',
-		url: 'https://mixpanel.github.io/fixpanel/financial',
+		vertical: 'financial',
+		url: 'https://mixpanel.github.io/fixpanel/financial/',
 		sequenceFiles: ['financial-sequence-kyc.json', 'financial-sequence-product-demo.json']
 	},
 	{
 		name: 'weBuy',
-		url: 'https://mixpanel.github.io/fixpanel/checkout',
+		vertical: 'checkout',
+		url: 'https://mixpanel.github.io/fixpanel/checkout/',
 		sequenceFiles: []
 	},
 	{
 		name: 'meTube',
-		url: 'https://mixpanel.github.io/fixpanel/streaming',
+		vertical: 'streaming',
+		url: 'https://mixpanel.github.io/fixpanel/streaming/',
 		sequenceFiles: []
 	},
 	{
 		name: 'youAdmin',
-		url: 'https://mixpanel.github.io/fixpanel/admin',
+		vertical: 'admin',
+		url: 'https://mixpanel.github.io/fixpanel/admin/',
 		sequenceFiles: []
 	},
 	{
 		name: 'ourHeart',
-		url: 'https://mixpanel.github.io/fixpanel/wellness',
+		vertical: 'wellness',
+		url: 'https://mixpanel.github.io/fixpanel/wellness/',
 		sequenceFiles: []
 	},
 	{
 		name: 'theyRead',
-		url: 'https://mixpanel.github.io/fixpanel/lifestyle',
+		vertical: 'lifestyle',
+		url: 'https://mixpanel.github.io/fixpanel/lifestyle/',
 		sequenceFiles: []
 	}
 ];
 
+const DEFAULT_USERS_PER_VERTICAL = 10;
+const DEFAULT_CONCURRENCY_PER_VERTICAL = 5;
+
 /**
- * Default meeple parameters for microsites
+ * How many verticals run in parallel. 3 keeps peak memory under ~1.5GB on
+ * Cloud Run (each vertical = 5 concurrent browsers × ~100MB).
+ */
+const MAX_PARALLEL_VERTICALS = 3;
+
+/**
+ * Per-meeple session ceiling. Persona durations top out at ~12min (browser),
+ * but we cap microsite meeples at 4min so the whole job fits the 27min CRON
+ * window even when verticals stack up.
+ */
+const PER_MEEPLE_MAX_DURATION_MS = 4 * 60 * 1000;
+
+/**
+ * Per-vertical wall-clock cap. With 5 concurrent meeples each capped at 4min,
+ * worst-case is ~5min including launch/teardown. Add 1min buffer.
+ */
+const PER_VERTICAL_TIMEOUT_MS = 6 * 60 * 1000;
+
+/**
+ * Whole-job ceiling (27min — fits inside the 30min CRON timeout with buffer).
+ * 6 verticals / 3 parallel = 2 batches × ~6min = ~12min realistic; 27min hard
+ * stop catches runaway cases.
+ */
+const MAX_JOB_DURATION_MS = 27 * 60 * 1000;
+
+/**
+ * Default per-meeple parameters for a microsite run.
+ * inject:false because each vertical loads its own Mixpanel SDK; defensive
+ * super-prop registration in headless.js piggybacks onto it.
  */
 const DEFAULT_MEEPLE_PARAMS = {
-	users: 5,
-	concurrency: 5,
+	users: DEFAULT_USERS_PER_VERTICAL,
+	concurrency: DEFAULT_CONCURRENCY_PER_VERTICAL,
 	headless: true,
 	inject: false,
 	past: false,
 	token: null,
 	masking: 'no masking',
-	maxDuration: 3 * 60 * 1000 // 3 minutes in milliseconds (reduced from 4 to fit CRON timeout)
+	maxDuration: PER_MEEPLE_MAX_DURATION_MS
 };
 
 /**
- * Maximum duration for entire microsites job (27 minutes to fit within 30-minute CRON timeout)
- */
-const MAX_JOB_DURATION_MS = 27 * 60 * 1000;
-
-/**
- * Get random temperature between 7 and 10
- * @returns {number}
- */
-// @ts-expect-error - Reserved for future temperature randomization
-function randomTemperature() {
-	return Math.floor(Math.random() * 4) + 7; // 7, 8, 9, or 10
-}
-
-/**
- * Get random drop-off percentage between 5 and 15
- * @returns {number}
- */
-function randomDropOff() {
-	return Math.floor(Math.random() * 11) + 5; // 5-15
-}
-
-/**
- * Run a single microsite simulation
- * @param {Object} microsite - Microsite configuration
- * @param {Object} overrideParams - Optional parameter overrides
- * @param {(message: any, meepleId?: any, socket?: any) => void} logger - Optional logging function
- * @returns {Promise<Object>} Simulation results
+ * Run a single vertical's simulation.
+ * @param {typeof MICROSITES[number]} microsite
+ * @param {Object} overrideParams
+ * @param {(message: any, meepleId?: any, socket?: any) => void} logger
+ * @returns {Promise<Object>}
  */
 async function runMicrositeSimulation(microsite, overrideParams = {}, logger = log) {
 	const startTime = Date.now();
-
-	// Wrap logger for production filtering (meeple actions will be filtered, job logs will pass)
 	const productionLogger = createProductionLogger(logger);
 
 	productionLogger(`\n${'='.repeat(60)}`);
-	productionLogger(`🏢 Starting microsite: ${microsite.name}`);
+	productionLogger(`🏢 Starting microsite: ${microsite.name} (${microsite.vertical})`);
 	productionLogger(`🌐 URL: ${microsite.url}`);
-	productionLogger(`📝 Available sequences: ${microsite.sequenceFiles.length}`);
+	productionLogger(`📝 Sequence files: ${microsite.sequenceFiles.length || 'none (persona-driven exploration)'}`);
 	productionLogger(`${'='.repeat(60)}\n`);
 
 	try {
-		// Load all sequences for this microsite
 		const sequences = {};
 		for (const filename of microsite.sequenceFiles) {
 			const sequenceName = filename.replace('.json', '').replace(/^.*-sequence-/, '');
 			const sequenceSpec = await loadSequence(filename);
-
-			// Randomize temperature for each sequence instance
-			// sequenceSpec.temperature = randomTemperature();
-
 			sequences[sequenceName] = sequenceSpec;
 		}
 
-		// Build meeple parameters
-		// Note: URL params (IS_MEEPLE, MEEPLE_ID, SEQUENCE) are added per-meeple in headless.js
 		const meepleParams = {
 			...DEFAULT_MEEPLE_PARAMS,
 			...overrideParams,
@@ -192,30 +213,20 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 			micrositeName: microsite.name
 		};
 
-		// Add random drop-off chance (5-15%)
-		const dropOffChance = randomDropOff();
-		productionLogger(`🎲 Drop-off chance: ${dropOffChance}%`);
-		productionLogger(`🌡️ Temperature range: 7-10 (randomized per meeple)`);
-
-		// Run the simulation with timeout wrapper
-		// Pass productionLogger to filter meeple action logs in production
-		// Since meeples run concurrently, timeout is maxDuration (per meeple) + buffer, NOT maxDuration * users
-		const micrositeTimeoutMs = meepleParams.maxDuration + 60000; // 3 min + 1 min buffer = 4 min per microsite
 		const result = await Promise.race([
 			// @ts-ignore - productionLogger matches LogFunction signature at runtime
 			main(meepleParams, productionLogger),
 			new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Microsite simulation timeout')), micrositeTimeoutMs)
+				setTimeout(() => reject(new Error(`${microsite.name} timeout`)), PER_VERTICAL_TIMEOUT_MS)
 			)
 		]);
 
 		const duration = (Date.now() - startTime) / 1000;
-
 		productionLogger(`\n✅ ${microsite.name} completed in ${duration.toFixed(2)}s`);
-		productionLogger(`${'='.repeat(60)}\n`);
 
 		return {
 			microsite: microsite.name,
+			vertical: microsite.vertical,
 			url: microsite.url,
 			success: true,
 			duration,
@@ -225,12 +236,11 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 		};
 	} catch (error) {
 		const duration = (Date.now() - startTime) / 1000;
-
 		productionLogger(`\n❌ ${microsite.name} failed: ${error.message}`);
-		productionLogger(`${'='.repeat(60)}\n`);
 
 		return {
 			microsite: microsite.name,
+			vertical: microsite.vertical,
 			url: microsite.url,
 			success: false,
 			duration,
@@ -241,137 +251,124 @@ async function runMicrositeSimulation(microsite, overrideParams = {}, logger = l
 	}
 }
 
-/**
- * Run all microsites sequentially
- * @param {Object} options - Configuration options
- * @param {(message: any, meepleId?: any, socket?: any) => void} logger - Optional logging function
- * @returns {Promise<Object>} Aggregated results from all microsites
- */
 export { createProductionLogger };
 
+/**
+ * Run all (or a filtered subset of) verticals in batched parallel.
+ *
+ * Recognized options:
+ *   - users (number, default 10): meeples per vertical
+ *   - concurrency (number, default 5): concurrent meeples within a vertical
+ *   - headless (boolean, default true)
+ *   - vertical (string): run a single vertical by slug ("financial", "checkout", etc.)
+ *   - parallelVerticals (number, default 3): how many verticals at once
+ *   - any other props are forwarded to the meeple engine
+ *
+ * @param {Record<string, any>} options
+ * @param {(message: any, meepleId?: any, socket?: any) => void} [logger]
+ * @returns {Promise<Object>}
+ */
 export async function runMicrositesJob(options = {}, logger = log) {
 	const jobId = uid(6);
 	const jobStartTime = Date.now();
-
-	// Wrap logger for production filtering
 	const productionLogger = createProductionLogger(logger);
+
+	const targetVerticals = options.vertical
+		? MICROSITES.filter(m => m.vertical === options.vertical || m.name === options.vertical)
+		: MICROSITES;
+
+	if (targetVerticals.length === 0) {
+		throw new Error(`No microsites match filter: ${options.vertical}`);
+	}
+
+	const parallelVerticals = Math.max(1, Math.min(options.parallelVerticals || MAX_PARALLEL_VERTICALS, 6));
+	const usersPerVertical = options.users || DEFAULT_USERS_PER_VERTICAL;
 
 	productionLogger(`\n${'█'.repeat(60)}`);
 	productionLogger(`🚀 MICROSITES JOB STARTED`);
 	productionLogger(`🆔 Job ID: ${jobId}`);
 	productionLogger(`⏰ Start time: ${new Date().toISOString()}`);
-	productionLogger(`⏱️  Max duration: 27 minutes (CRON timeout safety)`);
-	productionLogger(`📊 Total microsites: ${MICROSITES.length}`);
-	productionLogger(`👥 Meeples per microsite: ${options.users || DEFAULT_MEEPLE_PARAMS.users}`);
+	productionLogger(`⏱️  Max job duration: 27 minutes`);
+	productionLogger(`📊 Verticals: ${targetVerticals.length} (${targetVerticals.map(v => v.vertical).join(', ')})`);
+	productionLogger(`👥 Meeples per vertical: ${usersPerVertical}`);
+	productionLogger(`🔀 Parallel verticals: ${parallelVerticals}`);
 	productionLogger(`${'█'.repeat(60)}\n`);
 
+	const limit = pLimit(parallelVerticals);
 	let results = [];
 
 	try {
-		// Wrap entire job with 27-minute timeout to prevent CRON timeout
 		results = await Promise.race([
-			// Main job execution
-			(async () => {
-				const micrositeResults = [];
-
-				// Run each microsite sequentially (one at a time for memory safety)
-				for (const [index, microsite] of MICROSITES.entries()) {
-					// Check if we're approaching timeout (leave 2 min buffer)
-					const elapsed = Date.now() - jobStartTime;
-					if (elapsed > MAX_JOB_DURATION_MS - 120000) {
-						productionLogger(`\n⚠️  Approaching job timeout, stopping after ${index} microsites`);
-						break;
-					}
-
-					productionLogger(`\n📍 Progress: ${index + 1}/${MICROSITES.length} microsites`);
-
-					// Pass the original logger (not productionLogger) to let each simulation create its own wrapper
-					const result = await runMicrositeSimulation(microsite, options, logger);
-					micrositeResults.push(result);
-
-					// Small delay between microsites to allow cleanup
-					if (index < MICROSITES.length - 1) {
-						productionLogger(`⏸️  Pausing 5s before next microsite...\n`);
-						await new Promise(resolve => setTimeout(resolve, 5000));
-					}
-				}
-
-				return micrositeResults;
-			})(),
-
-			// Overall job timeout
+			Promise.all(
+				targetVerticals.map((microsite, index) =>
+					limit(() => {
+						productionLogger(`\n📍 Queued ${index + 1}/${targetVerticals.length}: ${microsite.name}`);
+						return runMicrositeSimulation(microsite, options, logger);
+					})
+				)
+			),
 			new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Overall job timeout (27 minutes exceeded)')), MAX_JOB_DURATION_MS)
+				setTimeout(() => reject(new Error('Overall job timeout (27 minutes)')), MAX_JOB_DURATION_MS)
 			)
 		]);
 	} catch (error) {
 		productionLogger(`\n❌ Job failed or timed out: ${error.message}`);
-		// Return partial results if we have any
-		if (results.length === 0) {
-			throw error;
-		}
+		if (results.length === 0) throw error;
 	}
 
 	const jobEndTime = Date.now();
 	const totalDuration = (jobEndTime - jobStartTime) / 1000;
-
-	// Calculate summary statistics
-	const successfulMicrosites = results.filter(r => r.success).length;
-	const failedMicrosites = results.filter(r => !r.success).length;
+	const successful = results.filter(r => r.success).length;
+	const failed = results.filter(r => !r.success).length;
 
 	productionLogger(`\n${'█'.repeat(60)}`);
 	productionLogger(`🏁 MICROSITES JOB COMPLETED`);
 	productionLogger(`🆔 Job ID: ${jobId}`);
-	productionLogger(`⏱️  Total duration: ${totalDuration.toFixed(2)}s (${(totalDuration / 60).toFixed(2)} minutes)`);
-	productionLogger(`✅ Successful: ${successfulMicrosites}/${MICROSITES.length}`);
-	productionLogger(`❌ Failed: ${failedMicrosites}/${MICROSITES.length}`);
+	productionLogger(`⏱️  Total duration: ${totalDuration.toFixed(2)}s (${(totalDuration / 60).toFixed(2)}m)`);
+	productionLogger(`✅ Successful: ${successful}/${targetVerticals.length}`);
+	productionLogger(`❌ Failed: ${failed}/${targetVerticals.length}`);
 	productionLogger(`⏰ End time: ${new Date().toISOString()}`);
 	productionLogger(`${'█'.repeat(60)}\n`);
 
 	return {
 		jobId,
-		success: failedMicrosites === 0,
+		success: failed === 0,
 		totalDuration,
 		startTime: jobStartTime,
 		endTime: jobEndTime,
 		microsites: results,
 		summary: {
-			total: MICROSITES.length,
-			successful: successfulMicrosites,
-			failed: failedMicrosites,
-			successRate: ((successfulMicrosites / MICROSITES.length) * 100).toFixed(1) + '%'
+			total: targetVerticals.length,
+			successful,
+			failed,
+			successRate: ((successful / targetVerticals.length) * 100).toFixed(1) + '%'
 		}
 	};
 }
 
-// Allow standalone execution for testing
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-	// @ts-expect-error - Environment variable reserved for future configuration
-	const { NODE_ENV = 'dev' } = process.env;
-
-	console.log('🧪 Running microsites job in standalone mode...\n');
-
-	// Parse command-line arguments for headless mode
 	const args = process.argv.slice(2);
-	// @ts-expect-error - Headless flag reserved for future CLI options
-	const headless = !args.includes('--no-headless');
-
-	const testOptions = {
-		headless: false,
-		users: 1, // Fewer users for testing
-		concurrency: 1
+	const getArg = (name, fallback) => {
+		const flag = args.find(a => a.startsWith(`--${name}=`));
+		return flag ? flag.split('=')[1] : fallback;
 	};
 
-	console.log(`Configuration: ${JSON.stringify(testOptions, null, 2)}\n`);
+	const headless = !args.includes('--no-headless');
+	const users = parseInt(getArg('users', String(DEFAULT_USERS_PER_VERTICAL)), 10);
+	const vertical = getArg('vertical', null);
+	const parallelVerticals = parseInt(getArg('parallel', String(MAX_PARALLEL_VERTICALS)), 10);
+
+	const testOptions = { headless, users, vertical, parallelVerticals };
+	console.log(`🧪 Standalone microsites: ${JSON.stringify(testOptions)}\n`);
 
 	runMicrositesJob(testOptions, console.log)
 		.then(results => {
-			console.log('\n✅ Standalone test completed!');
-			console.log(`Results: ${JSON.stringify(results.summary, null, 2)}`);
+			console.log('\n✅ Done!');
+			console.log(`Summary: ${JSON.stringify(results.summary, null, 2)}`);
 			process.exit(0);
 		})
 		.catch(error => {
-			console.error('\n❌ Standalone test failed:', error);
+			console.error('\n❌ Failed:', error);
 			process.exit(1);
 		});
 }

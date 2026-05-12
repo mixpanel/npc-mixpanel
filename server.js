@@ -530,17 +530,29 @@ app.get('/help', (_req, res) => {
 			},
 			'POST /microsites': {
 				auth: true,
-				description: 'Run simulations across all 6 Mixpanel microsites sequentially',
+				description:
+					'Run meeple simulations across the 6 fixpanel industry verticals (financial, checkout, streaming, admin, wellness, lifestyle). Verticals run 3-in-parallel by default; each gets 10 meeples with inject:false (sites bring their own Mixpanel SDK). Defensive super-prop registration attaches meeple_persona/meeple_phase/etc. to events the sites already fire.',
 				parameters: {
 					users: {
 						type: 'number',
-						default: 5,
-						description: 'Meeples per microsite'
+						default: 10,
+						description: 'Meeples per vertical'
 					},
 					concurrency: {
 						type: 'number',
 						default: 5,
-						description: 'Concurrent meeples per microsite'
+						description: 'Concurrent meeples within a single vertical'
+					},
+					parallelVerticals: {
+						type: 'number',
+						default: 3,
+						description: 'How many verticals to run in parallel (1-6, controls peak memory)'
+					},
+					vertical: {
+						type: 'string',
+						default: null,
+						description:
+							'Optional: run a single vertical by slug (financial, checkout, streaming, admin, wellness, lifestyle)'
 					},
 					headless: {
 						type: 'boolean',

@@ -526,22 +526,23 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 	const visitedPaths = new Set();
 	visitedPaths.add(pageUrlPath(page));
 
-	// Register super props at session start (Mixpanel is injected by ensurePageSetup above)
-	if (opts.inject !== false) {
-		await registerMeepleProps(
-			page,
-			{
-				meeple: true,
-				meeple_id: usersHandle,
-				meeple_persona: persona,
-				meeple_starting_page: genesisUrl,
-				meeple_session_target_duration_sec: Math.round(targetDurationMs / 1000),
-				meeple_phase: 'arrival',
-				meeple_actions: { ...actionCounts }
-			},
-			log
-		);
-	}
+	// Register super props at session start. Defensive: registerMeepleProps silently
+	// no-ops if window.mixpanel.register isn't present. When inject=true we just
+	// injected Mixpanel; when inject=false (microsites) the site brings its own SDK
+	// and our props piggyback onto its events.
+	await registerMeepleProps(
+		page,
+		{
+			meeple: true,
+			meeple_id: usersHandle,
+			meeple_persona: persona,
+			meeple_starting_page: genesisUrl,
+			meeple_session_target_duration_sec: Math.round(targetDurationMs / 1000),
+			meeple_phase: 'arrival',
+			meeple_actions: { ...actionCounts }
+		},
+		log
+	);
 
 	const actionEmojis = {
 		click: '🖱️',
@@ -681,8 +682,9 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 
 		actionIndex++;
 
-		// Periodic super-props update (every ~10 actions)
-		if (opts.inject !== false && actionIndex > 0 && actionIndex % 10 === 0) {
+		// Periodic super-props update (every ~10 actions). Defensive: no-ops if
+		// the page has no mixpanel.register.
+		if (actionIndex > 0 && actionIndex % 10 === 0) {
 			await registerMeepleProps(
 				page,
 				{
@@ -701,19 +703,18 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 
 	const actualDurationSec = (Date.now() - sessionStart) / 1000;
 
-	// Final super-props update — includes actual duration and full visit summary
-	if (opts.inject !== false) {
-		await registerMeepleProps(
-			page,
-			{
-				meeple_phase: 'complete',
-				meeple_session_actual_duration_sec: Math.round(actualDurationSec),
-				meeple_pages_visited: visitedPaths.size,
-				meeple_actions: { ...actionCounts }
-			},
-			log
-		);
-	}
+	// Final super-props update — includes actual duration and full visit summary.
+	// Defensive: no-ops if the page has no mixpanel.register.
+	await registerMeepleProps(
+		page,
+		{
+			meeple_phase: 'complete',
+			meeple_session_actual_duration_sec: Math.round(actualDurationSec),
+			meeple_pages_visited: visitedPaths.size,
+			meeple_actions: { ...actionCounts }
+		},
+		log
+	);
 
 	log(
 		`📊 <span style="color: #07B096;">Session complete:</span> ${actionResults.length} actions in ${actualDurationSec.toFixed(1)}s ` +
