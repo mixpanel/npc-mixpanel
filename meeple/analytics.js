@@ -97,6 +97,27 @@ export async function forceSpoofTimeInBrowser(page, log = console.log) {
 	});
 }
 
+/**
+ * Register meeple super properties on the in-page Mixpanel instance.
+ * Silently no-ops if Mixpanel isn't injected. Called at session start, periodically,
+ * and at session end to attach meeple metadata to every event for analysis.
+ *
+ * @param {Page} page
+ * @param {Object} props
+ * @param {Function} log
+ */
+export async function registerMeepleProps(page, props, log = console.log) {
+	try {
+		await page.evaluate(p => {
+			if (typeof window.mixpanel !== 'undefined' && typeof window.mixpanel.register === 'function') {
+				window.mixpanel.register(p);
+			}
+		}, props);
+	} catch (error) {
+		if (log) log(`⚠️ Failed to register meeple props: ${error.message}`);
+	}
+}
+
 // The time spoofing function that will be serialized and injected
 function spoofTime(startTimestamp) {
 	function DO_TIME_SPOOF() {

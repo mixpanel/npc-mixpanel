@@ -38,7 +38,7 @@ import {
 	enableChaosMode
 } from './browser.js';
 import { executeSequence } from './sequences.js';
-import { forceSpoofTimeInBrowser } from './analytics.js';
+import { forceSpoofTimeInBrowser, registerMeepleProps } from './analytics.js';
 import { personas } from './entities.js';
 import { generatePhaseSchedule, getPhaseForProgress, applyPhaseModifiers } from './phases.js';
 import { randomBetween, sleep, isDomainMatch } from './utils.js';
@@ -503,6 +503,36 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 	let currentPhase = 'arrival';
 	let actionIndex = 0;
 
+	// Action counts for Mixpanel super props (updated periodically)
+	const actionCounts = {
+		click: 0,
+		scroll: 0,
+		hover: 0,
+		navigate: 0,
+		form: 0,
+		mouse: 0,
+		other: 0
+	};
+	const visitedPaths = new Set();
+	visitedPaths.add(pageUrlPath(page));
+
+	// Register super props at session start (Mixpanel is injected by ensurePageSetup above)
+	if (opts.inject !== false) {
+		await registerMeepleProps(
+			page,
+			{
+				meeple: true,
+				meeple_id: usersHandle,
+				meeple_persona: persona,
+				meeple_starting_page: genesisUrl,
+				meeple_session_target_duration_sec: Math.round(targetDurationMs / 1000),
+				meeple_phase: 'arrival',
+				meeple_actions: { ...actionCounts }
+			},
+			log
+		);
+	}
+
 	const actionEmojis = {
 		click: '🖱️',
 		exploratoryClick: '🎯',
@@ -568,6 +598,7 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 			const newHotZones = await identifyHotZones(page);
 			hotZones.push(...newHotZones);
 			currentUrl = newUrl;
+			visitedPaths.add(pageUrlPath(page));
 			log(`🎯 Updated: ${hotZones.length} hot zones identified`);
 		}
 
@@ -595,6 +626,10 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 
 			if (action === 'click') consecutiveNonClicks = 0;
 			else consecutiveNonClicks++;
+
+			// Bump per-action counter for super props
+			if (Object.prototype.hasOwnProperty.call(actionCounts, action)) actionCounts[action]++;
+			else actionCounts.other++;
 
 			// Login-trap recovery: track form failures by URL path
 			if (action === 'form') {
@@ -636,14 +671,42 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 
 		actionIndex++;
 
+		// Periodic super-props update (every ~10 actions)
+		if (opts.inject !== false && actionIndex > 0 && actionIndex % 10 === 0) {
+			await registerMeepleProps(
+				page,
+				{
+					meeple_phase: currentPhase,
+					meeple_actions: { ...actionCounts },
+					meeple_pages_visited: visitedPaths.size
+				},
+				log
+			);
+		}
+
 		// Inter-action pause — tier depends on previous/next/phase/persona
 		await contextPause(previousAction, action, currentPhase, persona);
 	}
 
-	const actualDurationSec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+	const actualDurationSec = (Date.now() - sessionStart) / 1000;
+
+	// Final super-props update — includes actual duration and full visit summary
+	if (opts.inject !== false) {
+		await registerMeepleProps(
+			page,
+			{
+				meeple_phase: 'complete',
+				meeple_session_actual_duration_sec: Math.round(actualDurationSec),
+				meeple_pages_visited: visitedPaths.size,
+				meeple_actions: { ...actionCounts }
+			},
+			log
+		);
+	}
+
 	log(
-		`📊 <span style="color: #07B096;">Session complete:</span> ${actionResults.length} actions in ${actualDurationSec}s ` +
-			`(target: ${(targetDurationMs / 1000).toFixed(0)}s, final phase: ${currentPhase})`
+		`📊 <span style="color: #07B096;">Session complete:</span> ${actionResults.length} actions in ${actualDurationSec.toFixed(1)}s ` +
+			`(target: ${(targetDurationMs / 1000).toFixed(0)}s, final phase: ${currentPhase}, pages: ${visitedPaths.size})`
 	);
 
 	return actionResults;

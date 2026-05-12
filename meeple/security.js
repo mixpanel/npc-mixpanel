@@ -766,49 +766,36 @@ export async function relaxCSP(page, log = console.log) {
  */
 export async function ensurePageSetup(page, username, inject = true, opts = {}, log = console.log) {
 	try {
-		// Skip setup on about:blank pages entirely
 		const currentUrl = page.url();
 		if (currentUrl === 'about:blank' || currentUrl.startsWith('about:')) {
 			return; // Skip all setup on about: pages
 		}
 
-		// Always ensure localStorage bypass is in place (critical for each navigation)
-		await ensureStorageBypass(page, log);
+		// 1.1.0 fast path — one combined evaluate. If everything is already in place we
+		// return without doing any work, since this runs before every action.
+		const status = await page.evaluate(() => ({
+			// @ts-ignore - custom flags set by relaxCSP / ensureStorageBypass
+			cspRelaxed: !!window.CSP_WAS_RELAXED,
+			// @ts-ignore
+			storageBypassed: !!window.STORAGE_BYPASS_APPLIED,
+			mixpanelReady: !!(window.mixpanel && window.mixpanel.track)
+		}));
 
-		// Check if CSP is already relaxed
-		const cspStatus = await page.evaluate(() => {
-			return {
-				relaxed: window.CSP_WAS_RELAXED || false,
-				timestamp: window.CSP_RELAXED_TIMESTAMP || 0
-			};
-		});
+		const needsCsp = !status.cspRelaxed;
+		const needsStorage = !status.storageBypassed;
+		const needsMixpanel = inject && !status.mixpanelReady;
 
-		// Only relax CSP if not already done
-		if (!cspStatus.relaxed) {
-			await ensureCSPRelaxed(page, log);
-		}
+		if (!needsCsp && !needsStorage && !needsMixpanel) return;
 
-		// Check if Mixpanel is already injected
-		const mixpanelStatus = inject
-			? await page.evaluate(() => {
-					return {
-						injected: window.MIXPANEL_WAS_INJECTED || false,
-						available: typeof window.mixpanel !== 'undefined' && window.mixpanel.track
-					};
-				})
-			: { injected: true, available: false };
+		// Slow path — apply only what's missing
+		if (needsStorage) await ensureStorageBypass(page, log);
+		if (needsCsp) await ensureCSPRelaxed(page, log);
+		if (needsMixpanel) await ensureMixpanelInjected(page, username, opts, log);
 
-		// Only inject Mixpanel if requested and not already done
-		if (inject && !mixpanelStatus.injected && !mixpanelStatus.available) {
-			await ensureMixpanelInjected(page, username, opts, log);
-		}
-
-		// Only log success for real pages
 		if (!currentUrl.startsWith('chrome') && !currentUrl.startsWith('data:')) {
-			log(`✅ Page setup complete for ${username} (inject: ${inject})`);
+			log(`✅ Page setup applied for ${username} (inject: ${inject})`);
 		}
 	} catch (error) {
-		// Only log errors for non-blank pages
 		const currentUrl = page.url();
 		if (currentUrl && !currentUrl.startsWith('about:') && !currentUrl.startsWith('chrome')) {
 			log(`⚠️ Page setup error for ${username}: ${error.message}`);
