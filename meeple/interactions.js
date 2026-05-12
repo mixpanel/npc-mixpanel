@@ -1444,12 +1444,12 @@ function calculateHoverDuration(target, persona) {
  * Simulate a "dead click" - clicking just outside a button's bounding box so the JS handler doesn't fire.
  * This produces a click event in Session Replay that leads to no navigation or action.
  * @param {Page} page - Puppeteer page object
- * @param {Array} hotZones - Available hot zones
+ * @param {Array} _hotZones - reserved (kept for signature symmetry with other action handlers)
  * @param {Function} log - Logging function
  * @param {Object|null} mouseState
  * @returns {Promise<boolean>} - Success status
  */
-export async function deadClick(page, hotZones = [], log = console.log, mouseState = null) {
+export async function deadClick(page, _hotZones = [], log = console.log, mouseState = null) {
 	try {
 		// Find a clickable element (button/link) to "miss"
 		const targets = await page.evaluate(() => {

@@ -561,8 +561,10 @@ export async function interactWithForms(page, log = console.log, opts = {}) {
 			return null;
 		}, target);
 
-		// Convert evaluateHandle result to ElementHandle
-		const elementHandle = element.asElement();
+		// Convert evaluateHandle result to ElementHandle. asElement() returns
+		// ElementHandle<Node> | null; cast to the element-typed alias the form
+		// helpers expect.
+		const elementHandle = /** @type {ElementHandle | null} */ (element.asElement());
 		if (!elementHandle) {
 			log(`    └─ ⚠️ <span style="color: #F8BC3B;">Could not find form element</span>`);
 			return false;
