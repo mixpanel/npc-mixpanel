@@ -940,9 +940,9 @@ app.get('/mixtape', (_req, res) => {
 			},
 			'casual-browser': { weight: '22%', description: 'Browse genres, play a few tracks, hit paywall, dismiss, leave' },
 			'lofi-devotee': { weight: '30%', description: 'Lo-fi focused listening, subscribe via paywall, keep listening' },
-			'lofi-curious': {
+			'hiphop-curious': {
 				weight: '10%',
-				description: '1.1.x: lo-fi listener who hits paywall, dismisses, browses more, bounces without subscribing'
+				description: '1.1.x: hip-hop listener who hits paywall, dismisses, browses more, bounces without subscribing'
 			},
 			'new-visitor': {
 				weight: '22%',

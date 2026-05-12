@@ -125,12 +125,13 @@ const EMAIL_DOMAINS = [
 ];
 
 const PERSONAS = [
-	// 1.1.x rebalance — lo-fi cohort bumped to 40% (devotee 30 + curious 10) so the
-	// "lo-fi converts higher" story is visible in any content_genre breakdown.
+	// 1.1.x rebalance — story: lo-fi devotees subscribe, hip-hop crowd bounces.
+	// Two cohorts with opposite outcomes makes the genre→conversion gap loud
+	// in any content_genre breakdown.
 	{ name: 'power-listener', weight: 8, sequenceFile: 'mixtape-power-listener.json' },
 	{ name: 'casual-browser', weight: 22, sequenceFile: 'mixtape-casual-browser.json' },
 	{ name: 'lofi-devotee', weight: 30, sequenceFile: 'mixtape-lofi-devotee.json' },
-	{ name: 'lofi-curious', weight: 10, sequenceFile: 'mixtape-lofi-curious.json' },
+	{ name: 'hiphop-curious', weight: 10, sequenceFile: 'mixtape-hiphop-curious.json' },
 	{ name: 'new-visitor', weight: 22, sequenceFile: 'mixtape-new-visitor.json' },
 	{ name: 'churning', weight: 8, sequenceFile: 'mixtape-churning.json' }
 ];
