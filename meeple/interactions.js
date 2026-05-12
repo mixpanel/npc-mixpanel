@@ -111,13 +111,18 @@ export async function wait() {
  *   read  (2-8s)     — after navigation, after scroll, around hover
  *   think (5-15s)    — before form fill, phase transitions
  *
+ * Budget-aware: if remainingMs is provided, the pause is capped at 30% of
+ * remaining session time. Prevents one think-tier × slow-persona × windDown
+ * from eating most of a short speedRunner session.
+ *
  * @param {string|null} previousAction
  * @param {string|null} nextAction
  * @param {string} phase - arrival | exploration | engagement | windDown
  * @param {string} persona
+ * @param {number|null} [remainingMs] - milliseconds left in session budget
  * @returns {Promise<string>} resolves with the chosen tier name (for telemetry)
  */
-export async function contextPause(previousAction, nextAction, phase, persona) {
+export async function contextPause(previousAction, nextAction, phase, persona, remainingMs = null) {
 	const tier = pickPauseTier(previousAction, nextAction, phase);
 	const ranges = {
 		micro: [300, 1500],
@@ -126,7 +131,14 @@ export async function contextPause(previousAction, nextAction, phase, persona) {
 	};
 	const [lo, hi] = ranges[tier];
 	const base = lo + Math.random() * (hi - lo);
-	const delay = base * personaSpeedMod(persona) * phaseSpeedMod(phase);
+	let delay = base * personaSpeedMod(persona) * phaseSpeedMod(phase);
+
+	// Budget cap — never spend more than 30% of remaining session on a single pause
+	if (remainingMs != null && remainingMs > 0) {
+		const cap = remainingMs * 0.3;
+		if (delay > cap) delay = cap;
+	}
+
 	await new Promise(resolve => setTimeout(resolve, Math.max(50, Math.round(delay))));
 	return tier;
 }
@@ -642,7 +654,6 @@ export async function trackMouseMovement(page, target, log = null) {
  * @param {Object|null} mouseState - persistent cursor (updated after final movement)
  */
 export async function simulateReadingMovements(page, target, hoverDuration, persona, _log, mouseState = null) {
-	const cfg = personas[persona] || {};
 	const intensityByPersona = {
 		researcher: 1.5,
 		contentReader: 1.5,
@@ -747,8 +758,6 @@ export async function simulateReadingMovements(page, target, hoverDuration, pers
 	}
 
 	updateMouseState(mouseState, lastX, lastY);
-	// Reference cfg to silence unused warning in older lint configs
-	void cfg;
 }
 
 /**
@@ -1628,8 +1637,15 @@ export async function navigateToNewPage(page, mouseState, originDomain, log = co
 				`"<span style="color: #FEDE9B;">${target.text || '(no text)'}</span>"`
 		);
 
-		// Wait for nav to settle, then check URL or DOM mutation
-		await new Promise(resolve => setTimeout(resolve, 2500));
+		// Race real navigation against the SPA detection window. Real hrefs resolve as soon
+		// as the load event fires; SPAs (no Puppeteer nav event) fall through to the DOM-diff
+		// check after ~2.5s.
+		const navPromise = page
+			.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' })
+			.then(() => 'navigation')
+			.catch(() => null);
+		const spaPromise = new Promise(resolve => setTimeout(() => resolve('spa-window'), 2500));
+		await Promise.race([navPromise, spaPromise]);
 
 		const after = await page.evaluate(() => ({
 			url: window.location.href,

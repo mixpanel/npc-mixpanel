@@ -227,7 +227,8 @@ export const personas = {
 			mouse: 0.4,
 			exploratoryClick: 0.3,
 			rageClick: 0.6,
-			deadClick: 0.3
+			deadClick: 0.3,
+			confusedBehavior: 0.1
 		}
 	},
 	formFiller: {

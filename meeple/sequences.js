@@ -2,7 +2,17 @@
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
-import { wait, naturalMouseMovement, intelligentScroll, exploratoryClick, createMouseState } from './interactions.js';
+import {
+	wait,
+	naturalMouseMovement,
+	intelligentScroll,
+	exploratoryClick,
+	createMouseState,
+	getStartPos,
+	updateMouseState,
+	moveMouse,
+	contextPause
+} from './interactions.js';
 import { interactWithForms, fillRadioGroup, toggleCheckbox, fillSelectDropdown, fillTextInput } from './forms.js';
 import { randomBetween, sleep } from './utils.js';
 
@@ -66,7 +76,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 					`📋 <span style="color: #3498DB;">Action ${index + 1}/${actions.length}:</span> ${action.action} ${action.selector || ''}`
 				);
 
-				const result = await executeSequenceAction(page, action, hotZones, log, debug);
+				const result = await executeSequenceAction(page, action, hotZones, log, debug, mouseState);
 				actionResults.push(result);
 
 				// Handle success/failure based on circuit breaker config
@@ -159,7 +169,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
  * @param {boolean} debug - Enable debug logging
  * @returns {Promise<Object>} Action result
  */
-async function executeSequenceAction(page, action, hotZones, log, debug = false) {
+async function executeSequenceAction(page, action, hotZones, log, debug = false, mouseState = null) {
 	const {
 		action: actionType,
 		selector,
@@ -272,11 +282,11 @@ async function executeSequenceAction(page, action, hotZones, log, debug = false)
 			// Execute the action
 			switch (actionType.toLowerCase()) {
 				case 'click':
-					result = await executeClick(page, element, selector, log, debug);
+					result = await executeClick(page, element, selector, log, debug, mouseState);
 					break;
 				case 'type':
 					if (!text) throw new Error('Type action requires text field');
-					result = await executeType(page, element, selector, text, log, debug);
+					result = await executeType(page, element, selector, text, log, debug, mouseState);
 					break;
 				case 'select':
 					if (!value) throw new Error('Select action requires value field');
@@ -301,11 +311,11 @@ async function executeSequenceAction(page, action, hotZones, log, debug = false)
 			// Normal execution without navigation handling
 			switch (actionType.toLowerCase()) {
 				case 'click':
-					result = await executeClick(page, element, selector, log, debug);
+					result = await executeClick(page, element, selector, log, debug, mouseState);
 					break;
 				case 'type':
 					if (!text) throw new Error('Type action requires text field');
-					result = await executeType(page, element, selector, text, log, debug);
+					result = await executeType(page, element, selector, text, log, debug, mouseState);
 					break;
 				case 'select':
 					if (!value) throw new Error('Select action requires value field');
@@ -437,29 +447,25 @@ async function waitForElement(page, selector, log, debug = false) {
  * @param {boolean} debug - Enable debug logging
  * @returns {Promise<Object>} Action result
  */
-async function executeClick(page, element, selector, log, debug = false) {
+async function executeClick(page, element, selector, log, debug = false, mouseState = null) {
 	try {
-		// Scroll element into view if needed
 		await element.scrollIntoViewIfNeeded();
 		await sleep(randomBetween(100, 300));
 
-		// Get element bounds for natural clicking
 		const box = await element.boundingBox();
-		if (!box) {
-			throw new Error('Element has no bounding box');
-		}
+		if (!box) throw new Error('Element has no bounding box');
 
-		// Add some randomness to click position (human-like behavior)
-		const fuzziness = 0.35; // ±35%
+		const fuzziness = 0.35;
 		const clickX = box.x + box.width * (0.5 + (Math.random() - 0.5) * fuzziness);
 		const clickY = box.y + box.height * (0.5 + (Math.random() - 0.5) * fuzziness);
 
-		// Move mouse naturally to the element first
-		await page.mouse.move(clickX, clickY);
+		// Persistent cursor — move from last known position via humanized path
+		const start = getStartPos(page, mouseState);
+		await moveMouse(page, start.x, start.y, clickX, clickY, box.width, box.height, log);
 		await sleep(randomBetween(50, 150));
 
-		// Perform the click
 		await page.mouse.click(clickX, clickY);
+		updateMouseState(mouseState, clickX, clickY);
 		await sleep(randomBetween(100, 300));
 
 		log(`🖱️ <span style="color: #2ECC71;">Clicked:</span> ${selector}`);
@@ -480,17 +486,25 @@ async function executeClick(page, element, selector, log, debug = false) {
  * @param {boolean} debug - Enable debug logging
  * @returns {Promise<Object>} Action result
  */
-async function executeType(page, element, selector, text, log, debug = false) {
+async function executeType(page, element, selector, text, log, debug = false, mouseState = null) {
 	try {
-		// Scroll element into view and focus
 		await element.scrollIntoViewIfNeeded();
 		await sleep(randomBetween(100, 300));
 
-		// Clear existing content first
-		await element.click({ clickCount: 3 }); // Triple-click to select all
+		// Move cursor to the field via humanized path before clicking, so the type
+		// action doesn't teleport the mouse to the input.
+		const box = await element.boundingBox();
+		if (box) {
+			const targetX = box.x + box.width / 2;
+			const targetY = box.y + box.height / 2;
+			const start = getStartPos(page, mouseState);
+			await moveMouse(page, start.x, start.y, targetX, targetY, box.width, box.height, log);
+			updateMouseState(mouseState, targetX, targetY);
+		}
+
+		await element.click({ clickCount: 3 });
 		await sleep(randomBetween(50, 150));
 
-		// Type text with human-like delays
 		await element.type(text, { delay: randomBetween(50, 150) });
 		await sleep(randomBetween(100, 300));
 
@@ -660,9 +674,11 @@ async function executeRandomAction(page, hotZones, persona, log, mouseState = nu
  * @param {Function} log - Logging function
  */
 async function addHumanBehavior(page, hotZones, persona, log, mouseState = null) {
-	// Random delay between actions (500ms to 2000ms)
-	const baseDelay = randomBetween(500, 2000);
-	await sleep(baseDelay);
+	// 1.1.0: replace flat 500-2000ms delay with contextPause so sequences benefit
+	// from the same persona/phase-aware pacing as duration-driven sessions.
+	// Sequences don't track phase, so pin to 'engagement' (most action-dense phase)
+	// and use generic prev/next so contextPause defaults to micro/read tier.
+	await contextPause('click', 'click', 'engagement', persona);
 
 	// Occasionally add non-state-changing actions (30% chance)
 	if (Math.random() < 0.3) {

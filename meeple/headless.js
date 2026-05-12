@@ -692,8 +692,9 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 			);
 		}
 
-		// Inter-action pause — tier depends on previous/next/phase/persona
-		await contextPause(previousAction, action, currentPhase, persona);
+		// Inter-action pause — tier depends on previous/next/phase/persona, capped by remaining budget
+		const remainingMs = targetDurationMs - (Date.now() - sessionStart);
+		await contextPause(previousAction, action, currentPhase, persona, remainingMs);
 	}
 
 	const actualDurationSec = (Date.now() - sessionStart) / 1000;
