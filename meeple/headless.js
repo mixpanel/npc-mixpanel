@@ -71,7 +71,10 @@ export default async function main(PARAMS = {}, logFunction = null) {
 		networkProfile = 'fast',
 		chaosMode = false,
 		chaosFailRate = 0.15,
-		formMistakes = false
+		formMistakes = false,
+		// 1.1.0 persona controls
+		persona: personaOverride = null,
+		personaWeights = null
 	} = PARAMS;
 
 	if (url === 'fixpanel') url = `https://mixpanel.github.io/fixpanel/`;
@@ -134,7 +137,9 @@ export default async function main(PARAMS = {}, logFunction = null) {
 					networkProfile,
 					chaosMode,
 					chaosFailRate,
-					formMistakes
+					formMistakes,
+					personaOverride,
+					personaWeights
 				},
 				log
 			)
@@ -353,8 +358,11 @@ export async function simulateUser(
 			const hotZones = await identifyHotZones(page);
 			log(`🎯 <span style="color: #7856FF;">Hot zones identified:</span> ${hotZones.length} priority elements`);
 
-			// Select persona and generate action sequence or use provided sequence
-			const persona = selectPersona(log);
+			// Select persona — honoring optional API override / custom frequency weights
+			const persona = selectPersona(log, {
+				override: meepleOpts.personaOverride || null,
+				weights: meepleOpts.personaWeights || null
+			});
 			let actionResults;
 			const startTime = Date.now();
 
