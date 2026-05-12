@@ -1,0 +1,44 @@
+{
+	"community-voter": {
+		"description": "First-time community voter: lands on ourHeart, navigates to /wellness/vote/, methodically reads each case, picks an orange-bordered diagnosis vote, clicks Next Case, repeats across 6 cases, eventually hits the All Done state. Story: voting funnel completion across the case set. Dashboard: Vote Cast event count >= 3, Voting Completed cohort.",
+		"persona": "methodical",
+		"temperature": 9,
+		"chaos-range": [8, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*=\"/wellness/vote\"]",
+				"textFallback": "Vote",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.border-orange-200" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-next-case", "textFallback": "Next Case" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.border-orange-200" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-next-case", "textFallback": "Next Case" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.border-orange-200" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-next-case", "textFallback": "Next Case" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.border-orange-200" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-next-case", "textFallback": "Next Case" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

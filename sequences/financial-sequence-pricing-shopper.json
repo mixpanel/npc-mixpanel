@@ -1,0 +1,54 @@
+{
+	"pricing-shopper": {
+		"description": "First-timer compares pricing tiers (Basic/Pro/Enterprise) and features before committing. Clicks Pro tier trial then drops mid-KYC. Story: pricing-page driven entry, partial conversion. Dashboard: pricing-page → trial-clicked → signup-started → drop-off rate.",
+		"persona": "firstTimer",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "scroll", "amount": "page" },
+			{
+				"action": "click",
+				"selector": "a[href='/fixpanel/financial/features/']",
+				"textFallback": "Features",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "hover", "selector": "#trial" },
+			{ "action": "wait", "tier": "think" },
+			{
+				"action": "click",
+				"selector": "a[href='/fixpanel/financial/pricing/']",
+				"textFallback": "Pricing",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "#getStarted" },
+			{ "action": "hover", "selector": "#trial" },
+			{ "action": "hover", "selector": "#contactSales" },
+			{ "action": "wait", "tier": "think" },
+			{
+				"action": "click",
+				"selector": "#trial",
+				"textFallback": "Free Trial",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "click", "selector": "#next" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#previous" },
+			{ "action": "wait", "tier": "read" }
+		]
+	}
+}

@@ -1,0 +1,53 @@
+{
+	"stories-engaged": {
+		"description": "Reads a customer story (4-variant flag exp_customerStory: A=sarah, B=marco, C=priya, D=no-story), then proceeds into KYC and converts. Use to compare conversion lift across customer-story variants. Dashboard: Customer Story Modal Opened → Account Created funnel, breakdown by exp_customerStory variant.",
+		"persona": "contentReader",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "#customerStories" },
+			{ "action": "click", "selector": "#customerStories", "textFallback": "Customer Stories" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "hover", "selector": "#confirm-button" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#confirm-button", "textFallback": "Read" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "#getStarted" },
+			{
+				"action": "click",
+				"selector": "#getStarted",
+				"textFallback": "Get Started",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#open-auto-fill-modal-button", "textFallback": "Auto-Fill" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#auto-fill-action-button", "textFallback": "Auto-Fill" },
+			{ "action": "wait", "ms": 2500 },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 4 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#next" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 4 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#next" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 25 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted", "expectsNavigation": true, "navigationTimeout": 12000 }
+		]
+	}
+}

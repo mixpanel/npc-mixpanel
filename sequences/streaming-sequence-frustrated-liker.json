@@ -1,0 +1,66 @@
+{
+	"frustrated-liker": {
+		"description": "Counter-cohort to subscriber: rage-clicks Like (10x) and Subscribe (10x) on the broken buttons, gets nothing, dislikes the video out of spite (5x), bounces back home, clicks Trending nav, leaves. Pairs with subscriber to expose the Like/Subscribe success-rate gap. Dashboard: $mp_rage_click count by element, Disliked Video event, bounce after Watched Video.",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": ".bg-white.rounded-lg:nth-child(2)",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "click", "selector": "button:has(svg.lucide-user-plus)", "textFallback": "Subscribe" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-down)", "textFallback": "Dislike" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-down)", "textFallback": "Dislike" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-down)", "textFallback": "Dislike" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-down)", "textFallback": "Dislike" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-down)", "textFallback": "Dislike" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/streaming']",
+				"textFallback": "meTube",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "micro" },
+			{
+				"action": "click",
+				"selector": "a[href*='/trending']",
+				"textFallback": "Trending",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}

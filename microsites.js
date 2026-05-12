@@ -101,37 +101,80 @@ const MICROSITES = [
 		name: 'iBank',
 		vertical: 'financial',
 		url: 'https://mixpanel.github.io/fixpanel/financial/',
-		sequenceFiles: ['financial-sequence-kyc.json', 'financial-sequence-product-demo.json']
+		sequenceFiles: [
+			'financial-sequence-kyc-converter.json',
+			'financial-sequence-kyc-frustrated.json',
+			'financial-sequence-stories-engaged.json',
+			'financial-sequence-product-explorer.json',
+			'financial-sequence-pricing-shopper.json',
+			'financial-sequence-returning-customer.json',
+			'financial-sequence-bouncer.json'
+		]
 	},
 	{
 		name: 'weBuy',
 		vertical: 'checkout',
 		url: 'https://mixpanel.github.io/fixpanel/checkout/',
-		sequenceFiles: []
+		sequenceFiles: [
+			'checkout-sequence-cart-converter.json',
+			'checkout-sequence-coupon-frustrated.json',
+			'checkout-sequence-deals-shopper.json',
+			'checkout-sequence-window-shopper.json',
+			'checkout-sequence-chatbot-engager.json',
+			'checkout-sequence-bouncer.json'
+		]
 	},
 	{
 		name: 'meTube',
 		vertical: 'streaming',
 		url: 'https://mixpanel.github.io/fixpanel/streaming/',
-		sequenceFiles: []
+		sequenceFiles: [
+			'streaming-sequence-subscriber.json',
+			'streaming-sequence-frustrated-liker.json',
+			'streaming-sequence-playlist-curator.json',
+			'streaming-sequence-recommender-skeptic.json',
+			'streaming-sequence-history-rewatcher.json',
+			'streaming-sequence-bouncer.json'
+		]
 	},
 	{
 		name: 'youAdmin',
 		vertical: 'admin',
 		url: 'https://mixpanel.github.io/fixpanel/admin/',
-		sequenceFiles: []
+		sequenceFiles: [
+			'admin-sequence-power-onboarder.json',
+			'admin-sequence-permission-blocked.json',
+			'admin-sequence-csv-frustrated.json',
+			'admin-sequence-access-approver.json',
+			'admin-sequence-chatbot-explorer.json',
+			'admin-sequence-bouncer.json'
+		]
 	},
 	{
 		name: 'ourHeart',
 		vertical: 'wellness',
 		url: 'https://mixpanel.github.io/fixpanel/wellness/',
-		sequenceFiles: []
+		sequenceFiles: [
+			'wellness-sequence-form-completer.json',
+			'wellness-sequence-form-frustrated.json',
+			'wellness-sequence-wheel-spinner.json',
+			'wellness-sequence-community-voter.json',
+			'wellness-sequence-ai-chat-user.json',
+			'wellness-sequence-bouncer.json'
+		]
 	},
 	{
 		name: 'theyRead',
 		vertical: 'lifestyle',
 		url: 'https://mixpanel.github.io/fixpanel/lifestyle/',
-		sequenceFiles: []
+		sequenceFiles: [
+			'lifestyle-sequence-creator.json',
+			'lifestyle-sequence-comment-confused.json',
+			'lifestyle-sequence-bias-checker.json',
+			'lifestyle-sequence-sort-explorer.json',
+			'lifestyle-sequence-upvoter.json',
+			'lifestyle-sequence-bouncer.json'
+		]
 	}
 ];
 

@@ -1,0 +1,48 @@
+{
+	"coupon-frustrated": {
+		"description": "Coupon-frustrated abandoner: lands, adds to cart, lands in /cart/, tries SAVE15 (likely fails — Apply only works ~10%), retries with PROMO20, retries with DISCOUNT, scrolls in frustration, navigates away without checkout. Pairs with cart-converter to expose the broken-coupon abandonment gap. Dashboard: cohort with ≥3 Coupon Applied events AND zero Order Completed; funnel Add to Cart → Coupon Attempted → (drops here, never reaches Checkout Started).",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "click", "selector": "button.add-to-cart", "textFallback": "Add to Cart" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "button.add-to-cart", "textFallback": "Add to Cart" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/cart']",
+				"textFallback": "Cart",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='code']", "text": "SAVE15" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "type", "selector": "input[placeholder*='code']", "text": "PROMO20" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='code']", "text": "DISCOUNT" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

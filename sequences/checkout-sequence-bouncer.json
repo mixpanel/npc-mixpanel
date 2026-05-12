@@ -1,0 +1,28 @@
+{
+	"bouncer": {
+		"description": "Quick bouncer: lands, scrolls once, hovers a product, clicks one item, peeks at /deals/, scrolls, leaves. Story: top-of-funnel curiosity that doesn't engage with cart or checkout. Dashboard: high session count cohort with bounce_rate=true and zero Add to Cart events.",
+		"persona": "impulsive",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "micro" },
+			{
+				"action": "click",
+				"selector": "a[href*='/deals']",
+				"textFallback": "Deals",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "navigate" },
+			{ "action": "scroll", "direction": "up", "amount": "page" }
+		]
+	}
+}

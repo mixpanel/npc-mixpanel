@@ -1,0 +1,57 @@
+{
+	"history-rewatcher": {
+		"description": "Returning loyal viewer: lands, navigates straight to /history, scrolls past prior watches, re-clicks an old video, lands on /watch, hammers Like (~8 attempts, ~1-2 land at 20% rate), then explores /subscriptions and clicks a channel card. Story: returning-user retention cohort; pairs with subscriber to show Like-throughput differential by visit count. Dashboard: cohort = >=2 sessions; funnel Visited History -> Watched Video -> Liked Video.",
+		"persona": "returnVisitor",
+		"temperature": 9,
+		"chaos-range": [9, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/history']",
+				"textFallback": "History",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": ".bg-white.rounded-lg:nth-child(1)" },
+			{
+				"action": "click",
+				"selector": ".bg-white.rounded-lg:nth-child(1)",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "click", "selector": "button:has(svg.lucide-thumbs-up)", "textFallback": "Like" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/subscriptions']",
+				"textFallback": "Subscriptions",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": ".bg-white.rounded-lg:nth-child(2)" },
+			{ "action": "click", "selector": ".bg-white.rounded-lg:nth-child(2)" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}
