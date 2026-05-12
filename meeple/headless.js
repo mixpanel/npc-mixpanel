@@ -10,9 +10,10 @@ import u from 'ak-tools';
 
 // Import from new modular structure
 import { ensurePageSetup } from './security.js';
-import { selectPersona, generatePersonaActionSequence, getContextAwareAction } from './personas.js';
+import { selectPersona, pickNextAction } from './personas.js';
 import {
 	wait,
+	contextPause,
 	exploratoryClick,
 	rageClick,
 	clickStuff,
@@ -38,6 +39,8 @@ import {
 } from './browser.js';
 import { executeSequence } from './sequences.js';
 import { forceSpoofTimeInBrowser } from './analytics.js';
+import { personas } from './entities.js';
+import { generatePhaseSchedule, getPhaseForProgress, applyPhaseModifiers } from './phases.js';
 import { randomBetween, sleep } from './utils.js';
 
 const { NODE_ENV = '' } = process.env;
@@ -379,17 +382,16 @@ export async function simulateUser(
 				circuitBreakerTriggered = sequenceResult.circuitBreakerTriggered || false;
 				failedActions = sequenceResult.failedActions || [];
 			} else {
-				// Fall back to regular persona-based behavior
-				const actionSequence = generatePersonaActionSequence(persona, maxActions);
-				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona}, ${actionSequence.length} actions planned`);
+				// Duration-driven session — picks one action at a time, paced to fit persona's
+				// sessionDuration window. maxActions still acts as a hard ceiling if provided.
+				log(`🎭 <span style="color: #7856FF;">Persona:</span> ${persona} (duration-driven session)`);
 
 				actionResults = await simulateUserSession(
 					page,
-					actionSequence,
 					hotZones,
 					persona,
 					usersHandle,
-					meepleOpts,
+					{ ...meepleOpts, maxActions },
 					log
 				);
 			}
@@ -441,23 +443,51 @@ export async function simulateUser(
 }
 
 /**
- * Execute the main user session with action sequence
+ * Execute the main user session — duration-driven loop with phase-modulated action selection.
+ *
+ * Each tick:
+ *   1. Compute current phase from elapsed/target ratio
+ *   2. Apply phase modifiers to persona's base action weights
+ *   3. Pick next action (with safety valve against catatonic non-click streaks)
+ *   4. Execute action
+ *   5. Pause between actions via contextPause (tier depends on prev/next/phase/persona)
+ *
+ * Loop exit conditions:
+ *   - elapsedTime >= targetDuration (the normal exit)
+ *   - opts.maxActions hard ceiling reached (when provided)
+ *   - consecutive failures >= maxConsecutiveFailures
+ *
  * @param {Page} page - Puppeteer page object
- * @param {Array} actionSequence - Array of actions to perform
  * @param {Array} hotZones - Array of identified hot zones
  * @param {string} persona - Selected persona type
  * @param {string} usersHandle - User identifier
- * @param {Object} opts - Options object
+ * @param {Object} opts - Options object (may include maxActions, chaosMode, etc.)
  * @param {Function} log - Logging function
- * @returns {Promise<Array>} Array of completed actions
+ * @returns {Promise<Array>} Array of completed action names
  */
-async function simulateUserSession(page, actionSequence, hotZones, persona, usersHandle, opts, log) {
+async function simulateUserSession(page, hotZones, persona, usersHandle, opts, log) {
+	const personaConfig = personas[persona] || {};
+	const [minMin, maxMin] = personaConfig.sessionDuration || [2, 5];
+	const targetDurationMs = (minMin + Math.random() * (maxMin - minMin)) * 60 * 1000;
+	const phaseSchedule = generatePhaseSchedule();
+	const sessionStart = Date.now();
+	const baseWeights = personaConfig.actionWeights || {};
+	const hardCeiling = opts.maxActions || null;
+
+	log(
+		`⏱️ <span style="color: #7856FF;">Target session duration:</span> ${(targetDurationMs / 1000).toFixed(0)}s ` +
+			`(persona: ${persona}, range: ${minMin}-${maxMin}min)`
+	);
+
 	const actionResults = [];
-	const actionHistory = [];
-	const hoverHistory = []; // Track hover interactions for return visit behavior
+	const actionHistory = []; // [{ action, success, timestamp }]
+	const hoverHistory = [];
 	let consecutiveFailures = 0;
+	let consecutiveNonClicks = 0;
 	const maxConsecutiveFailures = 5;
-	let currentUrl = page.url(); // Track URL changes for hot zone re-detection
+	let currentUrl = page.url();
+	let currentPhase = 'arrival';
+	let actionIndex = 0;
 
 	const actionEmojis = {
 		click: '🖱️',
@@ -465,130 +495,89 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 		rageClick: '😡',
 		scroll: '📜',
 		mouse: '🖱️',
-		randomMouse: '🎲',
-		randomScroll: '🎯',
 		hover: '👁️',
 		wait: '⏸️',
 		form: '📝',
 		back: '⬅️',
 		forward: '➡️',
+		navigate: '🧭',
 		deadClick: '💀',
 		confusedBehavior: '🤔'
 	};
 
-	for (const [index, originalAction] of actionSequence.entries()) {
-		// Chaos mode: randomly inject friction behaviors (10% dead clicks, 5% confused behavior)
-		let chaosAction = originalAction;
-		if (opts.chaosMode) {
-			const roll = Math.random();
-			if (roll < 0.1) {
-				chaosAction = 'deadClick';
-			} else if (roll < 0.15) {
-				chaosAction = 'confusedBehavior';
-			}
+	while (Date.now() - sessionStart < targetDurationMs) {
+		if (hardCeiling && actionIndex >= hardCeiling) {
+			log(`    └─ 🛑 maxActions ceiling (${hardCeiling}) reached`);
+			break;
 		}
 
-		// Apply context-aware action selection
-		const action = getContextAwareAction(actionHistory, chaosAction, log);
+		const elapsed = Date.now() - sessionStart;
+		const progress = elapsed / targetDurationMs;
+		const newPhase = getPhaseForProgress(progress, phaseSchedule);
+		if (newPhase !== currentPhase) {
+			log(
+				`🌀 <span style="color: #9B59B6;">Phase transition:</span> ${currentPhase} → ${newPhase} ` +
+					`<span style="color: #888;">(${(progress * 100).toFixed(0)}%)</span>`
+			);
+			currentPhase = newPhase;
+		}
 
+		// Phase-modulated weights for this tick
+		const tickWeights = applyPhaseModifiers(baseWeights, currentPhase, personaConfig.phaseModifiers);
+
+		// Action selection — chaos mode may inject friction behaviors
+		const recentActionNames = actionHistory.slice(-10).map(h => h.action);
+		let action;
+		if (opts.chaosMode) {
+			const roll = Math.random();
+			if (roll < 0.1) action = 'deadClick';
+			else if (roll < 0.15) action = 'confusedBehavior';
+			else action = pickNextAction(tickWeights, persona, recentActionNames, consecutiveNonClicks);
+		} else {
+			action = pickNextAction(tickWeights, persona, recentActionNames, consecutiveNonClicks);
+		}
+
+		const previousAction = actionHistory.length ? actionHistory[actionHistory.length - 1].action : null;
 		const emoji = actionEmojis[action] || '🎯';
-		const contextNote =
-			action !== originalAction ? ` <span style="color: #888;">(adapted from ${originalAction})</span>` : '';
+		const elapsedSec = (elapsed / 1000).toFixed(0);
+		const targetSec = (targetDurationMs / 1000).toFixed(0);
 		log(
-			`  ├─ ${emoji} <span style="color: #FF7557;">Action ${index + 1}/${actionSequence.length}</span>: ${action}${contextNote}`
+			`  ├─ ${emoji} <span style="color: #FF7557;">Action ${actionIndex + 1}</span> ` +
+				`<span style="color: #888;">[${elapsedSec}s/${targetSec}s · ${currentPhase}]</span>: ${action}`
 		);
 
-		let funcToPerform;
-		// Check for URL changes and re-identify hot zones if needed
+		// Re-identify hot zones if URL changed
 		const newUrl = page.url();
 		if (newUrl !== currentUrl) {
 			log(`🔄 URL changed, re-identifying hot zones...`);
-			hotZones.length = 0; // Clear existing hot zones
+			hotZones.length = 0;
 			const newHotZones = await identifyHotZones(page);
 			hotZones.push(...newHotZones);
 			currentUrl = newUrl;
 			log(`🎯 Updated: ${hotZones.length} hot zones identified`);
 		}
 
-		switch (action) {
-			case 'click':
-				funcToPerform = () => clickStuff(page, hotZones, log);
-				break;
-			case 'exploratoryClick':
-				funcToPerform = () => exploratoryClick(page, log);
-				break;
-			case 'rageClick':
-				funcToPerform = () => rageClick(page, log);
-				break;
-			case 'scroll':
-				funcToPerform = () => intelligentScroll(page, hotZones, log);
-				break;
-			case 'mouse':
-				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
-				break;
-			case 'moveMouse':
-				funcToPerform = () => naturalMouseMovement(page, hotZones, log);
-				break;
-			case 'randomMouse':
-				funcToPerform = () => randomMouse(page, log);
-				break;
-			case 'randomScroll':
-				funcToPerform = () => randomScroll(page, log);
-				break;
-			case 'hover':
-				funcToPerform = () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
-				break;
-			case 'form':
-				funcToPerform = () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
-				break;
-			case 'deadClick':
-				funcToPerform = () => deadClick(page, hotZones, log);
-				break;
-			case 'confusedBehavior':
-				funcToPerform = () => confusedBehavior(page, log);
-				break;
-			case 'back':
-				funcToPerform = () => navigateBack(page, log);
-				break;
-			case 'forward':
-				funcToPerform = () => navigateForward(page, log);
-				break;
-			case 'wait':
-				funcToPerform = () => wait();
-				break;
-			default:
-				funcToPerform = () => wait();
-				break;
-		}
+		const funcToPerform = resolveActionHandler(action, page, hotZones, persona, hoverHistory, opts, log);
 
 		try {
-			// Ensure page setup before each action
 			await ensurePageSetup(page, usersHandle, opts.inject !== false, opts, log);
 
-			// Execute action with timeout
 			const actionTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Action timeout')), 30000));
-
 			await Promise.race([funcToPerform(), actionTimeout]);
 
 			actionResults.push(action);
-			consecutiveFailures = 0; // Reset failure count on success
-			actionHistory.push({
-				action,
-				success: true,
-				timestamp: Date.now()
-			});
+			consecutiveFailures = 0;
+			actionHistory.push({ action, success: true, timestamp: Date.now() });
+
+			if (action === 'click') consecutiveNonClicks = 0;
+			else consecutiveNonClicks++;
 		} catch (actionError) {
 			consecutiveFailures++;
 			log(`    ├─ ⚠️ <span style="color: #F8BC3B;">Action failed:</span> ${actionError.message}`);
+			actionHistory.push({ action, success: false, error: actionError.message, timestamp: Date.now() });
 
-			actionHistory.push({
-				action,
-				success: false,
-				error: actionError.message,
-				timestamp: Date.now()
-			});
+			if (action !== 'click') consecutiveNonClicks++;
 
-			// Circuit breaker: stop if too many consecutive failures
 			if (consecutiveFailures >= maxConsecutiveFailures) {
 				log(
 					`    └─ 🚨 <span style="color: #CC332B;">Too many consecutive failures (${consecutiveFailures}), terminating session</span>`
@@ -597,11 +586,57 @@ async function simulateUserSession(page, actionSequence, hotZones, persona, user
 			}
 		}
 
-		// Random sleep between actions
-		await sleep(randomBetween(500, 2000));
+		actionIndex++;
+
+		// Inter-action pause — tier depends on previous/next/phase/persona
+		await contextPause(previousAction, action, currentPhase, persona);
 	}
+
+	const actualDurationSec = ((Date.now() - sessionStart) / 1000).toFixed(1);
+	log(
+		`📊 <span style="color: #07B096;">Session complete:</span> ${actionResults.length} actions in ${actualDurationSec}s ` +
+			`(target: ${(targetDurationMs / 1000).toFixed(0)}s, final phase: ${currentPhase})`
+	);
 
 	return actionResults;
 }
 
-// performScroll function removed - unused (intelligentScroll from interactions.js is used instead)
+/**
+ * Resolve an action name to a callable handler. Unknown actions fall back to wait().
+ */
+function resolveActionHandler(action, page, hotZones, persona, hoverHistory, opts, log) {
+	switch (action) {
+		case 'click':
+			return () => clickStuff(page, hotZones, log);
+		case 'exploratoryClick':
+			return () => exploratoryClick(page, log);
+		case 'rageClick':
+			return () => rageClick(page, log);
+		case 'scroll':
+			return () => intelligentScroll(page, hotZones, log);
+		case 'mouse':
+		case 'moveMouse':
+			return () => naturalMouseMovement(page, hotZones, log);
+		case 'randomMouse':
+			return () => randomMouse(page, log);
+		case 'randomScroll':
+			return () => randomScroll(page, log);
+		case 'hover':
+			return () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
+		case 'form':
+			return () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
+		case 'deadClick':
+			return () => deadClick(page, hotZones, log);
+		case 'confusedBehavior':
+			return () => confusedBehavior(page, log);
+		case 'back':
+			return () => navigateBack(page, log);
+		case 'forward':
+			return () => navigateForward(page, log);
+		case 'wait':
+			return () => wait();
+		default:
+			// 'navigate' lands here until Phase 4 wires the handler.
+			return () => wait();
+	}
+}

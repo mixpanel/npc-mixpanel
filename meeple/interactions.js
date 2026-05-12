@@ -6,7 +6,8 @@ import {
 	regularButtonSelectors,
 	navigationSelectors,
 	contentSelectors,
-	interactiveSelectors
+	interactiveSelectors,
+	personas
 } from './entities.js';
 import { randomBetween } from './utils.js';
 
@@ -41,7 +42,9 @@ export function coinFlip() {
 }
 
 /**
- * Natural wait function with variable timing
+ * Natural wait function with variable timing.
+ * Used by the `wait` action and as a fallback elsewhere. Inter-action pacing
+ * uses contextPause() instead — see below.
  * @returns {Promise} - Resolves after random delay
  */
 export async function wait() {
@@ -60,6 +63,58 @@ export async function wait() {
 	}
 
 	await new Promise(resolve => setTimeout(resolve, delay));
+}
+
+/**
+ * Context-aware inter-action pause. Three tiers, modulated by persona pace and phase.
+ *
+ *   micro (0.3-1.5s) — between rapid actions (click→click, scroll steps)
+ *   read  (2-8s)     — after navigation, after scroll, around hover
+ *   think (5-15s)    — before form fill, phase transitions
+ *
+ * @param {string|null} previousAction
+ * @param {string|null} nextAction
+ * @param {string} phase - arrival | exploration | engagement | windDown
+ * @param {string} persona
+ * @returns {Promise<string>} resolves with the chosen tier name (for telemetry)
+ */
+export async function contextPause(previousAction, nextAction, phase, persona) {
+	const tier = pickPauseTier(previousAction, nextAction, phase);
+	const ranges = {
+		micro: [300, 1500],
+		read: [2000, 8000],
+		think: [5000, 15000]
+	};
+	const [lo, hi] = ranges[tier];
+	const base = lo + Math.random() * (hi - lo);
+	const delay = base * personaSpeedMod(persona) * phaseSpeedMod(phase);
+	await new Promise(resolve => setTimeout(resolve, Math.max(50, Math.round(delay))));
+	return tier;
+}
+
+function pickPauseTier(prev, next, phase) {
+	if (next === 'form') return 'think';
+	if (prev === 'navigate' || prev === 'back' || prev === 'forward') return 'read';
+	if (phase === 'windDown' && Math.random() < 0.4) return 'read';
+	if (phase === 'arrival' && Math.random() < 0.35) return 'read';
+	if (next === 'hover' || prev === 'hover') return 'read';
+	if (next === 'scroll' && prev === 'scroll') return 'micro';
+	return Math.random() < 0.15 ? 'read' : 'micro';
+}
+
+function personaSpeedMod(persona) {
+	const cfg = personas[persona];
+	if (!cfg) return 1.0;
+	if (cfg.typingSpeed === 'fast') return 0.6;
+	if (cfg.typingSpeed === 'slow') return 1.4;
+	return 1.0;
+}
+
+function phaseSpeedMod(phase) {
+	if (phase === 'engagement') return 0.85;
+	if (phase === 'windDown') return 1.3;
+	if (phase === 'arrival') return 1.1;
+	return 1.0;
 }
 
 /**
