@@ -112,8 +112,13 @@ export interface MeepleParams {
 	headless?: boolean;
 	/** Inject Mixpanel analytics tracking */
 	inject?: boolean;
-	/** Simulate past timestamps for analytics */
-	past?: boolean;
+	/**
+	 * Simulate past timestamps for analytics events.
+	 * - `false` (default): no spoofing
+	 * - `true`: random timestamp within last 120 hours (5 days)
+	 * - `number` (1-120): random timestamp within last N hours, clamped
+	 */
+	past?: boolean | number;
 	/** Mixpanel token override */
 	token?: string;
 	/** Maximum actions per user session */
@@ -389,7 +394,7 @@ export declare function simulateUser(
 	url: string,
 	headless?: boolean,
 	inject?: boolean,
-	past?: boolean,
+	past?: boolean | number,
 	maxActions?: number | null,
 	usersHandle?: string | null,
 	opts?: MeepleOptions,

@@ -40,6 +40,7 @@ import { pickNextAction } from '../meeple/personas.js';
 import { isDomainMatch } from '../meeple/utils.js';
 import { createMouseState, getStartPos, updateMouseState } from '../meeple/interactions.js';
 import { personas, personaNames } from '../meeple/entities.js';
+import { getRandomTimestampWithinHours } from '../meeple/analytics.js';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -1217,6 +1218,39 @@ describe('Meeple 1.1.0 — Domain Matching', () => {
 		expect(isDomainMatch('not a url', 'example.com')).toBe(false);
 		expect(isDomainMatch('', 'example.com')).toBe(false);
 		expect(isDomainMatch('https://x.com', '')).toBe(false);
+	});
+});
+
+describe('Meeple 1.1.0 — Past timestamp window', () => {
+	const noop = () => {};
+
+	test('1h window stays within the last hour', () => {
+		const now = Date.now();
+		for (let i = 0; i < 50; i++) {
+			const t = getRandomTimestampWithinHours(1, noop);
+			expect(t).toBeLessThanOrEqual(now + 50); // small slack for clock skew
+			expect(t).toBeGreaterThanOrEqual(now - 60 * 60 * 1000 - 50);
+		}
+	});
+
+	test('120h window stays within the last 5 days', () => {
+		const now = Date.now();
+		const t = getRandomTimestampWithinHours(120, noop);
+		expect(t).toBeLessThanOrEqual(now + 50);
+		expect(t).toBeGreaterThanOrEqual(now - 120 * 60 * 60 * 1000 - 50);
+	});
+
+	test('clamps oversized values to 120h', () => {
+		const now = Date.now();
+		const t = getRandomTimestampWithinHours(9999, noop);
+		// Must not exceed the 120h floor
+		expect(t).toBeGreaterThanOrEqual(now - 120 * 60 * 60 * 1000 - 50);
+	});
+
+	test('clamps zero/negative to 1h', () => {
+		const now = Date.now();
+		const t = getRandomTimestampWithinHours(0, noop);
+		expect(t).toBeGreaterThanOrEqual(now - 60 * 60 * 1000 - 50);
 	});
 });
 
