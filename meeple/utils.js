@@ -1,15 +1,25 @@
 /**
- * Select a random item from an array with weights
+ * Select a random item from an array with weights.
+ * Throws on degenerate input (zero/negative total weight) — caller should ensure
+ * at least one positive weight before calling.
+ *
  * @param {Array} items - Array of items to choose from
  * @param {Array} weights - Array of weights corresponding to items
  * @returns {any} - Selected item
  */
 export function weightedRandom(items, weights) {
+	if (items.length === 0) {
+		throw new Error('weightedRandom called with empty items array');
+	}
 	if (items.length !== weights.length) {
 		throw new Error('Items and weights arrays must have the same length');
 	}
 
 	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+	if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+		throw new Error(`weightedRandom: total weight must be > 0 (got ${totalWeight})`);
+	}
+
 	const random = Math.random() * totalWeight;
 
 	let weightSum = 0;
@@ -20,7 +30,7 @@ export function weightedRandom(items, weights) {
 		}
 	}
 
-	// Fallback to last item
+	// Fallback to last item (only reachable on floating-point edge cases)
 	return items[items.length - 1];
 }
 

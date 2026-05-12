@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import { uid } from 'ak-tools';
 import main from './meeple/headless.js';
 import { validateSequences } from './meeple/sequences.js';
-import { personaNames } from './meeple/entities.js';
+import { personaNames, personas as personaConfigs } from './meeple/entities.js';
 import { log } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -548,6 +548,31 @@ app.get('/help', (_req, res) => {
 				code: 401
 			}
 		}
+	});
+});
+
+// 1.1.0: persona catalog endpoint — single source of truth for UI clients.
+// Returns the canonical 15 persona names + their default frequency weights so the
+// UI doesn't have to hardcode them. Public, unauthenticated, available in both
+// runtime contexts.
+app.get('/api/personas', (_req, res) => {
+	/** @type {Object<string, number>} */
+	const frequencies = {};
+	/** @type {Object<string, {sessionDuration: [number, number], typingSpeed: string, scrollStyle: string}>} */
+	const meta = {};
+	for (const name of personaNames) {
+		const cfg = personaConfigs[name];
+		frequencies[name] = cfg.frequency;
+		meta[name] = {
+			sessionDuration: cfg.sessionDuration,
+			typingSpeed: cfg.typingSpeed,
+			scrollStyle: cfg.scrollStyle
+		};
+	}
+	res.json({
+		names: personaNames,
+		frequencies,
+		meta
 	});
 });
 

@@ -246,59 +246,96 @@ url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
 usersSlider.addEventListener('input', e => {
 	usersOutput.textContent = `${/** @type {HTMLInputElement} */ (e.target).value} meeples`;
+	updateEstimatedTime();
 });
 
+// 1.1.0: estimated wall-clock time = ceil(users / concurrency) × per-session-budget.
+// concurrency mirrors the submit handler's Math.min(users, 20). Per-session worst
+// case is the per-user totalTimeout in headless.js (10 min). Most personas finish
+// faster, so this is an upper bound.
+const PER_SESSION_BUDGET_MIN = 10;
+const MAX_CONCURRENCY = 20;
+function updateEstimatedTime() {
+	const el = document.getElementById('estimated-time');
+	if (!el) return;
+	const users = parseInt(usersSlider.value);
+	const concurrency = Math.min(users, MAX_CONCURRENCY);
+	const batches = Math.ceil(users / concurrency);
+	const minutes = batches * PER_SESSION_BUDGET_MIN;
+	const label = minutes < 60 ? `~${minutes} min` : `~${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+	el.textContent = `Estimated wall-clock: ${label} (worst case, ${concurrency} concurrent)`;
+}
+updateEstimatedTime();
+
 // ─── 1.1.0: Persona controls ────────────────────────────────────────
-// Source of truth for these names lives in meeple/entities.js (personaNames).
-// Inlined here because the UI is statically served (no build step).
-// Keep this list and the default-frequency map in sync if entities.js changes.
-const PERSONA_NAMES = [
-	'speedRunner',
-	'browser',
-	'researcher',
-	'shopper',
-	'taskFocused',
-	'explorer',
-	'skimmer',
-	'firstTimer',
-	'mobileUser',
-	'frustrated',
-	'formFiller',
-	'returnVisitor',
-	'contentReader',
-	'impulsive',
-	'methodical'
-];
-const PERSONA_DEFAULT_FREQ = {
-	speedRunner: 0.08,
-	browser: 0.15,
-	researcher: 0.08,
-	shopper: 0.12,
-	taskFocused: 0.1,
-	explorer: 0.1,
-	skimmer: 0.1,
-	firstTimer: 0.08,
-	mobileUser: 0.08,
-	frustrated: 0.04,
-	formFiller: 0.03,
-	returnVisitor: 0.06,
-	contentReader: 0.05,
-	impulsive: 0.02,
-	methodical: 0.01
+// Persona catalog is fetched from GET /api/personas at init time so the UI never
+// goes out of sync with meeple/entities.js. Inline FALLBACK below is used only if
+// the fetch fails (offline dev, transient error). Keep fallback roughly in sync;
+// drift here is non-fatal because real users hit the live endpoint.
+const PERSONA_FALLBACK = {
+	names: [
+		'speedRunner',
+		'browser',
+		'researcher',
+		'shopper',
+		'taskFocused',
+		'explorer',
+		'skimmer',
+		'firstTimer',
+		'mobileUser',
+		'frustrated',
+		'formFiller',
+		'returnVisitor',
+		'contentReader',
+		'impulsive',
+		'methodical'
+	],
+	frequencies: {
+		speedRunner: 0.08,
+		browser: 0.15,
+		researcher: 0.08,
+		shopper: 0.12,
+		taskFocused: 0.1,
+		explorer: 0.1,
+		skimmer: 0.1,
+		firstTimer: 0.08,
+		mobileUser: 0.08,
+		frustrated: 0.04,
+		formFiller: 0.03,
+		returnVisitor: 0.06,
+		contentReader: 0.05,
+		impulsive: 0.02,
+		methodical: 0.01
+	}
 };
 
-(function initPersonaControls() {
+async function fetchPersonaCatalog() {
+	try {
+		const res = await fetch('/api/personas', { credentials: 'same-origin' });
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const data = await res.json();
+		if (!Array.isArray(data.names) || !data.frequencies) throw new Error('malformed payload');
+		return { names: data.names, frequencies: data.frequencies };
+	} catch (err) {
+		console.warn('[ui] /api/personas fetch failed, using inline fallback:', err.message);
+		return PERSONA_FALLBACK;
+	}
+}
+
+(async function initPersonaControls() {
 	const personaSelect = /** @type {HTMLSelectElement} */ (document.getElementById('persona'));
 	const grid = document.getElementById('persona-mix-grid');
 	const dieBtn = document.getElementById('persona-mix-die');
 	if (!personaSelect || !grid || !dieBtn) return;
+
+	const { names, frequencies } = await fetchPersonaCatalog();
 
 	// Populate dropdown
 	const autoOpt = document.createElement('option');
 	autoOpt.value = '';
 	autoOpt.textContent = 'auto (frequency-weighted)';
 	personaSelect.appendChild(autoOpt);
-	for (const name of PERSONA_NAMES) {
+	for (const name of names) {
 		const opt = document.createElement('option');
 		opt.value = name;
 		opt.textContent = name;
@@ -306,8 +343,8 @@ const PERSONA_DEFAULT_FREQ = {
 	}
 
 	// Populate mix grid
-	for (const name of PERSONA_NAMES) {
-		const defaultPct = Math.round((PERSONA_DEFAULT_FREQ[name] || 0.05) * 100);
+	for (const name of names) {
+		const defaultPct = Math.round((frequencies[name] || 0.05) * 100);
 		const labelEl = document.createElement('span');
 		labelEl.className = 'persona-name';
 		labelEl.textContent = name;
@@ -330,7 +367,7 @@ const PERSONA_DEFAULT_FREQ = {
 		grid.appendChild(valueEl);
 	}
 
-	// Die: randomize all 15 sliders to 0-100
+	// Die: randomize all sliders to 0-100
 	dieBtn.addEventListener('click', () => {
 		const sliders = grid.querySelectorAll('input[type="range"]');
 		sliders.forEach(s => {

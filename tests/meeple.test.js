@@ -1162,6 +1162,13 @@ describe('Meeple 1.1.0 — Persona Selection', () => {
 		}
 	});
 
+	test('selectPersona with all-zero weights falls back to default frequencies', () => {
+		// Degenerate input — should not throw, should pick from default 15
+		const allZero = Object.fromEntries(personaNames.map(n => [n, 0]));
+		const r = selectPersona(noop, { weights: allZero });
+		expect(personaNames).toContain(r);
+	});
+
 	test('pickNextAction safety valve forces click after non-click streak', () => {
 		const weights = { scroll: 1.0, hover: 1.0, click: 0.001 };
 		const persona = 'researcher'; // maxConsecutiveNonClicks = 5

@@ -32,6 +32,18 @@ export function selectPersona(log = console.log, options = {}) {
 		throw new Error('No valid personas available for selection');
 	}
 
+	// Defensive: caller passed weights that all sum to zero (e.g. UI all-sliders-at-zero).
+	// Fall back to default per-persona frequencies rather than throwing.
+	const sum = freqs.reduce((a, b) => a + (b > 0 ? b : 0), 0);
+	if (sum <= 0) {
+		log(`⚠️ All persona weights are zero — falling back to default frequencies`);
+		const fallbackNames = personaNames;
+		const fallbackFreqs = personaNames.map(n => personas[n].frequency || 0.01);
+		const selected = weightedRandom(fallbackNames, fallbackFreqs);
+		log(`🎭 Selected persona: ${selected}`);
+		return selected;
+	}
+
 	const selected = weightedRandom(names, freqs);
 	log(`🎭 Selected persona: ${selected}`);
 	return selected;
