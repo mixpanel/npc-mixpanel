@@ -5,462 +5,340 @@
  * Extracted from headless.js for better code organization
  */
 
-// User behavior personas with action probabilities - Enhanced with modern user diversity
-const basePersonas = {
-	// Power users - confident, fast, goal-oriented
-	powerUser: {
-		scroll: 0.3,
-		mouse: 0.1,
-		click: 0.95,
-		exploratoryClick: 0.4,
-		wait: 0.1,
-		hover: 0.2,
-		form: 0.3,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.15
+/**
+ * Consolidated personas (Meeple 1.1.0). 15 distinct user archetypes with rich config.
+ *
+ * Each persona has:
+ *   - frequency: relative selection weight (used by selectPersona's weighted picker)
+ *   - sessionDuration: [min, max] minutes — drives duration-first session pacing
+ *   - actionWeights: per-action probability map (used to pick next action each tick)
+ *   - typingSpeed: 'fast' | 'medium' | 'slow' — modulates per-character delay in forms.js
+ *   - scrollStyle: 'quick' | 'moderate' | 'thorough' — modulates wheel-scroll cadence
+ *   - maxConsecutiveNonClicks: safety valve — force a click after this many non-click actions
+ *   - phaseModifiers (optional): per-phase override maps (defaults from phases.js apply otherwise)
+ *
+ * Frequencies don't need to sum to 1.0; weightedRandom normalizes.
+ */
+export const personas = {
+	speedRunner: {
+		frequency: 0.08,
+		sessionDuration: [1, 3],
+		typingSpeed: 'fast',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 2,
+		actionWeights: {
+			click: 0.95,
+			scroll: 0.2,
+			hover: 0.05,
+			navigate: 0.5,
+			form: 0.1,
+			wait: 0.05,
+			back: 0.05,
+			forward: 0.05,
+			mouse: 0.05,
+			exploratoryClick: 0.3,
+			rageClick: 0.05,
+			deadClick: 0.01
+		}
+	},
+	browser: {
+		frequency: 0.15,
+		sessionDuration: [3, 7],
+		typingSpeed: 'medium',
+		scrollStyle: 'moderate',
+		maxConsecutiveNonClicks: 4,
+		actionWeights: {
+			click: 0.7,
+			scroll: 0.4,
+			hover: 0.3,
+			navigate: 0.5,
+			form: 0.2,
+			wait: 0.3,
+			back: 0.15,
+			forward: 0.05,
+			mouse: 0.2,
+			exploratoryClick: 0.4,
+			rageClick: 0.1,
+			deadClick: 0.05
+		}
+	},
+	researcher: {
+		frequency: 0.08,
+		sessionDuration: [5, 12],
+		typingSpeed: 'slow',
+		scrollStyle: 'thorough',
+		maxConsecutiveNonClicks: 5,
+		actionWeights: {
+			click: 0.4,
+			scroll: 0.6,
+			hover: 0.7,
+			navigate: 0.5,
+			form: 0.3,
+			wait: 0.6,
+			back: 0.2,
+			forward: 0.1,
+			mouse: 0.4,
+			exploratoryClick: 0.3,
+			rageClick: 0.03,
+			deadClick: 0.05
+		}
+	},
+	shopper: {
+		frequency: 0.12,
+		sessionDuration: [3, 8],
+		typingSpeed: 'medium',
+		scrollStyle: 'moderate',
+		maxConsecutiveNonClicks: 4,
+		actionWeights: {
+			click: 0.7,
+			scroll: 0.5,
+			hover: 0.5,
+			navigate: 0.7,
+			form: 0.4,
+			wait: 0.3,
+			back: 0.4,
+			forward: 0.15,
+			mouse: 0.3,
+			exploratoryClick: 0.5,
+			rageClick: 0.1,
+			deadClick: 0.05
+		}
 	},
 	taskFocused: {
-		scroll: 0.2,
-		mouse: 0.1,
-		click: 0.9,
-		exploratoryClick: 0.3,
-		wait: 0.2,
-		hover: 0.1,
-		form: 0.5,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.2
+		frequency: 0.1,
+		sessionDuration: [1, 4],
+		typingSpeed: 'fast',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 3,
+		actionWeights: {
+			click: 0.85,
+			scroll: 0.2,
+			hover: 0.1,
+			navigate: 0.4,
+			form: 0.7,
+			wait: 0.1,
+			back: 0.15,
+			forward: 0.1,
+			mouse: 0.1,
+			exploratoryClick: 0.15,
+			rageClick: 0.15,
+			deadClick: 0.03
+		}
 	},
-	digitalNative: {
-		scroll: 0.25,
-		mouse: 0.05,
-		click: 0.92,
-		exploratoryClick: 0.35,
-		wait: 0.05,
-		hover: 0.15,
-		form: 0.45,
-		back: 0.1,
-		forward: 0.05,
-		rageClick: 0.08
-	},
-
-	// Shopping/conversion oriented
-	shopper: {
-		scroll: 0.4,
-		mouse: 0.2,
-		click: 0.85,
-		exploratoryClick: 0.5,
-		wait: 0.3,
-		hover: 0.4,
-		form: 0.4,
-		back: 0.3,
-		forward: 0.1,
-		rageClick: 0.12
-	},
-	comparison: {
-		scroll: 0.5,
-		mouse: 0.3,
-		click: 0.75,
-		exploratoryClick: 0.4,
-		wait: 0.4,
-		hover: 0.5,
-		form: 0.3,
-		back: 0.4,
-		forward: 0.1,
-		rageClick: 0.25
-	},
-	conversionOptimized: {
-		scroll: 0.35,
-		mouse: 0.25,
-		click: 0.88,
-		exploratoryClick: 0.45,
-		wait: 0.25,
-		hover: 0.35,
-		form: 0.6,
-		back: 0.2,
-		forward: 0.05,
-		rageClick: 0.18
-	},
-
-	// Content consumption
-	reader: {
-		scroll: 0.6,
-		mouse: 0.2,
-		click: 0.75,
-		exploratoryClick: 0.2,
-		wait: 0.5,
-		hover: 0.3,
-		form: 0.2,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.05
+	explorer: {
+		frequency: 0.1,
+		sessionDuration: [4, 10],
+		typingSpeed: 'medium',
+		scrollStyle: 'moderate',
+		maxConsecutiveNonClicks: 4,
+		actionWeights: {
+			click: 0.65,
+			scroll: 0.4,
+			hover: 0.4,
+			navigate: 0.9,
+			form: 0.3,
+			wait: 0.3,
+			back: 0.3,
+			forward: 0.15,
+			mouse: 0.3,
+			exploratoryClick: 0.7,
+			rageClick: 0.1,
+			deadClick: 0.04
+		}
 	},
 	skimmer: {
-		scroll: 0.7,
-		mouse: 0.1,
-		click: 0.7,
-		exploratoryClick: 0.2,
-		wait: 0.2,
-		hover: 0.2,
-		form: 0.1,
-		back: 0.3,
-		forward: 0.1,
-		rageClick: 0.1
+		frequency: 0.1,
+		sessionDuration: [2, 5],
+		typingSpeed: 'fast',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 5,
+		actionWeights: {
+			click: 0.5,
+			scroll: 0.85,
+			hover: 0.15,
+			navigate: 0.5,
+			form: 0.1,
+			wait: 0.15,
+			back: 0.4,
+			forward: 0.05,
+			mouse: 0.1,
+			exploratoryClick: 0.3,
+			rageClick: 0.1,
+			deadClick: 0.04
+		}
 	},
-	bingeWatcher: {
-		scroll: 0.8,
-		mouse: 0.15,
-		click: 0.72,
-		exploratoryClick: 0.25,
-		wait: 0.4,
-		hover: 0.25,
-		form: 0.15,
-		back: 0.15,
-		forward: 0.05,
-		rageClick: 0.08
+	firstTimer: {
+		frequency: 0.08,
+		sessionDuration: [3, 8],
+		typingSpeed: 'slow',
+		scrollStyle: 'thorough',
+		maxConsecutiveNonClicks: 4,
+		actionWeights: {
+			click: 0.5,
+			scroll: 0.5,
+			hover: 0.6,
+			navigate: 0.3,
+			form: 0.4,
+			wait: 0.7,
+			back: 0.3,
+			forward: 0.05,
+			mouse: 0.4,
+			exploratoryClick: 0.2,
+			rageClick: 0.05,
+			deadClick: 0.1
+		}
 	},
-
-	// Exploration patterns
-	explorer: {
-		scroll: 0.4,
-		mouse: 0.3,
-		click: 0.8,
-		exploratoryClick: 0.7,
-		wait: 0.3,
-		hover: 0.4,
-		form: 0.3,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.15
+	mobileUser: {
+		frequency: 0.08,
+		sessionDuration: [2, 6],
+		typingSpeed: 'medium',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 4,
+		actionWeights: {
+			click: 0.7,
+			scroll: 0.85,
+			hover: 0.05,
+			navigate: 0.4,
+			form: 0.3,
+			wait: 0.2,
+			back: 0.3,
+			forward: 0.1,
+			mouse: 0.05,
+			exploratoryClick: 0.3,
+			rageClick: 0.2,
+			deadClick: 0.08
+		}
 	},
-	discoverer: {
-		scroll: 0.3,
-		mouse: 0.4,
-		click: 0.85,
-		exploratoryClick: 0.8,
-		wait: 0.2,
-		hover: 0.6,
-		form: 0.4,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.12
+	frustrated: {
+		frequency: 0.04,
+		sessionDuration: [1, 4],
+		typingSpeed: 'medium',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 3,
+		actionWeights: {
+			click: 0.6,
+			scroll: 0.5,
+			hover: 0.2,
+			navigate: 0.3,
+			form: 0.2,
+			wait: 0.4,
+			back: 0.5,
+			forward: 0.05,
+			mouse: 0.4,
+			exploratoryClick: 0.3,
+			rageClick: 0.6,
+			deadClick: 0.3
+		}
 	},
-	curiosityDriven: {
-		scroll: 0.45,
-		mouse: 0.35,
-		click: 0.82,
-		exploratoryClick: 0.75,
-		wait: 0.25,
-		hover: 0.5,
-		form: 0.35,
-		back: 0.15,
-		forward: 0.08,
-		rageClick: 0.1
+	formFiller: {
+		frequency: 0.03,
+		sessionDuration: [2, 5],
+		typingSpeed: 'medium',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 3,
+		actionWeights: {
+			click: 0.6,
+			scroll: 0.2,
+			hover: 0.2,
+			navigate: 0.3,
+			form: 0.95,
+			wait: 0.2,
+			back: 0.15,
+			forward: 0.1,
+			mouse: 0.15,
+			exploratoryClick: 0.1,
+			rageClick: 0.1,
+			deadClick: 0.03
+		}
 	},
-
-	// Device-specific patterns
-	mobileHabits: {
-		scroll: 0.8,
-		mouse: 0.1,
-		click: 0.75,
-		exploratoryClick: 0.3,
-		wait: 0.2,
-		hover: 0.1,
-		form: 0.3,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.22
+	returnVisitor: {
+		frequency: 0.06,
+		sessionDuration: [2, 6],
+		typingSpeed: 'fast',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 3,
+		actionWeights: {
+			click: 0.8,
+			scroll: 0.3,
+			hover: 0.2,
+			navigate: 0.6,
+			form: 0.3,
+			wait: 0.15,
+			back: 0.2,
+			forward: 0.1,
+			mouse: 0.15,
+			exploratoryClick: 0.2,
+			rageClick: 0.1,
+			deadClick: 0.03
+		}
 	},
-	mobileFirst: {
-		scroll: 0.85,
-		mouse: 0.05,
-		click: 0.78,
-		exploratoryClick: 0.32,
-		wait: 0.15,
-		hover: 0.08,
-		form: 0.35,
-		back: 0.25,
-		forward: 0.12,
-		rageClick: 0.25
+	contentReader: {
+		frequency: 0.05,
+		sessionDuration: [5, 12],
+		typingSpeed: 'slow',
+		scrollStyle: 'thorough',
+		maxConsecutiveNonClicks: 7,
+		actionWeights: {
+			click: 0.3,
+			scroll: 0.7,
+			hover: 0.6,
+			navigate: 0.3,
+			form: 0.1,
+			wait: 0.7,
+			back: 0.1,
+			forward: 0.05,
+			mouse: 0.4,
+			exploratoryClick: 0.2,
+			rageClick: 0.02,
+			deadClick: 0.03
+		}
 	},
-	tabletUser: {
-		scroll: 0.65,
-		mouse: 0.2,
-		click: 0.8,
-		exploratoryClick: 0.4,
-		wait: 0.3,
-		hover: 0.25,
-		form: 0.4,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.18
-	},
-
-	// Efficiency patterns
-	decisive: {
-		scroll: 0.2,
-		mouse: 0.1,
-		click: 0.95,
-		exploratoryClick: 0.2,
-		wait: 0.1,
-		hover: 0.1,
-		form: 0.4,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.3
-	},
-	minimalist: {
-		scroll: 0.25,
-		mouse: 0.12,
-		click: 0.93,
-		exploratoryClick: 0.18,
-		wait: 0.12,
-		hover: 0.12,
-		form: 0.42,
-		back: 0.08,
-		forward: 0.08,
-		rageClick: 0.28
-	},
-
-	// Deep engagement patterns
-	researcher: {
-		scroll: 0.7,
-		mouse: 0.4,
-		click: 0.65,
-		exploratoryClick: 0.5,
-		wait: 0.6,
-		hover: 0.5,
-		form: 0.4,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.05
+	impulsive: {
+		frequency: 0.02,
+		sessionDuration: [1, 3],
+		typingSpeed: 'fast',
+		scrollStyle: 'quick',
+		maxConsecutiveNonClicks: 2,
+		actionWeights: {
+			click: 0.85,
+			scroll: 0.5,
+			hover: 0.1,
+			navigate: 0.6,
+			form: 0.2,
+			wait: 0.05,
+			back: 0.1,
+			forward: 0.05,
+			mouse: 0.1,
+			exploratoryClick: 0.6,
+			rageClick: 0.3,
+			deadClick: 0.1
+		}
 	},
 	methodical: {
-		scroll: 0.5,
-		mouse: 0.3,
-		click: 0.75,
-		exploratoryClick: 0.4,
-		wait: 0.5,
-		hover: 0.4,
-		form: 0.5,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.08
-	},
-	analytical: {
-		scroll: 0.6,
-		mouse: 0.45,
-		click: 0.68,
-		exploratoryClick: 0.42,
-		wait: 0.55,
-		hover: 0.48,
-		form: 0.45,
-		back: 0.15,
-		forward: 0.12,
-		rageClick: 0.06
-	},
-
-	// Accessibility and inclusive patterns
-	accessibilityUser: {
-		scroll: 0.4,
-		mouse: 0.2,
-		click: 0.85,
-		exploratoryClick: 0.3,
-		wait: 0.8,
-		hover: 0.6,
-		form: 0.5,
-		back: 0.25,
-		forward: 0.15,
-		rageClick: 0.4
-	},
-	keyboardNavigator: {
-		scroll: 0.3,
-		mouse: 0.05,
-		click: 0.9,
-		exploratoryClick: 0.25,
-		wait: 0.4,
-		hover: 0.1,
-		form: 0.6,
-		back: 0.2,
-		forward: 0.2,
-		rageClick: 0.35
-	},
-
-	// Age/generation patterns
-	genZ: {
-		scroll: 0.9,
-		mouse: 0.05,
-		click: 0.8,
-		exploratoryClick: 0.6,
-		wait: 0.1,
-		hover: 0.05,
-		form: 0.25,
-		back: 0.1,
-		forward: 0.05,
-		rageClick: 0.2
-	},
-	millennial: {
-		scroll: 0.5,
-		mouse: 0.2,
-		click: 0.85,
-		exploratoryClick: 0.4,
-		wait: 0.3,
-		hover: 0.25,
-		form: 0.4,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.15
-	},
-	genX: {
-		scroll: 0.4,
-		mouse: 0.3,
-		click: 0.8,
-		exploratoryClick: 0.3,
-		wait: 0.4,
-		hover: 0.4,
-		form: 0.5,
-		back: 0.3,
-		forward: 0.15,
-		rageClick: 0.12
-	},
-	boomer: {
-		scroll: 0.3,
-		mouse: 0.5,
-		click: 0.7,
-		exploratoryClick: 0.2,
-		wait: 0.7,
-		hover: 0.6,
-		form: 0.6,
-		back: 0.4,
-		forward: 0.2,
-		rageClick: 0.45
-	},
-
-	// Emotional/behavioral patterns
-	anxiousUser: {
-		scroll: 0.6,
-		mouse: 0.4,
-		click: 0.7,
-		exploratoryClick: 0.2,
-		wait: 0.6,
-		hover: 0.5,
-		form: 0.3,
-		back: 0.5,
-		forward: 0.1,
-		rageClick: 0.5
-	},
-	confidentUser: {
-		scroll: 0.3,
-		mouse: 0.15,
-		click: 0.9,
-		exploratoryClick: 0.5,
-		wait: 0.2,
-		hover: 0.2,
-		form: 0.5,
-		back: 0.15,
-		forward: 0.1,
-		rageClick: 0.1
-	},
-	cautiousUser: {
-		scroll: 0.5,
-		mouse: 0.35,
-		click: 0.65,
-		exploratoryClick: 0.15,
-		wait: 0.8,
-		hover: 0.7,
-		form: 0.4,
-		back: 0.4,
-		forward: 0.05,
-		rageClick: 0.08
-	},
-
-	// International/cultural patterns
-	international: {
-		scroll: 0.45,
-		mouse: 0.3,
-		click: 0.75,
-		exploratoryClick: 0.35,
-		wait: 0.5,
-		hover: 0.4,
-		form: 0.45,
-		back: 0.3,
-		forward: 0.15,
-		rageClick: 0.2
-	},
-	rtlUser: {
-		scroll: 0.5,
-		mouse: 0.25,
-		click: 0.8,
-		exploratoryClick: 0.4,
-		wait: 0.4,
-		hover: 0.35,
-		form: 0.4,
-		back: 0.25,
-		forward: 0.1,
-		rageClick: 0.15
-	},
-
-	// Gaming-inspired patterns (original)
-	minMaxer: {
-		scroll: 0.3,
-		mouse: 0.7,
-		click: 0.9,
-		exploratoryClick: 0.6,
-		wait: 0.2,
-		hover: 0.3,
-		form: 0.2,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.7
-	},
-	rolePlayer: {
-		scroll: 0.6,
-		mouse: 0.4,
-		click: 0.75,
-		exploratoryClick: 0.3,
-		wait: 0.6,
-		hover: 0.5,
-		form: 0.3,
-		back: 0.2,
-		forward: 0.1,
-		rageClick: 0.1
-	},
-	murderHobo: {
-		scroll: 0.1,
-		mouse: 0.1,
-		click: 0.99,
-		exploratoryClick: 0.9,
-		wait: 0.01,
-		hover: 0.1,
-		form: 0.1,
-		back: 0.1,
-		forward: 0.1,
-		rageClick: 0.95
-	},
-	ruleSlawyer: {
-		scroll: 0.9,
-		mouse: 0.6,
-		click: 0.65,
-		exploratoryClick: 0.3,
-		wait: 0.7,
-		hover: 0.6,
-		form: 0.6,
-		back: 0.3,
-		forward: 0.1,
-		rageClick: 0.05
+		frequency: 0.01,
+		sessionDuration: [6, 12],
+		typingSpeed: 'slow',
+		scrollStyle: 'thorough',
+		maxConsecutiveNonClicks: 5,
+		actionWeights: {
+			click: 0.6,
+			scroll: 0.4,
+			hover: 0.5,
+			navigate: 0.7,
+			form: 0.7,
+			wait: 0.5,
+			back: 0.2,
+			forward: 0.15,
+			mouse: 0.3,
+			exploratoryClick: 0.3,
+			rageClick: 0.03,
+			deadClick: 0.03
+		}
 	}
 };
 
-// Add randomMouse and randomScroll to all personas with small probability (0.03 = 3%)
-export const personas = {};
-for (const [personaName, personaData] of Object.entries(basePersonas)) {
-	personas[personaName] = {
-		...personaData,
-		randomMouse: 0.03,
-		randomScroll: 0.03
-	};
-}
+/** Persona names array (for validation in API). */
+export const personaNames = Object.keys(personas);
 
 // Puppeteer launch arguments optimized for maximum security bypass and Mixpanel injection
 export const puppeteerArgs = [

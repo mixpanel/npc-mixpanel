@@ -120,47 +120,27 @@ describe('Meeple Modules - Unit Tests', () => {
 		test('selectPersona returns valid persona', () => {
 			const persona = selectPersona();
 			const validPersonas = [
-				'powerUser',
-				'taskFocused',
-				'digitalNative',
-				'shopper',
-				'comparison',
-				'conversionOptimized',
-				'reader',
-				'skimmer',
-				'bingeWatcher',
-				'explorer',
-				'discoverer',
-				'curiosityDriven',
-				'mobileHabits',
-				'mobileFirst',
-				'tabletUser',
-				'decisive',
-				'minimalist',
+				'speedRunner',
+				'browser',
 				'researcher',
-				'methodical',
-				'analytical',
-				'accessibilityUser',
-				'keyboardNavigator',
-				'genZ',
-				'millennial',
-				'genX',
-				'boomer',
-				'anxiousUser',
-				'confidentUser',
-				'cautiousUser',
-				'international',
-				'rtlUser',
-				'minMaxer',
-				'rolePlayer',
-				'murderHobo',
-				'ruleSlawyer'
+				'shopper',
+				'taskFocused',
+				'explorer',
+				'skimmer',
+				'firstTimer',
+				'mobileUser',
+				'frustrated',
+				'formFiller',
+				'returnVisitor',
+				'contentReader',
+				'impulsive',
+				'methodical'
 			];
 			expect(validPersonas).toContain(persona);
 		});
 
 		test('generatePersonaActionSequence creates valid sequence', () => {
-			const sequence = generatePersonaActionSequence('powerUser', 5);
+			const sequence = generatePersonaActionSequence('researcher', 5);
 			expect(sequence).toHaveLength(5);
 			expect(Array.isArray(sequence)).toBe(true);
 
@@ -174,8 +154,10 @@ describe('Meeple Modules - Unit Tests', () => {
 				'form',
 				'back',
 				'forward',
+				'navigate',
 				'exploratoryClick',
-				'rageClick'
+				'rageClick',
+				'deadClick'
 			];
 			sequence.forEach(action => {
 				expect(validActions).toContain(action);
@@ -555,7 +537,7 @@ describe('Meeple Modules - Unit Tests', () => {
 			const hotZones = await identifyHotZones(testPage);
 			const hoverHistory = [];
 
-			await hoverOverElements(testPage, hotZones, 'powerUser', hoverHistory, consoleSpy);
+			await hoverOverElements(testPage, hotZones, 'researcher', hoverHistory, consoleSpy);
 
 			// Hover function may not always generate logs depending on available elements
 			expect(logMessages.length).toBeGreaterThanOrEqual(0);
