@@ -11,7 +11,9 @@ import {
 	getStartPos,
 	updateMouseState,
 	moveMouse,
-	contextPause
+	contextPause,
+	hoverOverElements,
+	navigateToNewPage
 } from './interactions.js';
 import { interactWithForms, fillRadioGroup, toggleCheckbox, fillSelectDropdown, fillTextInput } from './forms.js';
 import { randomBetween, sleep } from './utils.js';
@@ -34,8 +36,18 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 		'chaos-range': chaosRange = [1, 1],
 		actions = [],
 		circuitBreaker = {},
-		debug = false
+		debug = false,
+		// 1.1.x: per-sequence persona override (used for typing speed, dwell durations, pauses)
+		persona: sequencePersonaRaw = null
 	} = sequenceSpec;
+	// Effective persona — sequence-level override wins; falls back to caller-provided persona.
+	const effectivePersona = sequencePersonaRaw || persona;
+	if (sequencePersonaRaw && sequencePersonaRaw !== persona) {
+		log(
+			`🎭 <span style="color: #9B59B6;">Sequence persona override:</span> ${sequencePersonaRaw} ` +
+				`<span style="color: #888;">(caller persona was ${persona})</span>`
+		);
+	}
 
 	// Circuit breaker configuration with defaults
 	const { maxFailures = 3, resetOnSuccess = true, mode = 'terminate' } = circuitBreaker;
@@ -76,7 +88,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 					`📋 <span style="color: #3498DB;">Action ${index + 1}/${actions.length}:</span> ${action.action} ${action.selector || ''}`
 				);
 
-				const result = await executeSequenceAction(page, action, hotZones, log, debug, mouseState);
+				const result = await executeSequenceAction(page, action, hotZones, log, debug, mouseState, effectivePersona);
 				actionResults.push(result);
 
 				// Handle success/failure based on circuit breaker config
@@ -102,7 +114,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 			} else {
 				log(`🎲 <span style="color: #9B59B6;">Temperature bypass - random action instead</span>`);
 				// Execute a random action instead
-				const randomResult = await executeRandomAction(page, hotZones, persona, log, mouseState);
+				const randomResult = await executeRandomAction(page, hotZones, effectivePersona, log, mouseState);
 				actionResults.push(randomResult);
 			}
 
@@ -122,7 +134,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 			}
 
 			// Add realistic delays and non-state-changing actions between sequence actions
-			await addHumanBehavior(page, hotZones, persona, log, mouseState);
+			await addHumanBehavior(page, hotZones, effectivePersona, log, mouseState);
 		} catch (error) {
 			log(`🚨 <span style="color: #E74C3C;">Sequence action error:</span> ${error.message}`);
 			let currentUrl = 'unknown';
@@ -169,7 +181,15 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
  * @param {boolean} debug - Enable debug logging
  * @returns {Promise<Object>} Action result
  */
-async function executeSequenceAction(page, action, hotZones, log, debug = false, mouseState = null) {
+async function executeSequenceAction(
+	page,
+	action,
+	hotZones,
+	log,
+	debug = false,
+	mouseState = null,
+	sequencePersona = null
+) {
 	const {
 		action: actionType,
 		selector,
@@ -180,169 +200,141 @@ async function executeSequenceAction(page, action, hotZones, log, debug = false,
 		expectsNavigation,
 		navigationTimeout = 5000
 	} = action;
+	const lower = (actionType || '').toLowerCase();
 	const startTime = Date.now();
 	let currentUrl;
 
 	try {
-		// Get current URL for error reporting
 		try {
 			currentUrl = await page.url();
-		} catch (urlError) {
+		} catch {
 			currentUrl = 'unknown';
 		}
 
-		// Validate action has required fields
-		if (!actionType || !selector) {
-			throw new Error(`Invalid action: missing action type or selector`);
-		}
+		if (!actionType) throw new Error('Invalid action: missing action type');
 
 		if (debug) {
-			log(`🔍 <span style="color: #95A5A6;">Debug: Looking for element "${selector}" on ${currentUrl}</span>`);
+			log(
+				`🔍 <span style="color: #95A5A6;">Debug: ${actionType} ${selector || '(no selector)'} on ${currentUrl}</span>`
+			);
 		}
 
-		// Special handling for fillOutForm - it finds multiple elements
-		if (actionType.toLowerCase() === 'filloutform') {
+		// ── Selectorless actions (1.1.x) ────────────────────────────────────
+		if (lower === 'navigate') {
+			const result = await executeNavigate(page, mouseState, log);
+			return wrapResult(result, action, startTime, page);
+		}
+		if (lower === 'wait') {
+			const result = await executeWait(page, action, sequencePersona, log);
+			return wrapResult(result, action, startTime, page);
+		}
+		if (lower === 'scroll' && !selector) {
+			const result = await executePageScroll(page, action, hotZones, mouseState, log);
+			return wrapResult(result, action, startTime, page);
+		}
+
+		// Special handling for fillOutForm — finds multiple elements
+		if (lower === 'filloutform') {
+			if (!selector) throw new Error('fillOutForm requires selector');
 			const result = await executeFillOutForm(page, selector, clicksPerGroup, log);
-			const duration = Date.now() - startTime;
-			let pageUrl = 'unknown';
-			try {
-				pageUrl = await page.url();
-			} catch (urlError) {
-				// Ignore URL fetch errors
-			}
-			return {
-				...result,
-				action: actionType,
-				selector,
-				clicksPerGroup: clicksPerGroup || undefined,
-				duration,
-				timestamp: startTime,
-				page_url: pageUrl
-			};
+			return wrapResult({ ...result, clicksPerGroup: clicksPerGroup || undefined }, action, startTime, page);
 		}
 
-		// Wait for element to be available with timeout
-		const element = await waitForElement(page, selector, log, debug);
+		// All remaining actions require a selector
+		if (!selector) throw new Error(`${actionType} action requires a selector`);
+
+		// ── Element resolution with resilience ──────────────────────────────
+		let element = await waitForElement(page, selector, log, debug);
+		let resilience = null;
+
 		if (!element) {
-			if (debug) {
-				log(`❌ <span style="color: #E74C3C;">Debug: Element not found after timeout</span>`);
+			if (debug) log(`❌ <span style="color: #E74C3C;">Debug: ${selector} not found, entering resilience flow</span>`);
+
+			// 1. Text-match fallback for clicks
+			if (lower === 'click') {
+				const fb = await tryTextMatchClick(page, action, mouseState, log, debug);
+				if (fb && fb.success) {
+					return wrapResult(fb, action, startTime, page);
+				}
+				resilience = 'text-match-failed';
 			}
-			throw new Error(`Element not found: ${selector}`);
+
+			// 2. Filler action + brief pause
+			await runFillerAction(page, hotZones, mouseState, log);
+			await sleep(randomBetween(1000, 3000));
+
+			// 3. Retry with extended timeout
+			element = await waitForElement(page, selector, log, debug, 10000);
+			if (!element) {
+				log(`⏭️ <span style="color: #F39C12;">Skipping ${actionType}:</span> ${selector} not found after retry`);
+				return wrapResult(
+					{
+						success: false,
+						skipped: true,
+						reason: 'selector_not_found_after_retry',
+						resilience: resilience || 'filler-retry'
+					},
+					action,
+					startTime,
+					page
+				);
+			}
+			resilience = (resilience || '') + '|retry-hit';
 		}
 
-		if (debug) {
-			log(`✓ <span style="color: #27AE60;">Debug: Element found, preparing to interact</span>`);
-		}
-
-		// Handle requireActive flag for click actions
-		if (requireActive && actionType.toLowerCase() === 'click') {
-			const isActive = await page.evaluate(el => {
-				return !el.disabled && !el.classList.contains('disabled');
-			}, element);
+		// requireActive check (clicks only)
+		if (requireActive && lower === 'click') {
+			const isActive = await page.evaluate(el => !el.disabled && !el.classList.contains('disabled'), element);
 			if (!isActive) {
 				log(`⏭️ <span style="color: #F39C12;">Skipping click:</span> ${selector} is not active`);
-				let pageUrl = 'unknown';
-				try {
-					pageUrl = await page.url();
-				} catch (urlError) {
-					// Ignore URL fetch errors
-				}
-				return {
-					success: true,
-					skipped: true,
-					action: actionType,
-					selector,
-					duration: Date.now() - startTime,
-					timestamp: startTime,
-					page_url: pageUrl
-				};
+				return wrapResult({ success: true, skipped: true }, action, startTime, page);
 			}
 		}
 
+		// ── Execute with element ────────────────────────────────────────────
 		let result;
+		const navigationPromise = expectsNavigation
+			? page.waitForNavigation({ timeout: navigationTimeout, waitUntil: 'domcontentloaded' }).catch(() => null)
+			: null;
 
-		// Handle navigation expectations
-		if (expectsNavigation) {
-			if (debug) {
-				log(`🧭 <span style="color: #3498DB;">Debug: Action expects navigation, setting up listeners</span>`);
-			}
-			// Set up navigation promise before executing action
-			const navigationPromise = page
-				.waitForNavigation({
-					timeout: navigationTimeout,
-					waitUntil: 'domcontentloaded'
-				})
-				.catch(err => {
-					if (debug) {
-						log(`⚠️ <span style="color: #F39C12;">Debug: Navigation timeout or error: ${err.message}</span>`);
-					}
-					return null;
-				});
+		switch (lower) {
+			case 'click':
+				result = await executeClick(page, element, selector, log, debug, mouseState);
+				break;
+			case 'type':
+				if (!text) throw new Error('Type action requires text field');
+				result = await executeType(page, element, selector, text, log, debug, mouseState);
+				break;
+			case 'select':
+				if (!value) throw new Error('Select action requires value field');
+				result = await executeSelect(page, element, selector, value, log, debug);
+				break;
+			case 'hover':
+				result = await executeHover(page, element, selector, hotZones, sequencePersona, mouseState, log);
+				break;
+			case 'scroll':
+				result = await executeScrollToElement(page, element, selector, action, mouseState, log);
+				break;
+			default:
+				throw new Error(`Unsupported action type: ${actionType}`);
+		}
 
-			// Execute the action
-			switch (actionType.toLowerCase()) {
-				case 'click':
-					result = await executeClick(page, element, selector, log, debug, mouseState);
-					break;
-				case 'type':
-					if (!text) throw new Error('Type action requires text field');
-					result = await executeType(page, element, selector, text, log, debug, mouseState);
-					break;
-				case 'select':
-					if (!value) throw new Error('Select action requires value field');
-					result = await executeSelect(page, element, selector, value, log, debug);
-					break;
-				default:
-					throw new Error(`Unsupported action type: ${actionType}`);
-			}
-
-			// Wait for navigation to complete
+		if (navigationPromise) {
 			await navigationPromise;
-			let newUrl = 'unknown';
-			try {
-				newUrl = await page.url();
-			} catch (urlError) {
-				// Ignore URL fetch errors
-			}
 			if (debug) {
+				let newUrl = 'unknown';
+				try {
+					newUrl = await page.url();
+				} catch {
+					/* */
+				}
 				log(`🧭 <span style="color: #27AE60;">Debug: Navigation completed to ${newUrl}</span>`);
 			}
-		} else {
-			// Normal execution without navigation handling
-			switch (actionType.toLowerCase()) {
-				case 'click':
-					result = await executeClick(page, element, selector, log, debug, mouseState);
-					break;
-				case 'type':
-					if (!text) throw new Error('Type action requires text field');
-					result = await executeType(page, element, selector, text, log, debug, mouseState);
-					break;
-				case 'select':
-					if (!value) throw new Error('Select action requires value field');
-					result = await executeSelect(page, element, selector, value, log, debug);
-					break;
-				default:
-					throw new Error(`Unsupported action type: ${actionType}`);
-			}
 		}
 
-		const duration = Date.now() - startTime;
-		let pageUrl = 'unknown';
-		try {
-			pageUrl = await page.url();
-		} catch (urlError) {
-			// Ignore URL fetch errors
-		}
-		return {
-			...result,
-			action: actionType,
-			selector,
-			text: text || undefined,
-			value: value || undefined,
-			duration,
-			timestamp: startTime,
-			page_url: pageUrl
-		};
+		if (resilience) result = { ...result, resilience };
+
+		return wrapResult(result, action, startTime, page);
 	} catch (error) {
 		const duration = Date.now() - startTime;
 		let pageUrl = currentUrl || 'unknown';
@@ -391,13 +383,13 @@ async function executeSequenceAction(page, action, hotZones, log, debug = false,
  * @param {boolean} debug - Enable debug logging
  * @returns {Promise<ElementHandle|null>} Element handle or null
  */
-async function waitForElement(page, selector, log, debug = false) {
+async function waitForElement(page, selector, log, debug = false, timeout = 5000) {
 	try {
 		if (debug) {
-			log(`🔍 <span style="color: #95A5A6;">Debug: Waiting for selector with 5s timeout...</span>`);
+			log(`🔍 <span style="color: #95A5A6;">Debug: Waiting for selector with ${timeout}ms timeout...</span>`);
 		}
 		// Wait for element with timeout
-		await page.waitForSelector(selector, { timeout: 5000, visible: true });
+		await page.waitForSelector(selector, { timeout, visible: true });
 		const element = await page.$(selector);
 		if (debug && element) {
 			log(`✓ <span style="color: #27AE60;">Debug: Element found and visible</span>`);
@@ -631,6 +623,227 @@ async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
 	}
 }
 
+// ─── 1.1.x: New action handlers + resilience helpers ────────────────────
+
+/**
+ * Wrap an action result with the standard envelope (duration, timestamp, page_url, action meta).
+ */
+async function wrapResult(result, action, startTime, page) {
+	let pageUrl = 'unknown';
+	try {
+		pageUrl = await page.url();
+	} catch {
+		/* ignore */
+	}
+	return {
+		...result,
+		action: action.action,
+		selector: action.selector,
+		text: action.text || undefined,
+		value: action.value || undefined,
+		duration: Date.now() - startTime,
+		timestamp: startTime,
+		page_url: pageUrl
+	};
+}
+
+/** Selectorless navigate — wraps navigateToNewPage from interactions.js. */
+async function executeNavigate(page, mouseState, log) {
+	let originDomain = '';
+	try {
+		originDomain = new URL(page.url()).hostname;
+	} catch {
+		/* about:blank etc. */
+	}
+	const r = await navigateToNewPage(page, mouseState, originDomain, log);
+	return r.navigated
+		? { success: true, navigated: true, toUrl: r.toUrl, target: r.target }
+		: { success: true, navigated: false, skipped: true, reason: 'no-nav-detected' };
+}
+
+/** Explicit wait — accepts {ms} or {tier: micro|read|think}. */
+async function executeWait(page, action, sequencePersona, log) {
+	if (typeof action.ms === 'number' && Number.isFinite(action.ms)) {
+		const ms = Math.max(50, Math.min(30000, action.ms));
+		await sleep(ms);
+		log(`⏸️ <span style="color: #888;">Waited ${ms}ms</span>`);
+		return { success: true, waited_ms: ms };
+	}
+	if (action.tier) {
+		const tier = await contextPause(null, null, 'engagement', sequencePersona, null, action.tier);
+		log(`⏸️ <span style="color: #888;">Waited (tier: ${tier})</span>`);
+		return { success: true, waited_tier: tier };
+	}
+	// Validation should catch this; defensive default
+	await sleep(1000);
+	return { success: true, waited_ms: 1000 };
+}
+
+/** Page-level scroll (no selector) — uses intelligentScroll or directional wheel. */
+async function executePageScroll(page, action, hotZones, mouseState, log) {
+	if (action.direction || action.amount) {
+		const vp = page.viewport();
+		const half = Math.round(vp.height / 2);
+		const full = vp.height;
+		const dir = action.direction === 'up' ? -1 : 1;
+		let amount = full;
+		if (action.amount === 'half') amount = half;
+		else if (typeof action.amount === 'number') amount = action.amount;
+		try {
+			await page.mouse.wheel({ deltaY: dir * amount });
+		} catch {
+			await page.evaluate(d => window.scrollBy(0, d), dir * amount);
+		}
+		await sleep(randomBetween(200, 600));
+		log(`📜 <span style="color: #BCF0F0;">Scrolled ${dir * amount}px</span>`);
+		return { success: true, scrolled_px: dir * amount };
+	}
+	const ok = await intelligentScroll(page, hotZones, log, mouseState);
+	return ok ? { success: true } : { success: false, skipped: true, reason: 'nothing-to-scroll' };
+}
+
+/** Scroll a specific element into view (used when scroll action has a selector + element resolved). */
+async function executeScrollToElement(page, element, selector, action, mouseState, log) {
+	try {
+		await page.evaluate(el => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), element);
+		await sleep(randomBetween(300, 700));
+		log(`📜 <span style="color: #BCF0F0;">Scrolled element into view:</span> ${selector}`);
+		// Optional polish: small wheel jitter for human-feel
+		if (Math.random() < 0.4) {
+			try {
+				await page.mouse.wheel({ deltaY: randomBetween(-40, 40) });
+			} catch {
+				/* */
+			}
+		}
+		// mouseState unchanged — scroll doesn't move cursor
+		void mouseState;
+		void action;
+		return { success: true, scrolled_to: selector };
+	} catch (error) {
+		return { success: false, error: error.message };
+	}
+}
+
+/** Hover over a specific element with reading-trace dwell. */
+async function executeHover(page, element, selector, hotZones, persona, mouseState, log) {
+	try {
+		const box = await element.boundingBox();
+		if (!box) return { success: false, error: 'no-bounding-box' };
+		// Use the persona-aware hoverOverElements for the reading-trace pattern, but
+		// constrain it to this specific target by passing a single-zone hotZones list.
+		const targetZone = {
+			x: box.x + box.width / 2,
+			y: box.y + box.height / 2,
+			width: box.width,
+			height: box.height,
+			priority: 10,
+			text: '',
+			tag: 'sequence-hover'
+		};
+		const hoverHistory = [];
+		await hoverOverElements(page, [targetZone], persona, hoverHistory, log, mouseState);
+		log(`👁️ <span style="color: #FEDE9B;">Hovered:</span> ${selector}`);
+		void hotZones;
+		return { success: true };
+	} catch (error) {
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Text-match fallback: when the CSS selector fails, try to find a clickable element
+ * whose visible text matches the action's `textFallback` field (or text inferred from
+ * quoted strings in the selector). Click via coords if found.
+ */
+async function tryTextMatchClick(page, action, mouseState, log, debug) {
+	const candidates = collectFallbackText(action);
+	if (candidates.length === 0) return null;
+
+	const hit = await page.evaluate(texts => {
+		const sel =
+			'button, a, [role="button"], [role="link"], .btn, .nav-link, ' +
+			'.genre-pill, .genre-card-large, .genre-select-card, .track-card, .artist-item, ' +
+			'.btn-primary, .btn-header, [data-action], [data-nav]';
+		const els = Array.from(document.querySelectorAll(sel));
+		for (const t of texts) {
+			const lc = t.toLowerCase();
+			for (const el of els) {
+				const r = el.getBoundingClientRect();
+				if (r.width <= 0 || r.height <= 0) continue;
+				const cs = window.getComputedStyle(el);
+				if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+				const txt = (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '')
+					.trim()
+					.toLowerCase();
+				if (!txt) continue;
+				if (txt.includes(lc)) {
+					return {
+						x: r.x + r.width / 2,
+						y: r.y + r.height / 2,
+						width: r.width,
+						height: r.height,
+						matchedText: el.textContent?.trim().substring(0, 60) || ''
+					};
+				}
+			}
+		}
+		return null;
+	}, candidates);
+
+	if (!hit) {
+		if (debug)
+			log(
+				`🔍 <span style="color: #95A5A6;">Text fallback: no element matched any of [${candidates.join(', ')}]</span>`
+			);
+		return null;
+	}
+
+	const start = getStartPos(page, mouseState);
+	await moveMouse(page, start.x, start.y, hit.x, hit.y, hit.width, hit.height, log);
+	await sleep(randomBetween(80, 200));
+	await page.mouse.click(hit.x, hit.y);
+	updateMouseState(mouseState, hit.x, hit.y);
+	log(
+		`🔁 <span style="color: #07B096;">Text-match fallback hit:</span> "<span style="color: #FEDE9B;">${hit.matchedText}</span>" ` +
+			`<span style="color: #888;">(selector ${action.selector} missing)</span>`
+	);
+	return { success: true, fallback: 'text-match', matchedText: hit.matchedText };
+}
+
+/** Build the list of candidate strings for text-match fallback (textFallback first, then inferred). */
+function collectFallbackText(action) {
+	const out = [];
+	if (typeof action.textFallback === 'string' && action.textFallback.trim()) {
+		out.push(action.textFallback.trim());
+	}
+	// Infer from quoted strings inside the selector (e.g., [data-genre="lo-fi"] → "lo-fi")
+	if (typeof action.selector === 'string') {
+		const quoted = action.selector.match(/["']([^"']{2,40})["']/g);
+		if (quoted) {
+			for (const q of quoted) {
+				const s = q.slice(1, -1).trim();
+				if (s && !out.includes(s)) out.push(s);
+			}
+		}
+	}
+	return out;
+}
+
+/** Filler action — keeps the meeple producing events while the bad selector lingers. */
+async function runFillerAction(page, hotZones, mouseState, log) {
+	const fillers = [
+		() => intelligentScroll(page, hotZones, log, mouseState),
+		() => naturalMouseMovement(page, hotZones, log, mouseState)
+	];
+	const f = fillers[Math.floor(Math.random() * fillers.length)];
+	try {
+		await f();
+	} catch {
+		/* filler failures are non-fatal */
+	}
+}
+
 /**
  * Execute a random action when temperature causes sequence bypass
  * @param {Page} page - Puppeteer page object
@@ -747,26 +960,77 @@ export function validateSequence(sequenceSpec) {
 				return;
 			}
 
-			const { action: actionType, selector, text, value } = action;
+			const { action: actionType, selector, text, value, tier, ms } = action;
+			const lower = typeof actionType === 'string' ? actionType.toLowerCase() : '';
 
 			if (!actionType || typeof actionType !== 'string') {
 				errors.push(`Action ${index + 1} must have a valid action type`);
-			} else if (!['click', 'type', 'select', 'filloutform'].includes(actionType.toLowerCase())) {
+				return;
+			}
+
+			// 1.1.x: extended action types
+			const SELECTORLESS = ['navigate', 'wait'];
+			const SELECTOR_OPTIONAL = ['scroll']; // scroll can target an element OR scroll the page
+			const VALID_TYPES = ['click', 'type', 'select', 'filloutform', 'navigate', 'scroll', 'hover', 'wait'];
+
+			if (!VALID_TYPES.includes(lower)) {
 				errors.push(`Action ${index + 1} has unsupported action type: ${actionType}`);
+				return;
 			}
 
-			if (!selector || typeof selector !== 'string') {
-				errors.push(`Action ${index + 1} must have a valid selector`);
+			// Selector requirements
+			const selectorRequired = !SELECTORLESS.includes(lower) && !SELECTOR_OPTIONAL.includes(lower);
+			if (selectorRequired && (!selector || typeof selector !== 'string')) {
+				errors.push(`Action ${index + 1} (${actionType}) must have a valid selector`);
 			}
 
-			if (actionType === 'type' && (!text || typeof text !== 'string')) {
+			if (lower === 'type' && (!text || typeof text !== 'string')) {
 				errors.push(`Action ${index + 1} (type) must have a text field`);
 			}
 
-			if (actionType === 'select' && (!value || typeof value !== 'string')) {
+			if (lower === 'select' && (!value || typeof value !== 'string')) {
 				errors.push(`Action ${index + 1} (select) must have a value field`);
 			}
+
+			// Wait: must have exactly one of `tier` or `ms`
+			if (lower === 'wait') {
+				const hasTier = typeof tier === 'string';
+				const hasMs = typeof ms === 'number' && Number.isFinite(ms);
+				if (hasTier && hasMs) {
+					errors.push(`Action ${index + 1} (wait) cannot have both 'tier' and 'ms'`);
+				} else if (!hasTier && !hasMs) {
+					errors.push(`Action ${index + 1} (wait) must have either 'tier' (micro|read|think) or 'ms' (number)`);
+				} else if (hasTier && !['micro', 'read', 'think'].includes(tier)) {
+					errors.push(`Action ${index + 1} (wait) tier must be one of: micro, read, think`);
+				}
+			}
+
+			// Scroll: validate optional direction/amount if present
+			if (lower === 'scroll') {
+				if (action.direction !== undefined && !['up', 'down'].includes(action.direction)) {
+					errors.push(`Action ${index + 1} (scroll) direction must be 'up' or 'down'`);
+				}
+				if (action.amount !== undefined) {
+					const amt = action.amount;
+					const valid = amt === 'page' || amt === 'half' || (typeof amt === 'number' && amt > 0);
+					if (!valid) errors.push(`Action ${index + 1} (scroll) amount must be 'page', 'half', or a positive number`);
+				}
+			}
+
+			// textFallback (clicks only, optional)
+			if (action.textFallback !== undefined && typeof action.textFallback !== 'string') {
+				errors.push(`Action ${index + 1} textFallback must be a string`);
+			}
 		});
+
+		// Sequence-level persona override (optional)
+		if (sequenceSpec.persona !== undefined) {
+			if (typeof sequenceSpec.persona !== 'string') {
+				errors.push('persona must be a string');
+			}
+			// Don't validate against personas list here — sequences.js doesn't import entities.js
+			// at module load (would be circular). selectPersona handles unknown names gracefully.
+		}
 	}
 
 	return { valid: errors.length === 0, errors };

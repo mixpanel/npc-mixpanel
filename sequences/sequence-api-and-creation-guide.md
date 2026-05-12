@@ -121,20 +121,66 @@ The key is to get an ordered list of click events from your single walkthrough s
 
 ### Supported action types
 
-| Action        | Required Fields     | Optional                                                  | What it does                                                                         |
-| ------------- | ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `click`       | `selector`          | `requireActive`, `expectsNavigation`, `navigationTimeout` | Click an element. Adds natural mouse movement + position fuzz.                       |
-| `type`        | `selector`, `text`  |                                                           | Clear field, then type with human-like delays (50-150ms/char).                       |
-| `select`      | `selector`, `value` |                                                           | Select a dropdown option by its `value` attribute.                                   |
-| `fillOutForm` | `selector`          | `clicksPerGroup`                                          | Find all matching elements and fill them (radios, checkboxes, selects, text inputs). |
+| Action        | Required Fields           | Optional                                                                  | What it does                                                                                                                           |
+| ------------- | ------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `click`       | `selector`                | `requireActive`, `expectsNavigation`, `navigationTimeout`, `textFallback` | Click an element. Adds natural mouse movement + position fuzz.                                                                         |
+| `type`        | `selector`, `text`        |                                                                           | Clear field, then type with human-like delays (per-persona word-burst pacing as of 1.1.0).                                             |
+| `select`      | `selector`, `value`       |                                                                           | Select a dropdown option by its `value` attribute.                                                                                     |
+| `fillOutForm` | `selector`                | `clicksPerGroup`                                                          | Find all matching elements and fill them (radios, checkboxes, selects, text inputs).                                                   |
+| `navigate`    | _(none)_                  |                                                                           | **1.1.x**: find a same-domain link (real href + SPA patterns), click it, detect navigation via URL change or DOM-mutation.             |
+| `scroll`      | _(none)_                  | `selector`, `direction`, `amount`                                         | **1.1.x**: with `selector` → scroll element into view; without → page-level scroll. `direction: up\|down`, `amount: page\|half\|<px>`. |
+| `hover`       | `selector`                |                                                                           | **1.1.x**: hover with reading-trace dwell pattern (text-sweep / image-scan based on target type).                                      |
+| `wait`        | _(either)_ `tier` or `ms` |                                                                           | **1.1.x**: explicit pause. `tier: micro` (0.3-1.5s) / `read` (2-8s) / `think` (5-15s), OR `ms: <number>` clamped to [50, 30000].       |
 
 ### Action flags reference
 
-| Flag                | Type    | Default | Description                                                             |
-| ------------------- | ------- | ------- | ----------------------------------------------------------------------- |
-| `requireActive`     | boolean | false   | Skip action if element is disabled/inactive. Does NOT count as failure. |
-| `expectsNavigation` | boolean | false   | Wait for page navigation to complete after this action.                 |
-| `navigationTimeout` | number  | 5000    | Max time (ms) to wait for navigation when `expectsNavigation: true`.    |
+| Flag                | Type    | Default  | Description                                                                                                                                                     |
+| ------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requireActive`     | boolean | false    | Skip action if element is disabled/inactive. Does NOT count as failure.                                                                                         |
+| `expectsNavigation` | boolean | false    | Wait for page navigation to complete after this action.                                                                                                         |
+| `navigationTimeout` | number  | 5000     | Max time (ms) to wait for navigation when `expectsNavigation: true`.                                                                                            |
+| `textFallback`      | string  | _(none)_ | **1.1.x** (clicks only): when CSS selector fails, find a visible button/link whose text contains this string and click it. Recommended for nth-child selectors. |
+
+### 1.1.x: Sequence-level fields
+
+| Field     | Type   | Description                                                                                                                                                                                                          |
+| --------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `persona` | string | Per-sequence persona override (one of the 15 names from `GET /api/personas`). Modulates typing speed, dwell durations, inter-action pacing for this sequence only. Falls back to caller-provided persona if omitted. |
+
+### 1.1.x: Resilience on selector miss
+
+When a click selector fails to match within the standard 5s timeout, the engine runs a graceful recovery instead of throwing:
+
+1. **Text-match fallback (clicks only)**: searches visible button/link text using `textFallback` if provided, plus any quoted strings inferred from the selector itself (e.g. `[data-genre="lo-fi"]` infers `"lo-fi"`). If a match is found, the click executes via coords with `fallback: 'text-match'` in the result.
+2. **Filler action**: runs an `intelligentScroll` or `naturalMouseMovement` to keep the meeple producing events while the page settles.
+3. **Pause**: waits 1-3s for slow renders.
+4. **Retry**: re-attempts the original selector with an extended 10s timeout.
+5. **Skip**: if still missing, the step is dropped with `success: false, skipped: true, reason: 'selector_not_found_after_retry'`. **Skipped steps do not count toward `circuitBreaker.maxFailures`.**
+
+### Example using all the new actions
+
+```json
+{
+	"lofi-explorer": {
+		"description": "Lo-fi browser who hits the paywall, dismisses, wanders, bounces",
+		"persona": "skimmer",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "click", "selector": "#landingCta", "textFallback": "Start Listening" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".genre-pill:nth-child(1)", "textFallback": "Lo-Fi" },
+			{ "action": "click", "selector": ".track-card:nth-child(1)" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "hover", "selector": "#paywallTitle" },
+			{ "action": "click", "selector": "#paywallClose", "textFallback": "×" },
+			{ "action": "navigate" },
+			{ "action": "scroll", "direction": "down", "amount": "page" }
+		]
+	}
+}
+```
 
 ### Conversion script
 

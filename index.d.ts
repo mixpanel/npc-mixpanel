@@ -181,6 +181,12 @@ export interface SequenceSpec {
 	 * Outputs detailed information about selector matching, element states, and timing
 	 */
 	debug?: boolean;
+	/**
+	 * 1.1.x: Per-sequence persona override (one of the 15 personas in PersonaType).
+	 * Modulates typing speed, dwell durations, and inter-action pauses for this
+	 * sequence. Falls back to the caller-provided persona if omitted.
+	 */
+	persona?: PersonaType;
 }
 
 export interface CircuitBreakerConfig {
@@ -203,7 +209,15 @@ export interface CircuitBreakerConfig {
 	mode?: 'terminate' | 'skip';
 }
 
-export type SequenceAction = ClickAction | TypeAction | SelectAction;
+export type SequenceAction =
+	| ClickAction
+	| TypeAction
+	| SelectAction
+	| FillOutFormAction
+	| NavigateAction
+	| ScrollAction
+	| HoverAction
+	| WaitAction;
 
 export interface BaseAction {
 	/** CSS selector for the target element */
@@ -229,6 +243,12 @@ export interface BaseAction {
 
 export interface ClickAction extends BaseAction {
 	action: 'click';
+	/**
+	 * 1.1.x: when the CSS selector fails, the resilience layer searches visible
+	 * button/link text for this string and clicks the first match. Highly recommended
+	 * for nth-child selectors that may shift when the DOM changes.
+	 */
+	textFallback?: string;
 }
 
 export interface TypeAction extends BaseAction {
@@ -241,6 +261,42 @@ export interface SelectAction extends BaseAction {
 	action: 'select';
 	/** Value to select from dropdown */
 	value: string;
+}
+
+export interface FillOutFormAction extends BaseAction {
+	action: 'fillOutForm';
+	/** Number of clicks per radio group (for radiogroup elements) */
+	clicksPerGroup?: number;
+}
+
+/** 1.1.x: same-domain link wandering (real hrefs + SPA patterns). No selector required. */
+export interface NavigateAction {
+	action: 'navigate';
+}
+
+/** 1.1.x: scroll the page (no selector) or scroll an element into view (with selector). */
+export interface ScrollAction {
+	action: 'scroll';
+	/** Optional — scrolls this element into view if provided */
+	selector?: string;
+	/** For page-level scroll: direction */
+	direction?: 'up' | 'down';
+	/** For page-level scroll: 'page' (full viewport), 'half', or pixel count */
+	amount?: 'page' | 'half' | number;
+}
+
+/** 1.1.x: hover with reading-trace dwell. Selector required. */
+export interface HoverAction extends BaseAction {
+	action: 'hover';
+}
+
+/** 1.1.x: explicit pause. Specify EITHER tier OR ms (mutually exclusive). */
+export interface WaitAction {
+	action: 'wait';
+	/** micro=0.3-1.5s, read=2-8s, think=5-15s. Mutually exclusive with ms. */
+	tier?: 'micro' | 'read' | 'think';
+	/** Explicit pause in milliseconds, clamped to [50, 30000]. Mutually exclusive with tier. */
+	ms?: number;
 }
 
 export interface SequenceActionResult {

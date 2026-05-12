@@ -120,10 +120,11 @@ export async function wait() {
  * @param {string} phase - arrival | exploration | engagement | windDown
  * @param {string} persona
  * @param {number|null} [remainingMs] - milliseconds left in session budget
+ * @param {('micro'|'read'|'think')|null} [forcedTier] - bypass tier selection (for explicit `wait` action)
  * @returns {Promise<string>} resolves with the chosen tier name (for telemetry)
  */
-export async function contextPause(previousAction, nextAction, phase, persona, remainingMs = null) {
-	const tier = pickPauseTier(previousAction, nextAction, phase);
+export async function contextPause(previousAction, nextAction, phase, persona, remainingMs = null, forcedTier = null) {
+	const tier = forcedTier || pickPauseTier(previousAction, nextAction, phase);
 	const ranges = {
 		micro: [300, 1500],
 		read: [2000, 8000],

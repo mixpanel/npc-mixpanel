@@ -1,0 +1,127 @@
+{
+	"lofi-curious": {
+		"description": "Lo-Fi Curious: lo-fi listener who hits the paywall, dismisses it, browses a bit more, and bounces without subscribing",
+		"persona": "skimmer",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": {
+			"maxFailures": 5,
+			"resetOnSuccess": true,
+			"mode": "skip"
+		},
+		"actions": [
+			{
+				"action": "click",
+				"selector": "#landingCta",
+				"textFallback": "Start Listening"
+			},
+			{
+				"action": "scroll",
+				"amount": "half"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(2)"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(3)"
+			},
+			{
+				"action": "wait",
+				"tier": "read"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(4)"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(5)"
+			},
+			{
+				"action": "wait",
+				"tier": "think"
+			},
+			{
+				"action": "hover",
+				"selector": "#paywallTitle"
+			},
+			{
+				"action": "click",
+				"selector": "#paywallClose",
+				"textFallback": "×"
+			},
+			{
+				"action": "scroll",
+				"amount": "page"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(6)"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(7)"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn",
+				"textFallback": "Browse"
+			},
+			{
+				"action": "wait",
+				"tier": "read"
+			},
+			{
+				"action": "navigate"
+			},
+			{
+				"action": "scroll",
+				"direction": "down",
+				"amount": "page"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(2)"
+			},
+			{
+				"action": "wait",
+				"tier": "think"
+			},
+			{
+				"action": "click",
+				"selector": "#paywallClose",
+				"textFallback": "×"
+			},
+			{
+				"action": "scroll",
+				"direction": "up",
+				"amount": "page"
+			}
+		]
+	}
+}

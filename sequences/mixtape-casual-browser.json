@@ -3,69 +3,234 @@
 		"description": "Casual Browser: explore genres extensively, play 2 tracks, hit paywall multiple times, dismiss each time, leave frustrated",
 		"temperature": 8,
 		"chaos-range": [8, 12],
-		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"circuitBreaker": {
+			"maxFailures": 5,
+			"resetOnSuccess": true,
+			"mode": "skip"
+		},
 		"actions": [
-			{ "action": "click", "selector": "#landingCta" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(1)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-			{ "action": "click", "selector": ".genre-pill:nth-child(2)" },
-			{ "action": "click", "selector": ".track-card:nth-child(1)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(3)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-			{ "action": "click", "selector": ".genre-pill:nth-child(4)" },
-			{ "action": "click", "selector": ".track-card:nth-child(1)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(5)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-			{ "action": "click", "selector": ".genre-pill:nth-child(6)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(1)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(3)" },
-			{ "action": "click", "selector": ".track-card:nth-child(1)" },
-			{ "action": "click", "selector": "#paywallClose" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(5)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(5)" },
-			{ "action": "click", "selector": ".track-card:nth-child(1)" },
-			{ "action": "click", "selector": "#paywallClose" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(2)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(4)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(6)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-			{ "action": "click", "selector": ".genre-pill:nth-child(1)" },
-			{ "action": "click", "selector": ".track-card:nth-child(2)" },
-			{ "action": "click", "selector": "#paywallClose" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".nav-link[data-nav=\"genres\"]" },
-			{ "action": "click", "selector": ".genre-card-large:nth-child(6)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-
-			{ "action": "click", "selector": ".genre-pill:nth-child(3)" },
-			{ "action": "click", "selector": "#genreBackBtn" },
-			{ "action": "click", "selector": ".genre-pill:nth-child(4)" },
-			{ "action": "click", "selector": "#genreBackBtn" }
-		]
+			{
+				"action": "click",
+				"selector": "#landingCta"
+			},
+			{
+				"action": "scroll",
+				"amount": "page"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "wait",
+				"tier": "read"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(2)",
+				"textFallback": "Pop"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(3)",
+				"textFallback": "Rock"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(4)",
+				"textFallback": "Hip-Hop"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(5)",
+				"textFallback": "Electronic"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(6)",
+				"textFallback": "Jazz"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(3)",
+				"textFallback": "Rock"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": "#paywallClose"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(5)",
+				"textFallback": "Electronic"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(5)",
+				"textFallback": "Electronic"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(1)"
+			},
+			{
+				"action": "click",
+				"selector": "#paywallClose"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(2)",
+				"textFallback": "Pop"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(4)",
+				"textFallback": "Hip-Hop"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(6)",
+				"textFallback": "Jazz"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(1)",
+				"textFallback": "Lo-Fi"
+			},
+			{
+				"action": "click",
+				"selector": ".track-card:nth-child(2)"
+			},
+			{
+				"action": "click",
+				"selector": "#paywallClose"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".nav-link[data-nav=\"genres\"]"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-card-large:nth-child(6)",
+				"textFallback": "Jazz"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(3)",
+				"textFallback": "Rock"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			},
+			{
+				"action": "click",
+				"selector": ".genre-pill:nth-child(4)",
+				"textFallback": "Hip-Hop"
+			},
+			{
+				"action": "click",
+				"selector": "#genreBackBtn"
+			}
+		],
+		"persona": "browser"
 	}
 }

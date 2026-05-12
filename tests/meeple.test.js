@@ -1221,6 +1221,86 @@ describe('Meeple 1.1.0 — Domain Matching', () => {
 	});
 });
 
+describe('Meeple 1.1.x — Sequence API expansion', () => {
+	test('validateSequence accepts navigate action (no selector)', () => {
+		const seq = { description: 't', actions: [{ action: 'navigate' }] };
+		const r = validateSequence(seq);
+		expect(r.valid).toBe(true);
+		expect(r.errors).toEqual([]);
+	});
+
+	test('validateSequence accepts scroll without selector', () => {
+		const seq = {
+			description: 't',
+			actions: [
+				{ action: 'scroll' },
+				{ action: 'scroll', direction: 'down', amount: 'page' },
+				{ action: 'scroll', direction: 'up', amount: 250 }
+			]
+		};
+		expect(validateSequence(seq).valid).toBe(true);
+	});
+
+	test('validateSequence rejects scroll with bad direction or amount', () => {
+		const r1 = validateSequence({ actions: [{ action: 'scroll', direction: 'sideways' }] });
+		expect(r1.valid).toBe(false);
+		const r2 = validateSequence({ actions: [{ action: 'scroll', amount: -5 }] });
+		expect(r2.valid).toBe(false);
+	});
+
+	test('validateSequence accepts hover with selector', () => {
+		expect(validateSequence({ actions: [{ action: 'hover', selector: '#x' }] }).valid).toBe(true);
+	});
+
+	test('validateSequence rejects hover without selector', () => {
+		expect(validateSequence({ actions: [{ action: 'hover' }] }).valid).toBe(false);
+	});
+
+	test('validateSequence accepts wait with tier OR ms', () => {
+		expect(validateSequence({ actions: [{ action: 'wait', tier: 'micro' }] }).valid).toBe(true);
+		expect(validateSequence({ actions: [{ action: 'wait', tier: 'read' }] }).valid).toBe(true);
+		expect(validateSequence({ actions: [{ action: 'wait', tier: 'think' }] }).valid).toBe(true);
+		expect(validateSequence({ actions: [{ action: 'wait', ms: 1000 }] }).valid).toBe(true);
+	});
+
+	test('validateSequence rejects wait with both tier and ms', () => {
+		const r = validateSequence({ actions: [{ action: 'wait', tier: 'micro', ms: 500 }] });
+		expect(r.valid).toBe(false);
+		expect(r.errors.some(e => /both/.test(e))).toBe(true);
+	});
+
+	test('validateSequence rejects wait with neither tier nor ms', () => {
+		const r = validateSequence({ actions: [{ action: 'wait' }] });
+		expect(r.valid).toBe(false);
+		expect(r.errors.some(e => /must have either/.test(e))).toBe(true);
+	});
+
+	test('validateSequence rejects wait with bogus tier', () => {
+		const r = validateSequence({ actions: [{ action: 'wait', tier: 'bogus' }] });
+		expect(r.valid).toBe(false);
+	});
+
+	test('validateSequence accepts textFallback on click', () => {
+		const seq = { actions: [{ action: 'click', selector: '#x', textFallback: 'Submit' }] };
+		expect(validateSequence(seq).valid).toBe(true);
+	});
+
+	test('validateSequence rejects non-string textFallback', () => {
+		const seq = { actions: [{ action: 'click', selector: '#x', textFallback: 42 }] };
+		expect(validateSequence(seq).valid).toBe(false);
+	});
+
+	test('validateSequence accepts sequence-level persona override', () => {
+		const seq = { persona: 'researcher', actions: [{ action: 'click', selector: '#x' }] };
+		expect(validateSequence(seq).valid).toBe(true);
+	});
+
+	test('validateSequence rejects unknown action types', () => {
+		const r = validateSequence({ actions: [{ action: 'jiggle', selector: '#x' }] });
+		expect(r.valid).toBe(false);
+	});
+});
+
 describe('Meeple 1.1.0 — Past timestamp window', () => {
 	const noop = () => {};
 
