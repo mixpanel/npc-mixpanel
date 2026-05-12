@@ -14,14 +14,13 @@ import { selectPersona, pickNextAction } from './personas.js';
 import {
 	wait,
 	contextPause,
+	createMouseState,
 	exploratoryClick,
 	rageClick,
 	clickStuff,
 	intelligentScroll,
 	naturalMouseMovement,
 	hoverOverElements,
-	randomMouse,
-	randomScroll,
 	deadClick,
 	confusedBehavior
 } from './interactions.js';
@@ -473,6 +472,7 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 	const sessionStart = Date.now();
 	const baseWeights = personaConfig.actionWeights || {};
 	const hardCeiling = opts.maxActions || null;
+	const mouseState = createMouseState(page.viewport());
 
 	log(
 		`⏱️ <span style="color: #7856FF;">Target session duration:</span> ${(targetDurationMs / 1000).toFixed(0)}s ` +
@@ -557,7 +557,7 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 			log(`🎯 Updated: ${hotZones.length} hot zones identified`);
 		}
 
-		const funcToPerform = resolveActionHandler(action, page, hotZones, persona, hoverHistory, opts, log);
+		const funcToPerform = resolveActionHandler(action, page, hotZones, persona, hoverHistory, mouseState, opts, log);
 
 		try {
 			await ensurePageSetup(page, usersHandle, opts.inject !== false, opts, log);
@@ -604,31 +604,29 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 /**
  * Resolve an action name to a callable handler. Unknown actions fall back to wait().
  */
-function resolveActionHandler(action, page, hotZones, persona, hoverHistory, opts, log) {
+function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mouseState, opts, log) {
 	switch (action) {
 		case 'click':
-			return () => clickStuff(page, hotZones, log);
+			return () => clickStuff(page, hotZones, log, mouseState);
 		case 'exploratoryClick':
-			return () => exploratoryClick(page, log);
+			return () => exploratoryClick(page, log, mouseState);
 		case 'rageClick':
-			return () => rageClick(page, log);
+			return () => rageClick(page, log, mouseState);
 		case 'scroll':
-			return () => intelligentScroll(page, hotZones, log);
+			// 'randomScroll' was folded into intelligentScroll in 1.1.0 (Phase 3).
+			return () => intelligentScroll(page, hotZones, log, mouseState);
 		case 'mouse':
 		case 'moveMouse':
-			return () => naturalMouseMovement(page, hotZones, log);
-		case 'randomMouse':
-			return () => randomMouse(page, log);
-		case 'randomScroll':
-			return () => randomScroll(page, log);
+			// 'randomMouse' was removed in 1.1.0 (Phase 3) — fold into naturalMouseMovement.
+			return () => naturalMouseMovement(page, hotZones, log, mouseState);
 		case 'hover':
-			return () => hoverOverElements(page, hotZones, persona, hoverHistory, log);
+			return () => hoverOverElements(page, hotZones, persona, hoverHistory, log, mouseState);
 		case 'form':
 			return () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
 		case 'deadClick':
-			return () => deadClick(page, hotZones, log);
+			return () => deadClick(page, hotZones, log, mouseState);
 		case 'confusedBehavior':
-			return () => confusedBehavior(page, log);
+			return () => confusedBehavior(page, log, mouseState);
 		case 'back':
 			return () => navigateBack(page, log);
 		case 'forward':
