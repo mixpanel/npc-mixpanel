@@ -17,3 +17,5 @@ vscode-profile-*
 spec-*.jsonc
 service-account.json
 gcp-service-account-key.json
+plans/*
+!plans/.gitkeep

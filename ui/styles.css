@@ -1121,3 +1121,33 @@ body {
 		padding: 3px 6px;
 	}
 }
+
+/* ─── Persona mix grid (1.1.0) ─────────────────────────────────────── */
+.persona-mix-grid {
+	display: grid;
+	grid-template-columns: minmax(110px, auto) 1fr 36px;
+	gap: 6px 12px;
+	align-items: center;
+	font-size: 0.8em;
+}
+
+.persona-mix-grid .persona-name {
+	color: #ccc;
+	white-space: nowrap;
+}
+
+.persona-mix-grid input[type='range'] {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+.persona-mix-grid .persona-value {
+	color: #888;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+#persona-mix-die:hover {
+	background: #3a3a4e;
+}

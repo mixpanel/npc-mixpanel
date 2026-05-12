@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { uid } from 'ak-tools';
 import main from './meeple/headless.js';
 import { validateSequences } from './meeple/sequences.js';
+import { personaNames, personas as personaConfigs } from './meeple/entities.js';
 import { log } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -33,6 +34,41 @@ const mp = Mixpanel.init(MIXPANEL_TRACKING_TOKEN, {
 // Parse JSON bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/**
+ * Validate the optional 1.1.0 `persona` and `personaWeights` simulate-API params.
+ * @param {Object} params
+ * @returns {{valid: boolean, errors: string[]}}
+ */
+function validatePersonaParams(params) {
+	const errors = [];
+	const knownPersonas = new Set(personaNames);
+
+	if (params.persona !== undefined && params.persona !== null && params.persona !== '') {
+		if (typeof params.persona !== 'string') {
+			errors.push('persona must be a string');
+		} else if (!knownPersonas.has(params.persona)) {
+			errors.push(`Unknown persona "${params.persona}". Valid: ${personaNames.join(', ')}`);
+		}
+	}
+
+	if (params.personaWeights !== undefined && params.personaWeights !== null) {
+		if (typeof params.personaWeights !== 'object' || Array.isArray(params.personaWeights)) {
+			errors.push('personaWeights must be an object mapping persona name to weight');
+		} else {
+			for (const [name, weight] of Object.entries(params.personaWeights)) {
+				if (!knownPersonas.has(name)) {
+					errors.push(`Unknown persona in personaWeights: "${name}"`);
+				}
+				if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0) {
+					errors.push(`personaWeights["${name}"] must be a non-negative number`);
+				}
+			}
+		}
+	}
+
+	return { valid: errors.length === 0, errors };
+}
 
 function coerceTypes(obj) {
 	const coerced = {};
@@ -347,14 +383,14 @@ app.get('/help', (_req, res) => {
 					users: {
 						type: 'number',
 						default: 10,
-						max: 25,
+						max: 100,
 						description: 'Number of meeples (simulated users) to spawn'
 					},
 					concurrency: {
 						type: 'number',
 						default: 10,
-						max: 10,
-						description: 'Maximum concurrent meeples running at once'
+						max: 20,
+						description: 'Maximum concurrent meeples running at once (raised from 10 in 1.1.0)'
 					},
 					headless: {
 						type: 'boolean',
@@ -407,6 +443,18 @@ app.get('/help', (_req, res) => {
 						type: 'boolean',
 						default: false,
 						description: 'Meeples make intentional form mistakes, trigger validation errors, then correct'
+					},
+					persona: {
+						type: 'string',
+						optional: true,
+						enum: personaNames,
+						description: 'Force every meeple to use this persona (overrides frequency-weighted selection)'
+					},
+					personaWeights: {
+						type: 'object',
+						optional: true,
+						description:
+							'Custom frequency map { personaName: number }. Overrides default per-persona frequencies. Unknown persona names are rejected.'
 					},
 					sequences: {
 						type: 'object',
@@ -473,8 +521,8 @@ app.get('/help', (_req, res) => {
 				auth: true,
 				description: 'Run meeple simulations on the Mixtape music streaming demo with 5 persona types',
 				parameters: {
-					users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
-					concurrency: { type: 'number', default: 5, max: 10 },
+					users: { type: 'number', default: 10, max: 100, description: 'Number of meeples to spawn' },
+					concurrency: { type: 'number', default: 5, max: 20 },
 					headless: { type: 'boolean', default: true },
 					past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
 					bugRate: {
@@ -500,6 +548,31 @@ app.get('/help', (_req, res) => {
 				code: 401
 			}
 		}
+	});
+});
+
+// 1.1.0: persona catalog endpoint — single source of truth for UI clients.
+// Returns the canonical 15 persona names + their default frequency weights so the
+// UI doesn't have to hardcode them. Public, unauthenticated, available in both
+// runtime contexts.
+app.get('/api/personas', (_req, res) => {
+	/** @type {Object<string, number>} */
+	const frequencies = {};
+	/** @type {Object<string, {sessionDuration: [number, number], typingSpeed: string, scrollStyle: string}>} */
+	const meta = {};
+	for (const name of personaNames) {
+		const cfg = personaConfigs[name];
+		frequencies[name] = cfg.frequency;
+		meta[name] = {
+			sessionDuration: cfg.sessionDuration,
+			typingSpeed: cfg.typingSpeed,
+			scrollStyle: cfg.scrollStyle
+		};
+	}
+	res.json({
+		names: personaNames,
+		frequencies,
+		meta
 	});
 });
 
@@ -552,6 +625,16 @@ app.post('/simulate', async (req, res) => {
 					details: validation.errors
 				});
 			}
+		}
+
+		// 1.1.0: validate persona / personaWeights overrides
+		const personaValidation = validatePersonaParams(mergedParams);
+		if (!personaValidation.valid) {
+			logger.error(`/SIMULATE persona validation error`, { errors: personaValidation.errors, user, clientId });
+			return res.status(400).json({
+				error: 'Invalid persona parameters',
+				details: personaValidation.errors
+			});
 		}
 
 		const startTime = Date.now();
@@ -802,8 +885,8 @@ app.get('/mixtape', (_req, res) => {
 			safe_word: { required: true, description: 'Authentication password' }
 		},
 		parameters: {
-			users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
-			concurrency: { type: 'number', default: 5, max: 10, description: 'Max concurrent meeples' },
+			users: { type: 'number', default: 10, max: 100, description: 'Number of meeples to spawn' },
+			concurrency: { type: 'number', default: 5, max: 20, description: 'Max concurrent meeples' },
 			headless: { type: 'boolean', default: true, description: 'Run in headless mode' },
 			past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
 			bugRate: {

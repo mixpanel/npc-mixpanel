@@ -104,9 +104,9 @@ declare global {
 export interface MeepleParams {
 	/** Target URL to simulate user behavior on */
 	url?: string;
-	/** Number of concurrent users to simulate (max 25) */
+	/** Number of concurrent users to simulate (max 100, raised from 25 in 1.1.0) */
 	users?: number;
-	/** Concurrency limit for simultaneous executions (max 10) */
+	/** Concurrency limit for simultaneous executions (max 20, raised from 10 in 1.1.0) */
 	concurrency?: number;
 	/** Run browser in headless mode */
 	headless?: boolean;
@@ -137,6 +137,13 @@ export interface MeepleParams {
 	formMistakes?: boolean;
 	/** Client identifier for tracking which service triggered the job (e.g. 'powertools-ui', 'mpTweaks') */
 	client_id?: string;
+
+	// ── 1.1.0 Persona Controls ──
+
+	/** Force every meeple to use this persona (overrides frequency-weighted selection) */
+	persona?: PersonaType;
+	/** Custom frequency map { personaName: number }. Overrides default per-persona frequencies. */
+	personaWeights?: Partial<Record<PersonaType, number>>;
 }
 
 export interface SequencesSpec {
@@ -336,25 +343,23 @@ export interface MeepleOptions {
 
 export type LogFunction = (message: string, meepleId?: string | null) => void;
 
+/** Consolidated 1.1.0 persona set. See meeple/entities.js for per-persona config. */
 export type PersonaType =
-	| 'quickBrowser'
+	| 'speedRunner'
+	| 'browser'
 	| 'researcher'
 	| 'shopper'
-	| 'explorer'
-	| 'powerUser'
 	| 'taskFocused'
-	| 'methodical'
-	| 'impulse'
-	| 'reader'
+	| 'explorer'
 	| 'skimmer'
-	| 'discoverer'
-	| 'comparison'
-	| 'decisive'
-	| 'rolePlayer'
-	| 'minMaxer'
-	| 'murderHobo'
-	| 'ruleSlawyer'
-	| 'mobileHabits';
+	| 'firstTimer'
+	| 'mobileUser'
+	| 'frustrated'
+	| 'formFiller'
+	| 'returnVisitor'
+	| 'contentReader'
+	| 'impulsive'
+	| 'methodical';
 
 export interface ActionSequenceItem {
 	action: string;

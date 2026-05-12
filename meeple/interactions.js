@@ -6,7 +6,8 @@ import {
 	regularButtonSelectors,
 	navigationSelectors,
 	contentSelectors,
-	interactiveSelectors
+	interactiveSelectors,
+	personas
 } from './entities.js';
 import { randomBetween } from './utils.js';
 
@@ -17,6 +18,45 @@ export const CLICK_FUZZINESS = {
 	FORM_FIELD: 0.35, // ±35% (increased from ±20%)
 	EXPLORATORY: 0.6 // ±60% for random exploratory clicks
 };
+
+/**
+ * Create a fresh mouseState. Sessions start the cursor near a natural "just-opened-tab"
+ * position (center horizontally, upper third vertically).
+ * @param {{width: number, height: number}} viewport
+ * @returns {{x: number, y: number, lastMoveTimestamp: number}}
+ */
+export function createMouseState(viewport) {
+	return {
+		x: viewport.width / 2,
+		y: viewport.height / 3,
+		lastMoveTimestamp: Date.now()
+	};
+}
+
+/**
+ * Get the current cursor start position. Prefer mouseState; fall back to viewport center.
+ * @param {Object} page
+ * @param {Object|null} mouseState
+ * @returns {{x: number, y: number}}
+ */
+export function getStartPos(page, mouseState) {
+	if (mouseState && Number.isFinite(mouseState.x) && Number.isFinite(mouseState.y)) {
+		return { x: mouseState.x, y: mouseState.y };
+	}
+	const vp = page.viewport();
+	return { x: vp.width / 2, y: vp.height / 2 };
+}
+
+/**
+ * Persist the cursor's final position back into mouseState. No-op if mouseState is null.
+ */
+export function updateMouseState(mouseState, x, y) {
+	if (mouseState) {
+		mouseState.x = x;
+		mouseState.y = y;
+		mouseState.lastMoveTimestamp = Date.now();
+	}
+}
 
 /**
  * Utility function to ensure clicks stay within viewport bounds
@@ -41,7 +81,9 @@ export function coinFlip() {
 }
 
 /**
- * Natural wait function with variable timing
+ * Natural wait function with variable timing.
+ * Used by the `wait` action and as a fallback elsewhere. Inter-action pacing
+ * uses contextPause() instead — see below.
  * @returns {Promise} - Resolves after random delay
  */
 export async function wait() {
@@ -60,6 +102,70 @@ export async function wait() {
 	}
 
 	await new Promise(resolve => setTimeout(resolve, delay));
+}
+
+/**
+ * Context-aware inter-action pause. Three tiers, modulated by persona pace and phase.
+ *
+ *   micro (0.3-1.5s) — between rapid actions (click→click, scroll steps)
+ *   read  (2-8s)     — after navigation, after scroll, around hover
+ *   think (5-15s)    — before form fill, phase transitions
+ *
+ * Budget-aware: if remainingMs is provided, the pause is capped at 30% of
+ * remaining session time. Prevents one think-tier × slow-persona × windDown
+ * from eating most of a short speedRunner session.
+ *
+ * @param {string|null} previousAction
+ * @param {string|null} nextAction
+ * @param {string} phase - arrival | exploration | engagement | windDown
+ * @param {string} persona
+ * @param {number|null} [remainingMs] - milliseconds left in session budget
+ * @returns {Promise<string>} resolves with the chosen tier name (for telemetry)
+ */
+export async function contextPause(previousAction, nextAction, phase, persona, remainingMs = null) {
+	const tier = pickPauseTier(previousAction, nextAction, phase);
+	const ranges = {
+		micro: [300, 1500],
+		read: [2000, 8000],
+		think: [5000, 15000]
+	};
+	const [lo, hi] = ranges[tier];
+	const base = lo + Math.random() * (hi - lo);
+	let delay = base * personaSpeedMod(persona) * phaseSpeedMod(phase);
+
+	// Budget cap — never spend more than 30% of remaining session on a single pause
+	if (remainingMs != null && remainingMs > 0) {
+		const cap = remainingMs * 0.3;
+		if (delay > cap) delay = cap;
+	}
+
+	await new Promise(resolve => setTimeout(resolve, Math.max(50, Math.round(delay))));
+	return tier;
+}
+
+function pickPauseTier(prev, next, phase) {
+	if (next === 'form') return 'think';
+	if (prev === 'navigate' || prev === 'back' || prev === 'forward') return 'read';
+	if (phase === 'windDown' && Math.random() < 0.4) return 'read';
+	if (phase === 'arrival' && Math.random() < 0.35) return 'read';
+	if (next === 'hover' || prev === 'hover') return 'read';
+	if (next === 'scroll' && prev === 'scroll') return 'micro';
+	return Math.random() < 0.15 ? 'read' : 'micro';
+}
+
+function personaSpeedMod(persona) {
+	const cfg = personas[persona];
+	if (!cfg) return 1.0;
+	if (cfg.typingSpeed === 'fast') return 0.6;
+	if (cfg.typingSpeed === 'slow') return 1.4;
+	return 1.0;
+}
+
+function phaseSpeedMod(phase) {
+	if (phase === 'engagement') return 0.85;
+	if (phase === 'windDown') return 1.3;
+	if (phase === 'arrival') return 1.1;
+	return 1.0;
 }
 
 /**
@@ -236,8 +342,9 @@ export async function moveMouse(page, startX, startY, endX, endY, targetWidth = 
  * Perform exploratory clicking in content areas
  * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
+ * @param {Object|null} mouseState - persistent cursor position (1.1.0+)
  */
-export async function exploratoryClick(page, log = console.log) {
+export async function exploratoryClick(page, log = console.log, mouseState = null) {
 	try {
 		const viewport = await page.viewport();
 
@@ -278,24 +385,12 @@ export async function exploratoryClick(page, log = console.log) {
 		// Ensure click stays in viewport
 		const boundedPos = boundClickPosition(targetX, targetY, viewport);
 
-		// Get current mouse position for natural movement
-		const currentPos = await page.evaluate(() => {
-			return { x: window.mouseX || 0, y: window.mouseY || 0 };
-		});
+		// Persistent cursor — start from where we last were, not a fresh random point
+		const start = await getStartPos(page, mouseState);
 
-		// Natural mouse movement to target (estimate element size for Fitts' law)
-		const estimatedWidth = targetX && targetY ? 100 : 50; // Larger for content elements
+		const estimatedWidth = targetX && targetY ? 100 : 50;
 		const estimatedHeight = targetX && targetY ? 30 : 30;
-		await moveMouse(
-			page,
-			currentPos.x || 100,
-			currentPos.y || 100,
-			boundedPos.x,
-			boundedPos.y,
-			estimatedWidth,
-			estimatedHeight,
-			log
-		);
+		await moveMouse(page, start.x, start.y, boundedPos.x, boundedPos.y, estimatedWidth, estimatedHeight, log);
 
 		// Click with natural timing
 		await page.mouse.click(boundedPos.x, boundedPos.y, {
@@ -304,7 +399,9 @@ export async function exploratoryClick(page, log = console.log) {
 
 		log(`🎯 Exploratory click at (${Math.round(boundedPos.x)}, ${Math.round(boundedPos.y)})`);
 
-		// Update mouse position for tracking
+		updateMouseState(mouseState, boundedPos.x, boundedPos.y);
+
+		// Also surface position to page for any in-page tracking scripts that read it
 		await page.evaluate(
 			(x, y) => {
 				window.mouseX = x;
@@ -322,8 +419,9 @@ export async function exploratoryClick(page, log = console.log) {
  * Perform rage clicking - multiple rapid clicks when frustrated
  * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
+ * @param {Object|null} mouseState - persistent cursor position
  */
-export async function rageClick(page, log = console.log) {
+export async function rageClick(page, log = console.log, mouseState = null) {
 	try {
 		const viewport = await page.viewport();
 
@@ -372,15 +470,13 @@ export async function rageClick(page, log = console.log) {
 		// Ensure target stays in viewport
 		const boundedPos = boundClickPosition(targetX, targetY, viewport);
 
-		// Get current mouse position
-		const currentPos = await page.evaluate(vp => {
-			return { x: window.mouseX || vp.width / 2, y: window.mouseY || vp.height / 2 };
-		}, viewport);
+		// Persistent cursor start
+		const start = await getStartPos(page, mouseState);
 
 		// Frustrated/aggressive movement to target (faster, less smooth)
 		const frustratedPath = generateFrustratedMousePath(
-			currentPos.x || viewport.width / 2,
-			currentPos.y || viewport.height / 2,
+			start.x,
+			start.y,
 			boundedPos.x,
 			boundedPos.y,
 			targetWidth,
@@ -423,7 +519,8 @@ export async function rageClick(page, log = console.log) {
 			}
 		}
 
-		// Update final mouse position
+		// Update final mouse position (persistent + page-side)
+		updateMouseState(mouseState, boundedPos.x, boundedPos.y);
 		await page.evaluate(
 			(x, y) => {
 				window.mouseX = x;
@@ -541,46 +638,126 @@ export async function trackMouseMovement(page, target, log = null) {
 }
 
 /**
- * Simulate reading movements during hover
- * @param {Page} page - Puppeteer page object
- * @param {Object} target - Target element information
- * @param {number} hoverDuration - Duration of hover in milliseconds
- * @param {string} persona - User persona affecting reading behavior
- * @param {Function} _log - Logging function
+ * Simulate reading-trace mouse movements during hover.
+ *
+ * Pattern depends on target type:
+ *   - text content (paragraph/heading with substantial text): horizontal sweeps with vertical drift,
+ *     mimicking eye/cursor following lines of text
+ *   - image: slow diagonal scan with focal-point lingers
+ *   - default (interactive element): minimal jitter, brief settle
+ *
+ * @param {Page} page
+ * @param {Object} target - {x, y, width, height, text, tag}
+ * @param {number} hoverDuration
+ * @param {string} persona
+ * @param {Function} _log
+ * @param {Object|null} mouseState - persistent cursor (updated after final movement)
  */
-export async function simulateReadingMovements(page, target, hoverDuration, persona, _log) {
-	// Determine reading behavior based on persona
-	let readingIntensity = 1.0; // Default intensity
+export async function simulateReadingMovements(page, target, hoverDuration, persona, _log, mouseState = null) {
+	const intensityByPersona = {
+		researcher: 1.5,
+		contentReader: 1.5,
+		methodical: 1.4,
+		firstTimer: 1.3,
+		browser: 1.0,
+		shopper: 1.0,
+		explorer: 1.0,
+		skimmer: 0.7,
+		speedRunner: 0.5,
+		taskFocused: 0.5,
+		impulsive: 0.4
+	};
+	const readingIntensity = intensityByPersona[persona] || 1.0;
 
-	if (persona === 'researcher' || persona === 'powerUser') {
-		readingIntensity = 1.5; // More thorough reading
-	} else if (persona === 'quickBrowser' || persona === 'impulse') {
-		readingIntensity = 0.7; // Faster, less thorough
-	}
+	// Pick trace pattern by target characteristics
+	const isImage = target.tag === 'img' || target.tag === 'video' || target.tag === 'svg';
+	const isLongText = !isImage && target.text && target.text.length > 50;
 
-	const movements = Math.floor((hoverDuration / 1000) * readingIntensity * 3); // 3 movements per second base
+	let lastX = target.x;
+	let lastY = target.y;
 
-	for (let i = 0; i < movements; i++) {
-		const progress = i / movements;
-
-		// Simulate reading pattern - left to right, top to bottom
-		const readingX = target.x + target.width * 0.1 + target.width * 0.8 * (progress % 1);
-		const readingY = target.y + target.height * 0.2 + (target.height * 0.6 * Math.floor(progress * 3)) / 3;
-
-		// Add natural micro-movements
-		const jitterX = (Math.random() - 0.5) * 8;
-		const jitterY = (Math.random() - 0.5) * 4;
-
-		const finalX = readingX + jitterX;
-		const finalY = readingY + jitterY;
-
-		try {
-			await page.mouse.move(finalX, finalY);
+	if (isLongText) {
+		// Horizontal sweeps following text lines — left→right with downward drift
+		const lineCount = Math.max(2, Math.floor(target.height / 24));
+		const sweepsPerLine = Math.max(1, Math.round(readingIntensity));
+		const totalMoves = lineCount * sweepsPerLine;
+		const perMoveTime = hoverDuration / totalMoves;
+		for (let line = 0; line < lineCount; line++) {
+			const lineY = target.y - target.height * 0.4 + ((line + 0.5) / lineCount) * target.height * 0.8;
+			for (let s = 0; s < sweepsPerLine; s++) {
+				const startX = target.x - target.width * 0.4;
+				const endX = target.x + target.width * 0.4;
+				const steps = 6;
+				for (let i = 0; i <= steps; i++) {
+					const t = i / steps;
+					const x = startX + (endX - startX) * t + (Math.random() - 0.5) * 6;
+					const y = lineY + (Math.random() - 0.5) * 4;
+					try {
+						await page.mouse.move(x, y);
+					} catch {
+						/* continue */
+					}
+					await new Promise(resolve => setTimeout(resolve, perMoveTime / steps));
+					lastX = x;
+					lastY = y;
+				}
+			}
+		}
+	} else if (isImage) {
+		// Diagonal scan with focal-point lingers
+		const passes = Math.max(1, Math.round(2 * readingIntensity));
+		const perPass = hoverDuration / passes;
+		for (let p = 0; p < passes; p++) {
+			const corners = [
+				{ x: target.x - target.width * 0.4, y: target.y - target.height * 0.4 },
+				{ x: target.x + target.width * 0.4, y: target.y + target.height * 0.4 },
+				{ x: target.x + target.width * 0.4, y: target.y - target.height * 0.4 },
+				{ x: target.x - target.width * 0.4, y: target.y + target.height * 0.4 }
+			];
+			const start = corners[p % 2];
+			const end = corners[(p % 2) + 2];
+			const steps = 8;
+			for (let i = 0; i <= steps; i++) {
+				const t = i / steps;
+				const x = start.x + (end.x - start.x) * t + (Math.random() - 0.5) * 8;
+				const y = start.y + (end.y - start.y) * t + (Math.random() - 0.5) * 8;
+				try {
+					await page.mouse.move(x, y);
+				} catch {
+					/* continue */
+				}
+				await new Promise(resolve => setTimeout(resolve, perPass / steps));
+				lastX = x;
+				lastY = y;
+			}
+			// Focal-point linger at center
+			try {
+				await page.mouse.move(target.x, target.y);
+			} catch {
+				/* continue */
+			}
+			await new Promise(resolve => setTimeout(resolve, randomBetween(150, 400)));
+			lastX = target.x;
+			lastY = target.y;
+		}
+	} else {
+		// Default: small jitter inside the bounding box
+		const movements = Math.max(1, Math.floor((hoverDuration / 1000) * readingIntensity * 2));
+		for (let i = 0; i < movements; i++) {
+			const x = target.x + (Math.random() - 0.5) * (target.width || 50) * 0.4;
+			const y = target.y + (Math.random() - 0.5) * (target.height || 30) * 0.4;
+			try {
+				await page.mouse.move(x, y);
+			} catch {
+				/* continue */
+			}
 			await new Promise(resolve => setTimeout(resolve, hoverDuration / movements));
-		} catch (error) {
-			// Continue with remaining movements even if one fails
+			lastX = x;
+			lastY = y;
 		}
 	}
+
+	updateMouseState(mouseState, lastX, lastY);
 }
 
 /**
@@ -630,8 +807,11 @@ export async function trackHoverDwellEvent(page, target, hoverDuration, persona,
 /**
  * Smart click targeting - prioritizes elements users actually click
  * @param  {import('puppeteer').Page} page
+ * @param  {Array} hotZones
+ * @param  {Function} log
+ * @param  {Object|null} mouseState
  */
-export async function clickStuff(page, hotZones = [], log = console.log) {
+export async function clickStuff(page, hotZones = [], log = console.log, mouseState = null) {
 	try {
 		// If we have hot zones, prefer them (80% chance to use hot zone)
 		if (hotZones.length > 0 && Math.random() < 0.8) {
@@ -649,17 +829,9 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			const targetX = selectedZone.x + (Math.random() - 0.5) * 2 * selectedZone.width * CLICK_FUZZINESS.HOT_ZONE;
 			const targetY = selectedZone.y + (Math.random() - 0.5) * 2 * selectedZone.height * CLICK_FUZZINESS.HOT_ZONE;
 
-			// Slower, more realistic mouse movement to target
-			await moveMouse(
-				page,
-				Math.random() * page.viewport().width,
-				Math.random() * page.viewport().height,
-				targetX,
-				targetY,
-				selectedZone.width,
-				selectedZone.height,
-				log
-			);
+			// Persistent cursor start position
+			const start = await getStartPos(page, mouseState);
+			await moveMouse(page, start.x, start.y, targetX, targetY, selectedZone.width, selectedZone.height, log);
 
 			// More realistic pause before clicking (humans don't click immediately)
 			await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 75)); // 75-275ms (was 100-400ms)
@@ -670,6 +842,8 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 				count: 1,
 				button: 'left'
 			});
+
+			updateMouseState(mouseState, targetX, targetY);
 
 			log(
 				`    └─ 👆 <span style="color: #07B096;">Clicked hot zone</span> ${selectedZone.tag}: "<span style="color: #FEDE9B;">${selectedZone.text}</span>" <span style="color: #888;">(priority: ${selectedZone.priority})</span>`
@@ -775,17 +949,9 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 		const targetY =
 			rect.y + rect.height * 0.5 + (Math.random() - 0.5) * 2 * rect.height * CLICK_FUZZINESS.REGULAR_ELEMENT;
 
-		// Natural mouse movement to target
-		await moveMouse(
-			page,
-			Math.random() * page.viewport().width,
-			Math.random() * page.viewport().height,
-			targetX,
-			targetY,
-			rect.width,
-			rect.height,
-			log
-		);
+		// Persistent cursor — never teleport
+		const fallbackStart = await getStartPos(page, mouseState);
+		await moveMouse(page, fallbackStart.x, fallbackStart.y, targetX, targetY, rect.width, rect.height, log);
 
 		// More realistic pause before clicking (humans take time to aim)
 		await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 75)); // 75-275ms (was 100-400ms)
@@ -796,6 +962,8 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 			count: 1,
 			button: 'left'
 		});
+
+		updateMouseState(mouseState, targetX, targetY);
 
 		log(
 			`    └─ 👆 <span style="color: #07B096;">Clicked</span> ${selectedInfo.tag}: "<span style="color: #FEDE9B;">${selectedInfo.text}</span>" <span style="color: #888;">(priority: ${selectedInfo.priority})</span>`
@@ -832,114 +1000,117 @@ export async function clickStuff(page, hotZones = [], log = console.log) {
 }
 
 /**
- * Intelligent scrolling that feels natural and content-aware
+ * Wheel-based intelligent scrolling — emits real wheel events in 3-8 stepped chunks
+ * with reading pauses, instead of a single programmatic smooth scroll.
+ *
+ * 1.1.0: also folds in the previous `randomScroll` behavior — ~30% of scrolls are
+ * small undirected nudges instead of targeted seeks.
+ *
+ * @param {Page} page
+ * @param {Array} hotZones
+ * @param {Function} log
+ * @param {Object|null} mouseState - cursor stays put during scroll, but we move it for wheel realism
  */
-export async function intelligentScroll(page, hotZones = [], log = console.log) {
+export async function intelligentScroll(page, hotZones = [], log = console.log, mouseState = null) {
 	try {
 		const scrollInfo = await page.evaluate(() => {
 			const scrollHeight = document.documentElement.scrollHeight;
 			const viewportHeight = window.innerHeight;
 			const currentScroll = window.pageYOffset;
 			const maxScroll = scrollHeight - viewportHeight;
-
-			// Check if we can scroll
 			if (scrollHeight <= viewportHeight) return null;
 
-			// Find scroll targets (content sections)
 			const sections = document.querySelectorAll('article, section, .content, main, [class*="post"], [class*="card"]');
 			const targets = [];
-
 			sections.forEach(section => {
 				const rect = section.getBoundingClientRect();
-				if (rect.height > 100) {
-					// Only substantial content
-					targets.push({
-						top: section.offsetTop,
-						height: rect.height
-					});
-				}
+				if (rect.height > 100) targets.push({ top: section.offsetTop, height: rect.height });
 			});
 
-			return {
-				scrollHeight,
-				viewportHeight,
-				currentScroll,
-				maxScroll,
-				targets: targets.slice(0, 5) // Limit to first 5 sections
-			};
+			return { scrollHeight, viewportHeight, currentScroll, maxScroll, targets: targets.slice(0, 5) };
 		});
 
 		if (!scrollInfo) return false;
 
 		let targetScroll;
+		const isRandomNudge = Math.random() < 0.3; // 30% — small undirected scroll (replaces randomScroll)
 
-		// If we have hot zones, prefer scrolling towards them (70% chance)
-		if (hotZones.length > 0 && Math.random() < 0.7) {
-			// Find hot zones that are not currently visible
-			const currentViewportTop = scrollInfo.currentScroll;
-			const currentViewportBottom = scrollInfo.currentScroll + scrollInfo.viewportHeight;
+		if (isRandomNudge) {
+			const dir = Math.random() < 0.85 ? 1 : -1;
+			const distance = randomBetween(120, Math.round(scrollInfo.viewportHeight * 0.6));
+			targetScroll = scrollInfo.currentScroll + dir * distance;
+		} else if (hotZones.length > 0 && Math.random() < 0.7) {
+			const currentTop = scrollInfo.currentScroll;
+			const currentBottom = currentTop + scrollInfo.viewportHeight;
+			const offscreen = hotZones.filter(z => z.y < currentTop - 100 || z.y > currentBottom + 100);
 
-			const targetZones = hotZones.filter(zone => {
-				return zone.y < currentViewportTop - 100 || zone.y > currentViewportBottom + 100;
-			});
-
-			if (targetZones.length > 0) {
-				// Scroll towards a high-priority hot zone
-				const sortedZones = targetZones.sort((a, b) => b.priority - a.priority);
-				const targetZone = sortedZones[Math.floor(Math.random() * Math.min(3, sortedZones.length))]; // Pick from top 3
-				targetScroll = targetZone.y - scrollInfo.viewportHeight * 0.3; // Center zone in viewport
+			if (offscreen.length > 0) {
+				const sorted = offscreen.sort((a, b) => b.priority - a.priority);
+				const targetZone = sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
+				targetScroll = targetZone.y - scrollInfo.viewportHeight * 0.3;
 				log(
 					`    └─ 📜 <span style="color: #F8BC3B;">Scrolling toward hot zone:</span> ${targetZone.tag} "${targetZone.text}"`
 				);
+			} else if (scrollInfo.targets.length > 0) {
+				const t = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
+				targetScroll = t.top - scrollInfo.viewportHeight * 0.1;
 			} else {
-				// All hot zones visible, do regular content scroll
-				if (scrollInfo.targets.length > 0) {
-					const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
-					targetScroll = target.top - scrollInfo.viewportHeight * 0.1;
-				} else {
-					const scrollDirection = Math.random() < 0.8 ? 1 : -1;
-					const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7);
-					targetScroll = scrollInfo.currentScroll + scrollDistance * scrollDirection;
-				}
+				const dir = Math.random() < 0.8 ? 1 : -1;
+				targetScroll = scrollInfo.currentScroll + scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7) * dir;
 			}
 		} else if (scrollInfo.targets.length > 0 && Math.random() < 0.7) {
-			// 70% chance to scroll to content section
-			const target = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
-			targetScroll = target.top - scrollInfo.viewportHeight * 0.1; // Leave some margin
+			const t = scrollInfo.targets[Math.floor(Math.random() * scrollInfo.targets.length)];
+			targetScroll = t.top - scrollInfo.viewportHeight * 0.1;
 		} else {
-			// Random scroll
-			const scrollDirection = Math.random() < 0.8 ? 1 : -1; // 80% down, 20% up
-			const scrollDistance = scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7); // 30-100% of viewport
-			targetScroll = scrollInfo.currentScroll + scrollDistance * scrollDirection;
+			const dir = Math.random() < 0.8 ? 1 : -1;
+			targetScroll = scrollInfo.currentScroll + scrollInfo.viewportHeight * (0.3 + Math.random() * 0.7) * dir;
 		}
 
-		// Clamp to valid range
 		targetScroll = Math.max(0, Math.min(scrollInfo.maxScroll, targetScroll));
+		const totalDelta = targetScroll - scrollInfo.currentScroll;
+		if (Math.abs(totalDelta) < 5) return true; // already there
 
-		// Smooth scroll
-		await page.evaluate(target => {
-			window.scrollTo({
-				top: target,
-				behavior: 'smooth'
-			});
-		}, targetScroll);
+		// Position cursor over content first — wheel events fire at cursor location
+		const start = await getStartPos(page, mouseState);
+		await page.mouse.move(Math.round(start.x), Math.round(start.y));
 
-		// Wait for scroll to complete (more realistic timing)
-		await new Promise(resolve => setTimeout(resolve, Math.random() * 250 + 250)); // 250-500ms (was 400-750ms)
+		// Wheel-stepped scroll with jitter and occasional reading pause
+		const steps = randomBetween(3, 8);
+		const baseStep = totalDelta / steps;
+		for (let i = 0; i < steps; i++) {
+			const stepDelta = baseStep + randomBetween(-20, 20);
+			try {
+				await page.mouse.wheel({ deltaY: stepDelta });
+			} catch {
+				// Fallback: some sites swallow wheel events. Use programmatic scroll for this step.
+				await page.evaluate(d => window.scrollBy(0, d), stepDelta);
+			}
+			await new Promise(resolve => setTimeout(resolve, randomBetween(30, 120)));
+
+			// Scroll-then-read: ~30% of inter-step gaps include a longer reading pause
+			if (Math.random() < 0.3 && i < steps - 1) {
+				await new Promise(resolve => setTimeout(resolve, randomBetween(500, 2000)));
+			}
+		}
 
 		log(
-			`    └─ 📜 <span style="color: #BCF0F0;">Scrolled</span> to position <span style="color: #FEDE9B;">${Math.round(targetScroll)}</span>`
+			`    └─ 📜 <span style="color: #BCF0F0;">Wheel-scrolled</span> ${Math.round(totalDelta)}px ` +
+				`<span style="color: #888;">(${steps} steps${isRandomNudge ? ', nudge' : ''})</span>`
 		);
 		return true;
-	} catch (error) {
+	} catch (_error) {
 		return false;
 	}
 }
 
 /**
  * Natural mouse movement without clicking - simulates reading/hovering behavior
+ * @param {Page} page
+ * @param {Array} hotZones
+ * @param {Function} log
+ * @param {Object|null} mouseState
  */
-export async function naturalMouseMovement(page, hotZones = [], log = console.log) {
+export async function naturalMouseMovement(page, hotZones = [], log = console.log, mouseState = null) {
 	try {
 		let target;
 
@@ -987,16 +1158,9 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 		target.x = Math.max(50, Math.min(page.viewport().width - 50, target.x));
 		target.y = Math.max(50, Math.min(page.viewport().height - 50, target.y));
 
-		await moveMouse(
-			page,
-			Math.random() * page.viewport().width,
-			Math.random() * page.viewport().height,
-			target.x,
-			target.y,
-			100,
-			30,
-			log
-		);
+		const start = await getStartPos(page, mouseState);
+		await moveMouse(page, start.x, start.y, target.x, target.y, 100, 30, log);
+		updateMouseState(mouseState, target.x, target.y);
 
 		// More realistic pause (users move mouse then pause to read/think)
 		await new Promise(resolve => setTimeout(resolve, Math.random() * 400 + 200)); // 200-600ms (was 400-1000ms)
@@ -1015,8 +1179,21 @@ export async function naturalMouseMovement(page, hotZones = [], log = console.lo
 
 /**
  * Hover over elements to trigger dropdowns, tooltips, etc.
+ * @param {Page} page
+ * @param {Array} hotZones
+ * @param {string|null} persona
+ * @param {Array} hoverHistory
+ * @param {Function} log
+ * @param {Object|null} mouseState
  */
-export async function hoverOverElements(page, hotZones = [], persona = null, hoverHistory = [], log = console.log) {
+export async function hoverOverElements(
+	page,
+	hotZones = [],
+	persona = null,
+	hoverHistory = [],
+	log = console.log,
+	mouseState = null
+) {
 	try {
 		let target;
 
@@ -1069,44 +1246,57 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 			}
 		}
 
-		// Fallback: find regular hover targets
+		// Fallback: find regular hover targets (plus content elements for engagement-heavy personas)
 		if (!target) {
-			const hoverTargets = await page.evaluate(selectors => {
-				const elements = document.querySelectorAll(selectors.join(', '));
-				const targets = [];
+			const highEngagement = ['researcher', 'contentReader', 'firstTimer', 'methodical', 'browser'].includes(persona);
+			const hoverTargets = await page.evaluate(
+				(selectors, includeContent) => {
+					const baseSelector = selectors.join(', ');
+					const sel = includeContent
+						? baseSelector + ', p, h1, h2, h3, h4, h5, h6, img, [class*="price"], [class*="feature"], li'
+						: baseSelector;
+					const elements = document.querySelectorAll(sel);
+					const targets = [];
 
-				elements.forEach(el => {
-					const rect = el.getBoundingClientRect();
-					if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
-						targets.push({
-							x: rect.x + rect.width / 2,
-							y: rect.y + rect.height / 2,
-							width: rect.width,
-							height: rect.height,
-							text: el.textContent?.trim().substring(0, 30) || '',
-							tag: el.tagName.toLowerCase()
-						});
-					}
-				});
+					elements.forEach(el => {
+						const rect = el.getBoundingClientRect();
+						if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+							targets.push({
+								x: rect.x + rect.width / 2,
+								y: rect.y + rect.height / 2,
+								width: rect.width,
+								height: rect.height,
+								text: el.textContent?.trim().substring(0, 200) || '',
+								tag: el.tagName.toLowerCase()
+							});
+						}
+					});
 
-				return targets.slice(0, 20); // Limit to first 20 for performance
-			}, interactiveSelectors);
+					return targets.slice(0, 25);
+				},
+				interactiveSelectors,
+				highEngagement
+			);
 
 			if (hoverTargets.length === 0) return false;
 			target = hoverTargets[Math.floor(Math.random() * hoverTargets.length)];
 		}
 
-		// Move to element
+		// Move to element from current cursor position
+		const hoverStart = await getStartPos(page, mouseState);
+		const hoverTargetX = target.x + (Math.random() - 0.5) * 20;
+		const hoverTargetY = target.y + (Math.random() - 0.5) * 20;
 		await moveMouse(
 			page,
-			Math.random() * page.viewport().width,
-			Math.random() * page.viewport().height,
-			target.x + (Math.random() - 0.5) * 20,
-			target.y + (Math.random() - 0.5) * 20,
+			hoverStart.x,
+			hoverStart.y,
+			hoverTargetX,
+			hoverTargetY,
 			target.width || 100,
 			target.height || 30,
 			log
 		);
+		updateMouseState(mouseState, hoverTargetX, hoverTargetY);
 
 		// Calculate realistic hover duration based on content type and persona
 		const hoverDuration = calculateHoverDuration(target, persona);
@@ -1121,7 +1311,7 @@ export async function hoverOverElements(page, hotZones = [], persona = null, hov
 		);
 
 		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
-		await simulateReadingMovements(page, target, hoverDuration, persona, log);
+		await simulateReadingMovements(page, target, hoverDuration, persona, log, mouseState);
 
 		// Track explicit hover dwell event with Mixpanel
 		await trackHoverDwellEvent(page, target, hoverDuration, persona, log);
@@ -1211,31 +1401,28 @@ function calculateHoverDuration(target, persona) {
 	// Get base duration range
 	const baseDuration = contentTypeDurations[contentType];
 
-	// Persona-based modifiers
+	// Persona-based modifiers (1.1.0 personas)
 	const personaModifiers = {
-		// High engagement personas - longer hover times
+		// High engagement
 		researcher: 1.5,
-		ruleSlawyer: 1.4,
-		discoverer: 1.3,
-		comparison: 1.2,
-		rolePlayer: 1.2,
+		contentReader: 1.5,
+		methodical: 1.4,
+		firstTimer: 1.3,
 
-		// Medium engagement personas
+		// Medium engagement
 		shopper: 1.1,
 		explorer: 1.0,
-		methodical: 1.1,
-		reader: 1.3,
+		browser: 1.0,
+		formFiller: 1.0,
+		returnVisitor: 0.9,
 
-		// Low engagement personas - shorter hover times
-		powerUser: 0.7,
-		taskFocused: 0.6,
-		decisive: 0.5,
-		mobileHabits: 0.4,
-		murderHobo: 0.3,
-
-		// Variable engagement
-		skimmer: 0.8,
-		minMaxer: 0.9
+		// Low engagement / fast-pace
+		skimmer: 0.7,
+		mobileUser: 0.6,
+		taskFocused: 0.5,
+		speedRunner: 0.4,
+		impulsive: 0.4,
+		frustrated: 0.5
 	};
 
 	// Apply persona modifier
@@ -1254,56 +1441,15 @@ function calculateHoverDuration(target, persona) {
 }
 
 /**
- * Perform random mouse movement
- * @param {Page} page - Puppeteer page object
- * @param {Function} log - Logging function
- * @returns {Promise<boolean>} - Success status
- */
-export async function randomMouse(page, log = console.log) {
-	try {
-		const viewport = await page.viewport();
-		const startX = Math.random() * viewport.width;
-		const startY = Math.random() * viewport.height;
-		const endX = Math.random() * viewport.width;
-		const endY = Math.random() * viewport.height;
-
-		await moveMouse(page, startX, startY, endX, endY, 50, 50, log);
-		return true;
-	} catch (error) {
-		log(`⚠️ Random mouse error: ${error.message}`);
-		return false;
-	}
-}
-
-/**
- * Perform random scrolling on the page
- * @param {Page} page - Puppeteer page object
- * @param {Function} log - Logging function
- * @returns {Promise<boolean>} - Success status
- */
-export async function randomScroll(page, log = console.log) {
-	try {
-		const scrollDistance = randomBetween(-500, 500);
-		await page.evaluate(distance => {
-			window.scrollBy(0, distance);
-		}, scrollDistance);
-		log(`📜 Random scroll: ${scrollDistance}px`);
-		return true;
-	} catch (error) {
-		log(`⚠️ Random scroll error: ${error.message}`);
-		return false;
-	}
-}
-
-/**
  * Simulate a "dead click" - clicking just outside a button's bounding box so the JS handler doesn't fire.
  * This produces a click event in Session Replay that leads to no navigation or action.
  * @param {Page} page - Puppeteer page object
- * @param {Array} hotZones - Available hot zones
+ * @param {Array} _hotZones - reserved (kept for signature symmetry with other action handlers)
  * @param {Function} log - Logging function
+ * @param {Object|null} mouseState
  * @returns {Promise<boolean>} - Success status
  */
-export async function deadClick(page, hotZones = [], log = console.log) {
+export async function deadClick(page, _hotZones = [], log = console.log, mouseState = null) {
 	try {
 		// Find a clickable element (button/link) to "miss"
 		const targets = await page.evaluate(() => {
@@ -1359,9 +1505,11 @@ export async function deadClick(page, hotZones = [], log = console.log) {
 		clickY = Math.max(0, Math.min(viewport.height - 1, clickY));
 
 		// Move mouse naturally then click
-		await moveMouse(page, Math.random() * viewport.width, Math.random() * viewport.height, clickX, clickY, 20, 20, log);
+		const dcStart = await getStartPos(page, mouseState);
+		await moveMouse(page, dcStart.x, dcStart.y, clickX, clickY, 20, 20, log);
 		await new Promise(resolve => setTimeout(resolve, randomBetween(50, 150)));
 		await page.mouse.click(clickX, clickY);
+		updateMouseState(mouseState, clickX, clickY);
 
 		log(
 			`🖱️ <span style="color: #CC332B;">Dead click</span> near ${target.tag}: "<span style="color: #FEDE9B;">${target.text}</span>" <span style="color: #888;">(missed by ${missOffset}px)</span>`
@@ -1374,6 +1522,7 @@ export async function deadClick(page, hotZones = [], log = console.log) {
 		const realX = target.x + target.width / 2;
 		const realY = target.y + target.height / 2;
 		await page.mouse.click(realX, realY);
+		updateMouseState(mouseState, realX, realY);
 		log(`    └─ 👆 <span style="color: #07B096;">Retry click</span> (corrected aim)`);
 
 		return true;
@@ -1384,25 +1533,176 @@ export async function deadClick(page, hotZones = [], log = console.log) {
 }
 
 /**
+ * Navigate to a new page on the same domain by finding and clicking a link.
+ * Supports both real-href navigation and SPA patterns (href="#", javascript:void, router-links).
+ *
+ * @param {Page} page
+ * @param {Object|null} mouseState
+ * @param {string} originDomain - hostname of session genesis URL (for filtering candidates)
+ * @param {Function} log
+ * @returns {Promise<{navigated: boolean, fromUrl: string, toUrl: string|null, target: string|null}>}
+ */
+export async function navigateToNewPage(page, mouseState, originDomain, log = console.log) {
+	const fromUrl = page.url();
+	try {
+		const linksData = await page.evaluate(domain => {
+			function isSameDomain(targetHost, origin) {
+				if (!targetHost) return false;
+				if (targetHost === origin) return true;
+				if (targetHost === 'www.' + origin) return true;
+				if (origin === 'www.' + targetHost) return true;
+				if (targetHost.endsWith('.' + origin)) return true;
+				if (origin.endsWith('.' + targetHost)) return true;
+				return false;
+			}
+			const els = Array.from(document.querySelectorAll('a, [role="link"], [data-href], [routerlink]'));
+			const out = [];
+			for (const el of els) {
+				const r = el.getBoundingClientRect();
+				if (r.width <= 0 || r.height <= 0) continue;
+				if (r.top > window.innerHeight + 200 || r.bottom < -200) continue;
+				const cs = window.getComputedStyle(el);
+				if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+
+				const rawHref = el.getAttribute('href') || el.getAttribute('data-href') || el.getAttribute('routerlink') || '';
+				let isSpa = false;
+				let resolvedHref = '';
+				let sameDomain = false;
+
+				if (!rawHref || rawHref === '#' || rawHref.startsWith('javascript:')) {
+					isSpa = true;
+					sameDomain = true;
+				} else if (rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+					sameDomain = false;
+				} else {
+					try {
+						const u = new URL(rawHref, window.location.href);
+						if (!u.protocol.startsWith('http')) continue;
+						resolvedHref = u.href;
+						sameDomain = isSameDomain(u.hostname, domain);
+					} catch {
+						sameDomain = false;
+					}
+				}
+
+				if (!sameDomain) continue;
+
+				const inViewport = r.top >= 0 && r.bottom <= window.innerHeight;
+				const inHeader = !!el.closest('header, nav, [role="banner"], [role="navigation"]');
+				const text = (el.textContent || '').trim().substring(0, 60);
+
+				out.push({
+					x: r.x + r.width / 2,
+					y: r.y + r.height / 2,
+					width: r.width,
+					height: r.height,
+					href: resolvedHref,
+					isSpa,
+					inViewport,
+					inHeader,
+					text
+				});
+			}
+			return {
+				links: out,
+				nodeCount: document.querySelectorAll('*').length
+			};
+		}, originDomain);
+
+		if (!linksData.links || linksData.links.length === 0) {
+			log(`    └─ 🧭 <span style="color: #888;">No same-domain links found, skipping navigate</span>`);
+			return { navigated: false, fromUrl, toUrl: null, target: null };
+		}
+
+		// Weight: prefer in-viewport (×3), in-header (×2), real-href slightly over SPA
+		const pool = [];
+		for (const l of linksData.links) {
+			let w = 1;
+			if (l.inViewport) w += 2;
+			if (l.inHeader) w += 1;
+			if (!l.isSpa) w += 1;
+			for (let i = 0; i < w; i++) pool.push(l);
+		}
+		const target = pool[Math.floor(Math.random() * pool.length)];
+
+		// Move mouse to target naturally
+		const start = getStartPos(page, mouseState);
+		await moveMouse(page, start.x, start.y, target.x, target.y, target.width, target.height, log);
+		await new Promise(resolve => setTimeout(resolve, randomBetween(80, 250)));
+
+		// Register the navigation listener BEFORE clicking. Real-href clicks fire the
+		// nav event before/during the click, so attaching after would miss it and force
+		// every click to wait the full SPA window.
+		const navPromise = page
+			.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' })
+			.then(() => 'navigation')
+			.catch(() => null);
+
+		await page.mouse.click(target.x, target.y, { delay: randomBetween(25, 75) });
+		updateMouseState(mouseState, target.x, target.y);
+
+		log(
+			`    ├─ 🧭 <span style="color: #BCF0F0;">Navigate click</span> on ${target.isSpa ? 'SPA link' : 'href'}: ` +
+				`"<span style="color: #FEDE9B;">${target.text || '(no text)'}</span>"`
+		);
+
+		// Real hrefs resolve as soon as the load event fires (navPromise wins); SPAs
+		// (no Puppeteer nav event) fall through to the DOM-diff check after ~2.5s.
+		const spaPromise = new Promise(resolve => setTimeout(() => resolve('spa-window'), 2500));
+		await Promise.race([navPromise, spaPromise]);
+
+		const after = await page.evaluate(() => ({
+			url: window.location.href,
+			nodeCount: document.querySelectorAll('*').length
+		}));
+
+		const urlChanged = after.url !== fromUrl;
+		const nodeDelta = Math.abs(after.nodeCount - linksData.nodeCount);
+		const domDiff = nodeDelta / Math.max(1, linksData.nodeCount);
+		const navigated = urlChanged || domDiff > 0.3;
+
+		if (navigated) {
+			log(
+				`    └─ ✅ <span style="color: #07B096;">Navigated</span> to ${after.url} ` +
+					`<span style="color: #888;">(urlChange: ${urlChanged}, domDiff: ${(domDiff * 100).toFixed(0)}%)</span>`
+			);
+		} else {
+			log(`    └─ 🤷 <span style="color: #888;">Click registered but no navigation detected</span>`);
+		}
+
+		return { navigated, fromUrl, toUrl: navigated ? after.url : null, target: target.text };
+	} catch (error) {
+		log(`    └─ ⚠️ Navigate action failed: ${error.message}`);
+		return { navigated: false, fromUrl, toUrl: null, target: null };
+	}
+}
+
+/**
  * Simulate confused user behavior: rapid jittery mouse movements and frantic scrolling.
  * Triggered when a meeple encounters friction (failed action, timeout, etc.)
  * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
+ * @param {Object|null} mouseState
  * @returns {Promise<boolean>} - Success status
  */
-export async function confusedBehavior(page, log = console.log) {
+export async function confusedBehavior(page, log = console.log, mouseState = null) {
 	try {
 		log(`🤔 <span style="color: #F8BC3B;">Meeple is confused</span> (friction detected)`);
 		const viewport = page.viewport();
 
 		// Phase 1: Rapid, jittery mouse movements across the screen
 		const jitterMoves = randomBetween(4, 8);
+		let lastX = 0;
+		let lastY = 0;
 		for (let i = 0; i < jitterMoves; i++) {
 			const x = Math.random() * viewport.width;
 			const y = Math.random() * viewport.height;
 			await page.mouse.move(x, y, { steps: randomBetween(1, 3) }); // low steps = jerky
+			lastX = x;
+			lastY = y;
 			await new Promise(resolve => setTimeout(resolve, randomBetween(50, 150)));
 		}
+		updateMouseState(mouseState, lastX, lastY);
 
 		// Phase 2: Frantic scroll up and down
 		const scrollBursts = randomBetween(2, 4);

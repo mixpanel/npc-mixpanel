@@ -1,17 +1,52 @@
 import u from 'ak-tools';
-import { personas } from './entities.js';
+import { personas, personaNames } from './entities.js';
 import { weightedRandom } from './utils.js';
 
 /**
- * Randomly select a persona from available personas
+ * Select a persona — weighted by `frequency` from the persona config.
+ * Supports forced override (API caller wants a specific persona) or custom weights.
+ *
  * @param {Function} log - Logging function
- * @returns {string} - Selected persona key
+ * @param {Object} [options]
+ * @param {string|null} [options.override] - Force a specific persona (validated against personaNames)
+ * @param {Object<string, number>|null} [options.weights] - Custom freq map { personaName: weight }
+ * @returns {string} Selected persona key
  */
-export function selectPersona(log = console.log) {
-	const personaKeys = Object.keys(personas);
-	const selectedPersona = personaKeys[Math.floor(Math.random() * personaKeys.length)];
-	log(`🎭 Selected persona: ${selectedPersona}`);
-	return selectedPersona;
+export function selectPersona(log = console.log, options = {}) {
+	const { override = null, weights = null } = options;
+
+	if (override) {
+		if (!personas[override]) {
+			throw new Error(`Unknown persona: ${override}. Valid personas: ${personaNames.join(', ')}`);
+		}
+		log(`🎭 Persona forced via override: ${override}`);
+		return override;
+	}
+
+	const weightMap = weights || Object.fromEntries(personaNames.map(name => [name, personas[name].frequency || 0.01]));
+
+	const names = Object.keys(weightMap).filter(name => personas[name]);
+	const freqs = names.map(name => weightMap[name]);
+
+	if (names.length === 0) {
+		throw new Error('No valid personas available for selection');
+	}
+
+	// Defensive: caller passed weights that all sum to zero (e.g. UI all-sliders-at-zero).
+	// Fall back to default per-persona frequencies rather than throwing.
+	const sum = freqs.reduce((a, b) => a + (b > 0 ? b : 0), 0);
+	if (sum <= 0) {
+		log(`⚠️ All persona weights are zero — falling back to default frequencies`);
+		const fallbackNames = personaNames;
+		const fallbackFreqs = personaNames.map(n => personas[n].frequency || 0.01);
+		const selected = weightedRandom(fallbackNames, fallbackFreqs);
+		log(`🎭 Selected persona: ${selected}`);
+		return selected;
+	}
+
+	const selected = weightedRandom(names, freqs);
+	log(`🎭 Selected persona: ${selected}`);
+	return selected;
 }
 
 /**
@@ -57,39 +92,58 @@ export function getContextAwareAction(actionHistory, suggestedAction, _log = con
 }
 
 /**
- * Generate an action sequence based on a persona
+ * Get the action-weights map for a persona.
+ * Always returns a fresh shallow copy so callers can modify (e.g. apply phase modifiers).
+ *
+ * @param {string} persona
+ * @returns {Object<string, number>}
+ */
+export function getPersonaActionWeights(persona) {
+	const config = personas[persona];
+	if (!config) throw new Error(`Unknown persona: ${persona}`);
+	return { ...config.actionWeights };
+}
+
+/**
+ * Generate an action sequence based on a persona.
+ * NOTE: As of 1.1.0, sessions are duration-driven (see headless.js); this is retained for
+ * legacy callers and as a fallback when targetDuration cannot be computed.
+ *
  * @param {string} persona - The persona to use for action generation
  * @param {number|null} maxActions - Maximum number of actions (optional)
  * @returns {Array} - Array of actions to perform
  */
 export function generatePersonaActionSequence(persona, maxActions = null) {
-	const personaWeights = personas[persona];
-	if (!personaWeights) {
-		throw new Error(`Unknown persona: ${persona}`);
-	}
+	const config = personas[persona];
+	if (!config) throw new Error(`Unknown persona: ${persona}`);
 
-	const actionTypes = Object.keys(personaWeights);
-	const weights = Object.values(personaWeights);
+	const actionWeights = config.actionWeights;
+	const actionTypes = Object.keys(actionWeights);
+	const weights = Object.values(actionWeights);
 
 	return generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions);
 }
 
 /**
- * Generate a weighted random action sequence with natural flow patterns
+ * Generate a weighted random action sequence with natural flow patterns.
+ *
+ * 1.1.0 changes:
+ *   - Removed 80% click floor (was forcing every persona toward clicks).
+ *   - Added consecutive non-click safety valve (per-persona maxConsecutiveNonClicks).
+ *
  * @param {Array} actionTypes - Types of actions available
  * @param {Array} weights - Weights for each action type
- * @param {string} _persona - The persona being used (reserved for future personalization)
+ * @param {string} persona - The persona being used (for safety-valve config)
  * @param {number|null} maxActions - Maximum number of actions (optional)
  * @returns {Array} - Array of actions to perform
  */
-export function generateWeightedRandomActionSequence(actionTypes, weights, _persona, maxActions = null) {
+export function generateWeightedRandomActionSequence(actionTypes, weights, persona, maxActions = null) {
 	const sequence = [];
-	const totalActions = maxActions || u.rand(50, 150); // Default session length (increased for more data)
+	const totalActions = maxActions || u.rand(50, 150);
 	const actionHistory = [];
 
-	// Ensure minimum engagement - at least 80% of actions should be clicks (doubled for better heatmap data)
-	const minClicks = Math.floor(totalActions * 0.8);
-	let clickCount = 0;
+	const personaConfig = personas[persona] || {};
+	const maxConsecutiveNonClicks = personaConfig.maxConsecutiveNonClicks || 5;
 
 	// Prevent excessive consecutive same actions
 	const maxConsecutive = {
@@ -100,6 +154,8 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, _pers
 		type: 2
 	};
 
+	let consecutiveNonClicks = 0;
+
 	for (let i = 0; i < totalActions; i++) {
 		let selectedAction;
 		let attempts = 0;
@@ -109,29 +165,28 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, _pers
 			selectedAction = weightedRandom(actionTypes, weights);
 			attempts++;
 
-			// If we're running out of actions and need more clicks
-			if (i >= totalActions - (minClicks - clickCount) && selectedAction !== 'click') {
+			// Safety valve: if too many non-click actions in a row, force a click
+			if (consecutiveNonClicks >= maxConsecutiveNonClicks && actionTypes.includes('click')) {
 				selectedAction = 'click';
+				break;
 			}
 
-			// Check consecutive action limits
-			const consecutiveCount = actionHistory
-				.slice(-maxConsecutive[selectedAction] || 2)
-				.filter(action => action === selectedAction).length;
+			// Check consecutive same-action limits
+			const limit = maxConsecutive[selectedAction] || 2;
+			const consecutiveCount = actionHistory.slice(-limit).filter(action => action === selectedAction).length;
 
-			if (consecutiveCount < (maxConsecutive[selectedAction] || 2)) {
-				break; // Action is acceptable
-			}
+			if (consecutiveCount < limit) break;
 		} while (attempts < maxAttempts);
 
-		// Apply context-aware modifications
 		const contextAwareAction = getContextAwareAction(actionHistory, selectedAction);
 
 		sequence.push(contextAwareAction);
 		actionHistory.push(contextAwareAction);
 
 		if (contextAwareAction === 'click') {
-			clickCount++;
+			consecutiveNonClicks = 0;
+		} else {
+			consecutiveNonClicks++;
 		}
 
 		// Keep action history manageable
@@ -141,4 +196,37 @@ export function generateWeightedRandomActionSequence(actionTypes, weights, _pers
 	}
 
 	return sequence;
+}
+
+/**
+ * Pick the next action given current weights and recent history.
+ * Used by the duration-driven session loop in headless.js — selects one action at a time
+ * so phase modifiers can be re-applied between actions.
+ *
+ * @param {Object<string, number>} actionWeights - current weight map (post phase modifiers)
+ * @param {string} persona - persona key (for safety-valve config)
+ * @param {Array} actionHistory - recent action names (most recent last)
+ * @param {number} consecutiveNonClicks - current run of non-click actions
+ * @returns {string} chosen action
+ */
+export function pickNextAction(actionWeights, persona, actionHistory, consecutiveNonClicks) {
+	const personaConfig = personas[persona] || {};
+	const maxConsecutiveNonClicks = personaConfig.maxConsecutiveNonClicks || 5;
+	const actionTypes = Object.keys(actionWeights);
+	const weights = Object.values(actionWeights);
+
+	if (consecutiveNonClicks >= maxConsecutiveNonClicks && actionTypes.includes('click')) {
+		return 'click';
+	}
+
+	const maxConsecutive = { click: 3, scroll: 4, wait: 2, hover: 2 };
+	let selected;
+	const maxAttempts = 10;
+	for (let i = 0; i < maxAttempts; i++) {
+		selected = weightedRandom(actionTypes, weights);
+		const limit = maxConsecutive[selected] || 3;
+		const consec = actionHistory.slice(-limit).filter(a => a === selected).length;
+		if (consec < limit) break;
+	}
+	return getContextAwareAction(actionHistory, selected);
 }

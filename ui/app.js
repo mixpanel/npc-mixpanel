@@ -246,7 +246,137 @@ url.value = possibleUrls[Math.floor(Math.random() * possibleUrls.length)];
 
 usersSlider.addEventListener('input', e => {
 	usersOutput.textContent = `${/** @type {HTMLInputElement} */ (e.target).value} meeples`;
+	updateEstimatedTime();
 });
+
+// 1.1.0: estimated wall-clock time = ceil(users / concurrency) × per-session-budget.
+// concurrency mirrors the submit handler's Math.min(users, 20). Per-session worst
+// case is the per-user totalTimeout in headless.js (10 min). Most personas finish
+// faster, so this is an upper bound.
+const PER_SESSION_BUDGET_MIN = 10;
+const MAX_CONCURRENCY = 20;
+function updateEstimatedTime() {
+	const el = document.getElementById('estimated-time');
+	if (!el) return;
+	const users = parseInt(usersSlider.value);
+	const concurrency = Math.min(users, MAX_CONCURRENCY);
+	const batches = Math.ceil(users / concurrency);
+	const minutes = batches * PER_SESSION_BUDGET_MIN;
+	const label = minutes < 60 ? `~${minutes} min` : `~${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+	el.textContent = `Estimated wall-clock: ${label} (worst case, ${concurrency} concurrent)`;
+}
+updateEstimatedTime();
+
+// ─── 1.1.0: Persona controls ────────────────────────────────────────
+// Persona catalog is fetched from GET /api/personas at init time so the UI never
+// goes out of sync with meeple/entities.js. Inline FALLBACK below is used only if
+// the fetch fails (offline dev, transient error). Keep fallback roughly in sync;
+// drift here is non-fatal because real users hit the live endpoint.
+const PERSONA_FALLBACK = {
+	names: [
+		'speedRunner',
+		'browser',
+		'researcher',
+		'shopper',
+		'taskFocused',
+		'explorer',
+		'skimmer',
+		'firstTimer',
+		'mobileUser',
+		'frustrated',
+		'formFiller',
+		'returnVisitor',
+		'contentReader',
+		'impulsive',
+		'methodical'
+	],
+	frequencies: {
+		speedRunner: 0.08,
+		browser: 0.15,
+		researcher: 0.08,
+		shopper: 0.12,
+		taskFocused: 0.1,
+		explorer: 0.1,
+		skimmer: 0.1,
+		firstTimer: 0.08,
+		mobileUser: 0.08,
+		frustrated: 0.04,
+		formFiller: 0.03,
+		returnVisitor: 0.06,
+		contentReader: 0.05,
+		impulsive: 0.02,
+		methodical: 0.01
+	}
+};
+
+async function fetchPersonaCatalog() {
+	try {
+		const res = await fetch('/api/personas', { credentials: 'same-origin' });
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const data = await res.json();
+		if (!Array.isArray(data.names) || !data.frequencies) throw new Error('malformed payload');
+		return { names: data.names, frequencies: data.frequencies };
+	} catch (err) {
+		console.warn('[ui] /api/personas fetch failed, using inline fallback:', err.message);
+		return PERSONA_FALLBACK;
+	}
+}
+
+(async function initPersonaControls() {
+	const personaSelect = /** @type {HTMLSelectElement} */ (document.getElementById('persona'));
+	const grid = document.getElementById('persona-mix-grid');
+	const dieBtn = document.getElementById('persona-mix-die');
+	if (!personaSelect || !grid || !dieBtn) return;
+
+	const { names, frequencies } = await fetchPersonaCatalog();
+
+	// Populate dropdown
+	const autoOpt = document.createElement('option');
+	autoOpt.value = '';
+	autoOpt.textContent = 'auto (frequency-weighted)';
+	personaSelect.appendChild(autoOpt);
+	for (const name of names) {
+		const opt = document.createElement('option');
+		opt.value = name;
+		opt.textContent = name;
+		personaSelect.appendChild(opt);
+	}
+
+	// Populate mix grid
+	for (const name of names) {
+		const defaultPct = Math.round((frequencies[name] || 0.05) * 100);
+		const labelEl = document.createElement('span');
+		labelEl.className = 'persona-name';
+		labelEl.textContent = name;
+		const slider = document.createElement('input');
+		slider.type = 'range';
+		slider.min = '0';
+		slider.max = '100';
+		slider.value = String(defaultPct);
+		slider.dataset.persona = name;
+		slider.dataset.default = String(defaultPct);
+		slider.className = 'persona-mix-slider';
+		const valueEl = document.createElement('span');
+		valueEl.className = 'persona-value';
+		valueEl.textContent = String(defaultPct);
+		slider.addEventListener('input', () => {
+			valueEl.textContent = slider.value;
+		});
+		grid.appendChild(labelEl);
+		grid.appendChild(slider);
+		grid.appendChild(valueEl);
+	}
+
+	// Die: randomize all sliders to 0-100
+	dieBtn.addEventListener('click', () => {
+		const sliders = grid.querySelectorAll('input[type="range"]');
+		sliders.forEach(s => {
+			const sl = /** @type {HTMLInputElement} */ (s);
+			sl.value = String(Math.floor(Math.random() * 101));
+			sl.dispatchEvent(new Event('input'));
+		});
+	});
+})();
 
 // Update token field styling based on inject checkbox
 /** @type {HTMLInputElement} */
@@ -530,8 +660,9 @@ form.addEventListener('submit', async e => {
 	const data = Object.fromEntries(formData.entries());
 	data.safeWord = 'let me in...';
 	data.users = parseInt(data.users);
-	data.concurrency = data.users;
-	if (data.concurrency > 5) data.concurrency = 5;
+	// 1.1.0: backend caps concurrency at 20; mirror the per-batch-equals-users heuristic
+	// but cap at 20 to match the new server limit instead of the old UI-side 5.
+	data.concurrency = Math.min(data.users, 20);
 
 	// Ensure checkbox values are included in the data
 	data.inject = /** @type {HTMLInputElement} */ (form.querySelector('#inject')).checked;
@@ -543,6 +674,27 @@ form.addEventListener('submit', async e => {
 	data.networkProfile = /** @type {HTMLSelectElement} */ (form.querySelector('#networkProfile')).value;
 	data.chaosMode = /** @type {HTMLInputElement} */ (form.querySelector('#chaosMode')).checked;
 	data.formMistakes = /** @type {HTMLInputElement} */ (form.querySelector('#formMistakes')).checked;
+
+	// 1.1.0 persona controls
+	const personaVal = /** @type {HTMLSelectElement} */ (form.querySelector('#persona')).value;
+	if (personaVal) {
+		data.persona = personaVal;
+	} else {
+		// No explicit persona — collect personaWeights only if user changed any slider
+		delete data.persona;
+		const sliders = form.querySelectorAll('.persona-mix-slider');
+		/** @type {Object<string, number>} */
+		const weights = {};
+		let hasCustom = false;
+		sliders.forEach(s => {
+			const sl = /** @type {HTMLInputElement} */ (s);
+			const val = parseInt(sl.value);
+			const def = parseInt(sl.dataset.default || '0');
+			if (val !== def) hasCustom = true;
+			weights[sl.dataset.persona] = val / 100;
+		});
+		if (hasCustom) data.personaWeights = weights;
+	}
 
 	// Show terminal with animation
 	const terminal = document.getElementById('terminal');

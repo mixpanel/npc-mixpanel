@@ -1,15 +1,25 @@
 /**
- * Select a random item from an array with weights
+ * Select a random item from an array with weights.
+ * Throws on degenerate input (zero/negative total weight) — caller should ensure
+ * at least one positive weight before calling.
+ *
  * @param {Array} items - Array of items to choose from
  * @param {Array} weights - Array of weights corresponding to items
  * @returns {any} - Selected item
  */
 export function weightedRandom(items, weights) {
+	if (items.length === 0) {
+		throw new Error('weightedRandom called with empty items array');
+	}
 	if (items.length !== weights.length) {
 		throw new Error('Items and weights arrays must have the same length');
 	}
 
 	const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+	if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+		throw new Error(`weightedRandom: total weight must be > 0 (got ${totalWeight})`);
+	}
+
 	const random = Math.random() * totalWeight;
 
 	let weightSum = 0;
@@ -20,7 +30,7 @@ export function weightedRandom(items, weights) {
 		}
 	}
 
-	// Fallback to last item
+	// Fallback to last item (only reachable on floating-point edge cases)
 	return items[items.length - 1];
 }
 
@@ -118,4 +128,27 @@ export function shuffle(array) {
 		[arr[i], arr[j]] = [arr[j], arr[i]];
 	}
 	return arr;
+}
+
+/**
+ * Compare a URL's hostname against an origin domain, allowing subdomains and www variants.
+ * Used by the domain-boundary recovery logic to keep meeples on-site.
+ *
+ * @param {string} currentUrl
+ * @param {string} originDomain - bare hostname (e.g. "example.com" — not a URL)
+ * @returns {boolean}
+ */
+export function isDomainMatch(currentUrl, originDomain) {
+	if (!currentUrl || !originDomain) return false;
+	try {
+		const host = new URL(currentUrl).hostname;
+		if (host === originDomain) return true;
+		if (host === 'www.' + originDomain) return true;
+		if (originDomain === 'www.' + host) return true;
+		if (host.endsWith('.' + originDomain)) return true;
+		if (originDomain.endsWith('.' + host)) return true;
+		return false;
+	} catch {
+		return false;
+	}
 }
