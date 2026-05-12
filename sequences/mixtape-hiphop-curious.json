@@ -1,6 +1,6 @@
 {
-	"lofi-curious": {
-		"description": "Lo-Fi Curious: lo-fi listener who hits the paywall, dismisses it, browses a bit more, and bounces without subscribing",
+	"hiphop-curious": {
+		"description": "Hip-Hop Curious: hip-hop listener who hits the paywall, dismisses it, browses a bit more, and bounces without subscribing",
 		"persona": "skimmer",
 		"temperature": 8,
 		"chaos-range": [8, 12],
@@ -21,8 +21,8 @@
 			},
 			{
 				"action": "click",
-				"selector": ".genre-pill:nth-child(1)",
-				"textFallback": "Lo-Fi"
+				"selector": ".genre-pill:nth-child(4)",
+				"textFallback": "Hip-Hop"
 			},
 			{
 				"action": "click",
@@ -67,8 +67,8 @@
 			},
 			{
 				"action": "click",
-				"selector": ".genre-pill:nth-child(1)",
-				"textFallback": "Lo-Fi"
+				"selector": ".genre-pill:nth-child(4)",
+				"textFallback": "Hip-Hop"
 			},
 			{
 				"action": "click",
@@ -97,8 +97,8 @@
 			},
 			{
 				"action": "click",
-				"selector": ".genre-card-large:nth-child(1)",
-				"textFallback": "Lo-Fi"
+				"selector": ".genre-card-large:nth-child(4)",
+				"textFallback": "Hip-Hop"
 			},
 			{
 				"action": "click",

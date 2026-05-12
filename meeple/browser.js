@@ -48,9 +48,13 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}, log 
  * Launch a new browser instance with proper configuration
  *
  * DevTools Debugging:
- * - Set NODE_ENV=dev and headless=false to auto-open DevTools
+ * - Opt-in via OPEN_DEVTOOLS=true env var (also requires headless=false)
  * - Use 'debugger' statements in injected code to pause execution
- * - Example: NODE_ENV=dev npm run local (with headless: false in config)
+ * - Example: NODE_ENV=dev OPEN_DEVTOOLS=true npm run local
+ *
+ * NOTE: Docked DevTools shrinks the page viewport by 25-40%, which affects
+ * hot-zone detection and replay heatmaps. Off by default even in dev so the
+ * viewport meeples see matches what production sees.
  *
  * @param {boolean} headless - Whether to run in headless mode
  * @param {Function} log - Logging function
@@ -58,12 +62,12 @@ export async function setUserAgent(page, userAgent, additionalHeaders = {}, log 
  */
 export async function launchBrowser(headless = true, log = console.log) {
 	try {
-		// Auto-open DevTools in development mode when not headless
-		const isDev = process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'development';
-		const shouldOpenDevTools = isDev && !headless;
+		// DevTools is now opt-in (was auto-on for NODE_ENV=dev + headless=false until 1.1.x).
+		// Docked DevTools shrinks the viewport, which silently distorts hot zones and replays.
+		const shouldOpenDevTools = process.env.OPEN_DEVTOOLS === 'true' && !headless;
 
 		if (shouldOpenDevTools) {
-			log('🔧 Opening DevTools automatically (NODE_ENV=dev, headless=false)');
+			log('🔧 Opening DevTools (OPEN_DEVTOOLS=true). Note: docked DevTools shrinks viewport.');
 		}
 
 		const browser = await puppeteer.launch({
