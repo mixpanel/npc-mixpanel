@@ -481,13 +481,48 @@ app.get('/help', (_req, res) => {
 									items: {
 										action: {
 											type: 'string',
-											enum: ['click', 'type', 'select', 'fillOutForm']
+											enum: ['click', 'type', 'select', 'fillOutForm', 'navigate', 'scroll', 'hover', 'wait']
 										},
-										selector: { type: 'string', required: true },
+										selector: {
+											type: 'string',
+											requiredFor:
+												'click, type, select, fillOutForm, hover (optional for scroll, omitted for navigate/wait)'
+										},
 										text: { type: 'string', requiredFor: 'type' },
-										value: { type: 'string', requiredFor: 'select' }
+										value: { type: 'string', requiredFor: 'select' },
+										textFallback: {
+											type: 'string',
+											optional: true,
+											description:
+												'1.1.x: when selector fails on a click action, the resilience layer searches visible text for this string and clicks the first matching element. Recommended for nth-child selectors.'
+										},
+										tier: {
+											type: 'string',
+											requiredFor: 'wait',
+											enum: ['micro', 'read', 'think'],
+											description:
+												'For wait actions: micro=0.3-1.5s, read=2-8s, think=5-15s. Mutually exclusive with ms.'
+										},
+										ms: {
+											type: 'number',
+											requiredFor: 'wait',
+											range: [50, 30000],
+											description: 'For wait actions: explicit pause in ms. Mutually exclusive with tier.'
+										},
+										direction: { type: 'string', optional: true, enum: ['up', 'down'] },
+										amount: { type: 'string | number', optional: true, description: 'page | half | pixel count' }
 									}
+								},
+								persona: {
+									type: 'string',
+									optional: true,
+									description:
+										'1.1.x: per-sequence persona override (one of the 15 names from /api/personas). Modulates typing speed, dwell durations, inter-action pacing.'
 								}
+							},
+							resilience: {
+								description:
+									'1.1.x: on selector-not-found for clicks, engine tries (1) text-match fallback against visible text using textFallback or quoted strings from the selector, (2) filler scroll/mouse + 1-3s pause, (3) retry with 10s timeout, then (4) drops the step as skipped. Skipped steps do NOT count toward circuitBreaker.maxFailures.'
 							}
 						}
 					}
@@ -898,17 +933,22 @@ app.get('/mixtape', (_req, res) => {
 			}
 		},
 		personas: {
+			// 1.1.x rebalance: 40% lo-fi cohort (devotee 30 + curious 10) → ~60-pt conversion gap visible in dashboards
 			'power-listener': {
-				weight: '10%',
+				weight: '8%',
 				description: 'Full funnel: signup → onboarding → heavy listening → subscribe annual'
 			},
-			'casual-browser': { weight: '30%', description: 'Browse genres, play a few tracks, hit paywall, dismiss, leave' },
-			'lofi-devotee': { weight: '8%', description: 'Lo-fi focused listening, subscribe via paywall, keep listening' },
+			'casual-browser': { weight: '22%', description: 'Browse genres, play a few tracks, hit paywall, dismiss, leave' },
+			'lofi-devotee': { weight: '30%', description: 'Lo-fi focused listening, subscribe via paywall, keep listening' },
+			'lofi-curious': {
+				weight: '10%',
+				description: '1.1.x: lo-fi listener who hits paywall, dismisses, browses more, bounces without subscribing'
+			},
 			'new-visitor': {
-				weight: '35%',
+				weight: '22%',
 				description: 'Brief visit, play 1 track, signup, partial onboarding (abandon at artist step)'
 			},
-			churning: { weight: '17%', description: 'Quick visit, play 1 track, leave immediately' }
+			churning: { weight: '8%', description: 'Quick visit, play 1 track, leave immediately' }
 		},
 		example: 'POST /mixtape with { "user_id": "you@mixpanel.com", "safe_word": "pickles", "users": 10 }'
 	});
