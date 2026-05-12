@@ -1,0 +1,35 @@
+{
+	"bias-checker": {
+		"description": "Flag-driven analyzer cohort: lands, opens the Analyze Post modal (gated by feature flag we-read-post-analyzer with 3 variants A=present-day-engine, B=historical-engine, C=control), selects a post from the dropdown, runs analysis, reads results, runs a second analysis on a different post. Story: tests post-analyzer engagement and variant impact. Dashboard: breakdown of 'Post Analyzed' event by we-read-post-analyzer variant; funnel Analyze Modal Opened → Post Selected → Analyze Clicked → Result Shown.",
+		"persona": "researcher",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "hover", "selector": "button:has(svg)", "textFallback": "Analyze Post" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Analyze Post" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "select", "selector": "select", "value": "5" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".bg-amber-600.w-full", "textFallback": "Analyze Post" },
+			{ "action": "wait", "ms": 4000 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "select", "selector": "select", "value": "12" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".bg-amber-600.w-full", "textFallback": "Analyze Post" },
+			{ "action": "wait", "ms": 4000 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "select", "selector": "select", "value": "18" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".bg-amber-600.w-full", "textFallback": "Analyze Post" },
+			{ "action": "wait", "ms": 4000 },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

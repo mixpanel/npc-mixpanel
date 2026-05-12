@@ -1,0 +1,70 @@
+{
+	"cart-converter": {
+		"description": "Happy-path weBuy purchase: lands, browses, adds to cart, attempts coupon (~10% Apply success — most fail and that's the point), proceeds through 3-step payment (contact / shipping / payment), waits ~38s for the disabled Complete Order button to enable, slogs through the 10-click submit gauntlet, lands on order confirmation. Story: cohort that survives both frictions and converts. Dashboard: funnel Page View → Add to Cart → Checkout Started → Order Completed, breakdown by feature_flag_chatbot / cart abandonment rate.",
+		"persona": "taskFocused",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button[class*='cart' i]", "textFallback": "Add to Cart" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "button[class*='cart' i]", "textFallback": "Add to Cart" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/cart']",
+				"textFallback": "Cart",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='code' i]", "text": "SAVE15" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#nonexistent-apply-coupon", "textFallback": "Apply" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/payment']",
+				"textFallback": "Checkout",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder='First Name']", "text": "Test" },
+			{ "action": "type", "selector": "input[placeholder='Last Name']", "text": "Customer" },
+			{ "action": "type", "selector": "input[placeholder='Email Address']", "text": "customer@example.com" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#nonexistent-continue-shipping", "textFallback": "Continue to Shipping" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder='Street Address']", "text": "123 Main St" },
+			{ "action": "type", "selector": "input[placeholder='City']", "text": "San Francisco" },
+			{ "action": "type", "selector": "input[placeholder='ZIP Code']", "text": "94110" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#nonexistent-continue-payment", "textFallback": "Continue to Payment" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder='Card Number']", "text": "4242 4242 4242 4242" },
+			{ "action": "type", "selector": "input[placeholder='MM/YY']", "text": "12/28" },
+			{ "action": "type", "selector": "input[placeholder='CVV']", "text": "123" },
+			{ "action": "wait", "ms": 38000 },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "#nonexistent-complete", "textFallback": "Complete Order" },
+			{
+				"action": "click",
+				"selector": "#nonexistent-complete",
+				"textFallback": "Complete Order",
+				"expectsNavigation": true,
+				"navigationTimeout": 12000
+			}
+		]
+	}
+}

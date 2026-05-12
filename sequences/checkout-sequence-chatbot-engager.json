@@ -1,0 +1,52 @@
+{
+	"chatbot-engager": {
+		"description": "Chatbot-flag-driven engagement cohort (we_buy_chatbot ON): lands, waits for ChatbotWidget to render bottom-right, opens chat panel, sends 2 messages, reads responses, closes panel, continues browsing, adds to cart but bails before checkout. Story: feature-flag impact on engagement (NOT conversion). Dashboard: breakdown of Chatbot Opened / Chatbot Message Sent event counts by feature_flag_chatbot variant; cohort with chatbot engagement vs control on time-on-site.",
+		"persona": "contentReader",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "direction": "up", "amount": "half" },
+			{ "action": "wait", "ms": 3000 },
+			{ "action": "hover", "selector": ".fixed.bottom-6.right-6" },
+			{ "action": "click", "selector": ".fixed.bottom-6.right-6 button", "textFallback": "Chat" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='essage' i]", "text": "Do you ship internationally?" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.send-message", "textFallback": "Send" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "type", "selector": "input[placeholder*='essage' i]", "text": "What is your return policy?" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.send-message", "textFallback": "Send" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "type", "selector": "input[placeholder*='essage' i]", "text": "Thanks for the help!" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.send-message", "textFallback": "Send" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.close-chat", "textFallback": "Close" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.add-to-cart", "textFallback": "Add to Cart" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/cart']",
+				"textFallback": "Cart",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "scroll", "direction": "up", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

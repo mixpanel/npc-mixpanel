@@ -1,0 +1,20 @@
+{
+	"bouncer": {
+		"description": "Quick bouncer on the /admin/ landing page: scrolls, eyes Request Demo CTA, clicks it, glances at the form, bounces back, leaves. Story: top-of-funnel curiosity that doesn't sign in or trial. Dashboard: high session-count cohort with bounce_rate=true and 0 Sign In events.",
+		"persona": "impulsive",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#requestDemo", "textFallback": "Request Demo" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "direction": "up", "amount": "page" }
+		]
+	}
+}

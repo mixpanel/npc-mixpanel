@@ -1,0 +1,82 @@
+{
+	"deals-shopper": {
+		"description": "Methodical bargain hunter: lands, navigates to /deals/, scrolls flash sales, hovers 2-3 deals reading details, grabs one deal which lands in cart, proceeds to /payment/ and slogs through the 10-click order submit. Story: deals-page-driven conversion path (separate from the homepage browse path). Dashboard: funnel Deals Page View → Grab This Deal → Order Completed; breakdown by deal SKU to see which flash sale converts.",
+		"persona": "methodical",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/deals']",
+				"textFallback": "Deals",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.grab-deal" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.grab-deal" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "direction": "up", "amount": "half" },
+			{ "action": "hover", "selector": "button.grab-deal" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.grab-deal", "textFallback": "Grab This Deal" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/cart']",
+				"textFallback": "Cart",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/payment']",
+				"textFallback": "Checkout",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='mail' i]", "text": "customer@example.com" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='ame' i]", "text": "Test User" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='ddress' i]", "text": "123 Main St" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='ard' i]", "text": "4242 4242 4242 4242" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='MM' i]", "text": "12/28" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='CVV' i]", "text": "123" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "wait", "ms": 30000 },
+			{ "action": "wait", "ms": 8000 },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{ "action": "click", "selector": "button.complete-order", "textFallback": "Complete Order" },
+			{
+				"action": "click",
+				"selector": "button.complete-order",
+				"textFallback": "Complete Order",
+				"expectsNavigation": true,
+				"navigationTimeout": 12000
+			}
+		]
+	}
+}

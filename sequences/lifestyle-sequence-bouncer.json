@@ -1,0 +1,20 @@
+{
+	"bouncer": {
+		"description": "Quick bouncer: lands on theyRead, scrolls a couple of screens, clicks a hashtag chip (RickRoll opens in a new tab, harmless), then leaves. Story: top-of-funnel curiosity that doesn't engage with posts, votes, or the analyzer. Dashboard: high session-count cohort with bounce_rate=true and 0 Post Upvoted / Post Submitted events.",
+		"persona": "impulsive",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(2) .bg-zinc-700", "textFallback": "#" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}

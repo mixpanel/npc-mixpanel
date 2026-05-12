@@ -1,0 +1,40 @@
+{
+	"creator": {
+		"description": "Happy-path content creator: lands on theyRead, scrolls feed, opens Create Post form, fills title + long-form content + tags, submits successfully, redirects back to /lifestyle. Story: complete post-submission funnel for the lifestyle vertical. Dashboard: funnel landing → Create Post Clicked → Submit Post Clicked → Post Submitted → /lifestyle redirect. Pairs with comment-confused and bouncer to expose the creator-to-bouncer ratio.",
+		"persona": "taskFocused",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/lifestyle/submit']",
+				"textFallback": "Create Post",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "type",
+				"selector": "form input[type='text']:first-of-type",
+				"text": "Why I Stopped Following Trends"
+			},
+			{ "action": "wait", "tier": "micro" },
+			{
+				"action": "type",
+				"selector": "form textarea",
+				"text": "After years of chasing every new fad, I realized that authenticity matters more than novelty. Here is what changed for me and why I think you might benefit from doing the same."
+			},
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "form input[type='text']:last-of-type", "text": "lifestyle, opinion, trends" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button[type='submit']", "textFallback": "Post to Community" },
+			{ "action": "wait", "ms": 3000 },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

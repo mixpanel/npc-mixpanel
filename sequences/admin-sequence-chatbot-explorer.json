@@ -1,0 +1,48 @@
+{
+	"chatbot-explorer": {
+		"description": "Engages the you-admin-helper-bot integration chatbot (3-variant flag: cloud bot A / on-prem bot B / control C). Lands on /admin/, opens the floating bottom-right chat button (only rendered on the landing page), asks two integration questions (Salesforce, HubSpot), waits for responses, then signs in. Story: variant test of helper bot — measure engagement and downstream sign-in conversion by variant. Dashboard: breakdown of Chatbot Opened, Chatbot Message Sent by you-admin-helper-bot variant; downstream conversion to Sign-In click by variant.",
+		"persona": "contentReader",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "button.fixed.bottom-6.right-6" },
+			{ "action": "click", "selector": "button.fixed.bottom-6.right-6", "textFallback": "Ask about integrations" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "type",
+				"selector": "input[placeholder='Ask about integrations...']",
+				"text": "How do I integrate Salesforce?"
+			},
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#nonexistent-send", "textFallback": "Send" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "type", "selector": "input[placeholder='Ask about integrations...']", "text": "What about HubSpot?" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#nonexistent-send", "textFallback": "Send" },
+			{ "action": "wait", "tier": "think" },
+			{
+				"action": "type",
+				"selector": "input[placeholder='Ask about integrations...']",
+				"text": "Does it support SAML SSO?"
+			},
+			{ "action": "click", "selector": "#nonexistent-send", "textFallback": "Send" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#adminSignIn",
+				"textFallback": "Sign In",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[type=email]", "text": "integration.lead@stark-industries.com" },
+			{ "action": "type", "selector": "input[type=password]", "text": "JarvisIsBest!" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Sign In" },
+			{ "action": "wait", "ms": 2500 }
+		]
+	}
+}

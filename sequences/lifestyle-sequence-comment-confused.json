@@ -1,0 +1,47 @@
+{
+	"comment-confused": {
+		"description": "Counter-cohort: lands on theyRead, attempts to read comments on multiple posts but each comment-count badge fires a window.alert (auto-dismissed by browser handler) instead of opening comments. Repeats 3-4 times across different posts before bouncing. Story: cohort hitting the dead-end comment feature; exposes broken-engagement gap. Dashboard: 'Comment Click Failed' event count > 0, breakdown by post — funnel landing → Comment Badge Clicked → bounce. Pairs with creator + upvoter to show what % of feed engagement dies on comments.",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": ".bg-zinc-800.border-zinc-700:nth-child(1)" },
+			{
+				"action": "click",
+				"selector": ".bg-zinc-800.border-zinc-700:nth-child(1) .text-zinc-500",
+				"textFallback": "comments"
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": ".bg-zinc-800.border-zinc-700:nth-child(2) .text-zinc-500",
+				"textFallback": "comments"
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": ".bg-zinc-800.border-zinc-700:nth-child(3)" },
+			{
+				"action": "click",
+				"selector": ".bg-zinc-800.border-zinc-700:nth-child(3) .text-zinc-500",
+				"textFallback": "comments"
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": ".bg-zinc-800.border-zinc-700:nth-child(5) .text-zinc-500",
+				"textFallback": "comments"
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "direction": "up", "amount": "page" }
+		]
+	}
+}

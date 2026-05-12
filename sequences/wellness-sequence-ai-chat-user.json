@@ -1,0 +1,45 @@
+{
+	"ai-chat-user": {
+		"description": "AI doctor power-user: lands on ourHeart, clicks the AI Doctor CTA, types an initial symptom message, sends, waits for the AI response, asks a follow-up, sends, then shares the diagnosis via Share This Diagnosis. Story: chat engagement + diagnosis-share funnel. Dashboard: Chat Message Sent event count >= 2, Diagnosis Shared cohort.",
+		"persona": "contentReader",
+		"temperature": 9,
+		"chaos-range": [8, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/wellness/chat']",
+				"textFallback": "AI Doctor",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "input[placeholder*=\"Describe your symptoms\"]" },
+			{
+				"action": "type",
+				"selector": "input[placeholder*=\"Describe your symptoms\"]",
+				"text": "I have been feeling tired for two weeks and have headaches"
+			},
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.bg-purple-600" },
+			{ "action": "wait", "ms": 3000 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "input[placeholder*=\"Describe your symptoms\"]" },
+			{
+				"action": "type",
+				"selector": "input[placeholder*=\"Describe your symptoms\"]",
+				"text": "Should I see a doctor?"
+			},
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "button.bg-purple-600" },
+			{ "action": "wait", "ms": 3000 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#nonexistent-share-btn", "textFallback": "Share This Diagnosis" },
+			{ "action": "wait", "tier": "read" }
+		]
+	}
+}

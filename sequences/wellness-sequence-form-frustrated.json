@@ -1,0 +1,45 @@
+{
+	"form-frustrated": {
+		"description": "Counter-cohort to wellness-form-completer: lands on ourHeart, clicks Post Symptoms, fills the form with values that all violate strict validation (username too short + no digit, age underage, duration in wrong format, symptoms too short + missing punctuation), submits and sees the .bg-red-50 error list, scrolls, fixes only ONE field, submits again, still fails, abandons. Story: frustrated form abandoner that exposes the over-strict validation gap. Dashboard: wellness submit funnel drop-off, Form Validation Failed event count > 2, no Form Submitted success.",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/wellness/submit']",
+				"textFallback": "Post Symptoms",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "input[placeholder*=\"SneezMaster\"]" },
+			{ "action": "type", "selector": "input[placeholder*=\"SneezMaster\"]", "text": "abc" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "input[placeholder*=\"32\"]" },
+			{ "action": "type", "selector": "input[placeholder*=\"32\"]", "text": "5" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "input[placeholder*=\"3 days\"]" },
+			{ "action": "type", "selector": "input[placeholder*=\"3 days\"]", "text": "three days" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "textarea[placeholder*=\"Be as detailed\"]" },
+			{ "action": "type", "selector": "textarea[placeholder*=\"Be as detailed\"]", "text": "head hurts" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "form button[type=\"submit\"]", "textFallback": "Submit" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": ".bg-red-50.border-l-4.border-red-500" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "input[placeholder*=\"32\"]" },
+			{ "action": "type", "selector": "input[placeholder*=\"32\"]", "text": "32" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "form button[type=\"submit\"]", "textFallback": "Submit" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}

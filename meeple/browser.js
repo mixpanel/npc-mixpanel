@@ -269,11 +269,16 @@ export async function createPage(browser, log = console.log) {
 		};
 		await page.setViewport(viewport);
 
-		// Initialize mouse position tracking
-		// await page.evaluateOnNewDocument(() => {
-		// 	window.mouseX = 0;
-		// 	window.mouseY = 0;
-		// });
+		// Defensive default: dismiss any window.alert / confirm / prompt / beforeunload
+		// dialog so they never block puppeteer. Sites that fire alerts on bug paths
+		// (e.g. lifestyle vertical's broken comment handler) would otherwise hang.
+		page.on('dialog', async dialog => {
+			try {
+				await dialog.dismiss();
+			} catch {
+				/* dialog may have already been handled */
+			}
+		});
 
 		log(`📄 New page created with agent: ${userAgent.substring(0, 50)}...`);
 		return page;

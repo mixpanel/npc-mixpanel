@@ -1,0 +1,33 @@
+{
+	"recommender-skeptic": {
+		"description": "Flag-driven partial-conversion cohort for me-tube-video-recommender (variants A/B/C): opens 'Just For You' modal, hovers the recommendation, closes WITHOUT clicking Watch Now, returns to the grid, types in the search bar, bounces. Pairs with playlist-curator to surface variant abandonment rate. Dashboard: funnel Opened Recommender -> (skipped Watch Now), breakdown by Video Recommender variant; cohort = Opened Recommender AND NOT Watched Recommended Video.",
+		"persona": "researcher",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "scroll", "direction": "up", "amount": "half" },
+			{ "action": "hover", "selector": "button:has(svg.lucide-sparkles)" },
+			{ "action": "click", "selector": "button:has(svg.lucide-sparkles)", "textFallback": "Just For You" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": ".bg-white.rounded-lg" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button:has(svg.lucide-x)", "textFallback": "Close" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "input[placeholder='Search videos...']" },
+			{ "action": "type", "selector": "input[placeholder='Search videos...']", "text": "documentary" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": ".bg-white.rounded-lg:nth-child(1)" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}

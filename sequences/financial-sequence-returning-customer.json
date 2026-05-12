@@ -1,0 +1,53 @@
+{
+	"returning-customer": {
+		"description": "Returning user logs in, explores product portfolio actions, generates report. Story: power-user retention metric. Dashboard: returning-cohort vs new-signup engagement breakdown (Investment Adjusted, Report Generated counts).",
+		"persona": "returnVisitor",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{
+				"action": "click",
+				"selector": "#memberLogin",
+				"textFallback": "Member Login",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "#email", "text": "{{email}}" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "#password", "text": "Tr0ub4dor&3" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#logIn", "textFallback": "Log In" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href='/fixpanel/financial/product/']",
+				"textFallback": "Product",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#rebalance", "textFallback": "Rebalance" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[type=number]", "text": "30000" },
+			{ "action": "click", "selector": "#increaseInvestment", "textFallback": "Increase" },
+			{ "action": "click", "selector": "#increaseInvestment", "textFallback": "Increase" },
+			{ "action": "click", "selector": "#increaseInvestment", "textFallback": "Increase" },
+			{ "action": "click", "selector": "[role=tab]", "textFallback": "Savings" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#increaseSavings", "textFallback": "Increase" },
+			{ "action": "click", "selector": "#adjustGoal", "textFallback": "Goal" },
+			{ "action": "click", "selector": "[role=tab]", "textFallback": "Expenses" },
+			{ "action": "click", "selector": "#reduceExpenses", "textFallback": "Reduce" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "#generateReport" },
+			{ "action": "click", "selector": "#generateReport", "textFallback": "Report" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

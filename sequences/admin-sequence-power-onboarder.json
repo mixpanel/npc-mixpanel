@@ -1,0 +1,50 @@
+{
+	"power-onboarder": {
+		"description": "Power admin onboards 2 new employees end-to-end. Lands on /admin/, signs in, navigates to /employees, opens Add New Employee modal, fills name/email/role and submits. Submit has 25% permission-error rate (server-side bug); meeple submits 2x per add to handle the bug. Repeats hire flow 2 times to fit the 240s microsite cap. Story: high-intent admin completing onboarding tasks despite the permission bug. Dashboard: funnel landing -> Sign In -> /employees -> Add Employee Opened -> Employee Added (count >= 1), breakdown by error rate per session.",
+		"persona": "taskFocused",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "#adminSignIn",
+				"textFallback": "Sign In",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[type=email]", "text": "admin.lead@acme-corp.com" },
+			{ "action": "type", "selector": "input[type=password]", "text": "Sup3rSecure!" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Sign In" },
+			{ "action": "wait", "ms": 2500 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "a[href*='/employees']", "textFallback": "Employees" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "button.bg-blue-600.text-white", "textFallback": "Add New Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": ".z-50 input[placeholder='John Doe']", "text": "Priya Ramachandran" },
+			{ "action": "type", "selector": ".z-50 input[type=email]", "text": "priya.r@acme-corp.com" },
+			{ "action": "type", "selector": ".z-50 input[placeholder='Software Engineer']", "text": "Senior Engineer" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".z-50 button.bg-blue-600.text-white", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".z-50 button.bg-blue-600.text-white", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.bg-blue-600.text-white", "textFallback": "Add New Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": ".z-50 input[placeholder='John Doe']", "text": "Marcus Okonkwo" },
+			{ "action": "type", "selector": ".z-50 input[type=email]", "text": "marcus.o@acme-corp.com" },
+			{ "action": "type", "selector": ".z-50 input[placeholder='Software Engineer']", "text": "Product Manager" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".z-50 button.bg-blue-600.text-white", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".z-50 button.bg-blue-600.text-white", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" }
+		]
+	}
+}

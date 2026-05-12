@@ -1,0 +1,46 @@
+{
+	"permission-blocked": {
+		"description": "Counter-cohort to power-onboarder: tries to add an employee, hits the 25% permission-denied toast on submit, retries 3-4 times, gives up. Pairs with power-onboarder to expose the permission bug's drop-off impact. Dashboard: funnel Sign In -> /employees -> Add Employee Opened -> Permission Denied event count >= 1, conversion to Employee Added < 30% for this cohort.",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#adminSignIn",
+				"textFallback": "Sign In",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[type=email]", "text": "ops.manager@globex.io" },
+			{ "action": "type", "selector": "input[type=password]", "text": "letmein2026" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Sign In" },
+			{ "action": "wait", "ms": 2500 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "a[href*='/employees']", "textFallback": "Employees" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Add New Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[name='name'], input[placeholder*='Name' i]", "text": "Devon Carter" },
+			{ "action": "type", "selector": "input[type=email]", "text": "devon.c@globex.io" },
+			{ "action": "type", "selector": "input[name='role'], input[placeholder*='Role' i]", "text": "Analyst" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Add Employee" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "direction": "up", "amount": "page" }
+		]
+	}
+}

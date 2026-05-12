@@ -1,0 +1,45 @@
+{
+	"kyc-converter": {
+		"description": "Happy-path KYC: lands, opens KYC auto-fill modal (variant flag i-bank-kyc-flow), completes 3 steps, slogs through the 10-click submit (Step 3 has 20% radio bug — relies on heavy fillOutForm), lands on success page. Story: KYC auto-fill exposed cohort that converts. Dashboard: signup funnel landing → step1 → step2 → step3 → account-created, breakdown by KYC Auto-Fill variant.",
+		"persona": "taskFocused",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#getStarted",
+				"textFallback": "Get Started",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "#open-auto-fill-modal-button" },
+			{ "action": "click", "selector": "#open-auto-fill-modal-button", "textFallback": "Auto-Fill" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#auto-fill-action-button", "textFallback": "Auto-Fill" },
+			{ "action": "wait", "ms": 3000 },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 4 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#next", "requireActive": true },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 4 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#next", "requireActive": true },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 25 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted" },
+			{ "action": "click", "selector": "#getStarted", "expectsNavigation": true, "navigationTimeout": 12000 }
+		]
+	}
+}

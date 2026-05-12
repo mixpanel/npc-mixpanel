@@ -1,0 +1,38 @@
+{
+	"upvoter": {
+		"description": "High-engagement content reader: lands on theyRead and works through the feed casting upvotes (and one downvote) on multiple posts. Story: heavy-engagement reader cohort that drives the vote-event volume. Dashboard: 'Post Upvoted' / 'Post Downvoted' events per session > 5; breakdown by post id surfaces top-voted content. Pairs with comment-confused (engaged-but-blocked) and bouncer (no engagement) to triangulate the vote-engagement curve.",
+		"persona": "contentReader",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": ".bg-zinc-800.border-zinc-700:nth-child(1)" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(1) button:first-of-type" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(2) button:first-of-type" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(3) button:first-of-type" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(4) button:nth-of-type(2)" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(5) button:first-of-type" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(6) button:first-of-type" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(7) button:first-of-type" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(8) button:first-of-type" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(9) button:first-of-type" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(10) button:first-of-type" }
+		]
+	}
+}

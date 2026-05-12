@@ -1,0 +1,45 @@
+{
+	"window-shopper": {
+		"description": "Cautious first-time visitor: lands, scrolls product grid, hovers multiple products reading details, uses search bar, clicks one product card, considers adding to cart, navigates to /support/ to read FAQ before committing, ultimately bounces without completing checkout. Story: top-of-funnel research that needs more nurturing. Dashboard: cohort with high product hover count + Search Performed event + Support Page View but zero Add to Cart conversions.",
+		"persona": "firstTimer",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "type", "selector": "input[placeholder*='earch' i]", "text": "headphones" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.search-submit", "textFallback": "Search" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "button.add-to-cart" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.add-to-cart", "textFallback": "Add to Cart", "requireActive": true },
+			{ "action": "wait", "tier": "read" },
+			{
+				"action": "click",
+				"selector": "a[href*='/support']",
+				"textFallback": "Support",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "navigate" }
+		]
+	}
+}

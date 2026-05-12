@@ -1,0 +1,40 @@
+{
+	"kyc-frustrated": {
+		"description": "Counter-cohort: opens KYC, skips auto-fill, slogs through steps 1+2, gets stuck on step 3 (20%-success radio trap), bounces. Pairs with kyc-converter to expose the auto-fill conversion gap. Dashboard: signup funnel drop-off at step 3, Form Validation Failed event count > 0.",
+		"persona": "frustrated",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#getStarted",
+				"textFallback": "Get Started",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#next" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#next" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "click", "selector": "#getStarted", "requireActive": true },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#getStarted", "requireActive": true },
+			{ "action": "fillOutForm", "selector": "[role=radiogroup]", "clicksPerGroup": 2 },
+			{ "action": "click", "selector": "#getStarted", "requireActive": true },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#previous" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "navigate" }
+		]
+	}
+}

@@ -1,0 +1,42 @@
+{
+	"csv-frustrated": {
+		"description": "Methodical admin trying to export the employee roster to CSV. The Export CSV button always fails with an 'Export Failed' toast (no download fires). Meeple tries 3+ times, scrolls, attempts to filter, then bounces. Story: cohort blocked by the CSV export bug. Dashboard: count of Export CSV Clicked events per session >= 3 with 0 successful downloads; high session_duration with no conversion.",
+		"persona": "methodical",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#adminSignIn",
+				"textFallback": "Sign In",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[type=email]", "text": "data.ops@initech.com" },
+			{ "action": "type", "selector": "input[type=password]", "text": "Quarter1Report!" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Sign In" },
+			{ "action": "wait", "ms": 2500 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "a[href*='/employees']", "textFallback": "Employees" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "hover", "selector": "#nonexistent-cta" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Export CSV" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Export CSV" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Export CSV" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "direction": "up", "amount": "page" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Export CSV" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "micro" }
+		]
+	}
+}

@@ -1,0 +1,27 @@
+{
+	"bouncer": {
+		"description": "Quick bouncer: lands, looks at testimonials and a feature, leaves without converting. Story: top-of-funnel curiosity that doesn't engage. Dashboard: high session-count cohort with bounce_rate=true and 0 KYC starts.",
+		"persona": "impulsive",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "page" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "amount": "page" },
+			{
+				"action": "click",
+				"selector": "a[href='/fixpanel/financial/testimonials/']",
+				"textFallback": "Testimonials",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "navigate" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "scroll", "direction": "up", "amount": "page" }
+		]
+	}
+}

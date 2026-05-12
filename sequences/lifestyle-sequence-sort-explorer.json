@@ -1,0 +1,36 @@
+{
+	"sort-explorer": {
+		"description": "First-time visitor exploring the feed sort filters: lands, methodically tries Popular → Likely to Agree → Likely to Disagree, scrolls feed between each, clicks 1-2 hashtag chips (which open RickRoll in a new tab — meeple stays on /lifestyle, harmless). Story: tests how often sort algorithms get switched. Dashboard: 'Lifestyle Sort Changed' event count > 2 per session; breakdown by selected sort; tag-click count surfaces tag engagement.",
+		"persona": "methodical",
+		"temperature": 8,
+		"chaos-range": [8, 12],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Popular" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Likely to Agree" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Likely to Disagree" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(2) .bg-zinc-700", "textFallback": "#" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Popular" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": ".bg-zinc-800.border-zinc-700:nth-child(4) .bg-zinc-700", "textFallback": "#" },
+			{ "action": "wait", "tier": "read" }
+		]
+	}
+}

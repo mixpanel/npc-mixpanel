@@ -1,0 +1,48 @@
+{
+	"access-approver": {
+		"description": "Access-control admin doing real work on /admin/access: signs in, reviews Pending Requests tab, approves and rejects requests, jumps to Provisioned Services tab and accidentally clicks Bulk Provision (rickroll trap, opens video in new tab — funny chaos signal), then Teams & Groups tab + Manage Team (also a rickroll). Story: power user who occasionally falls into the rickroll detour. Dashboard: count of Approve/Reject events, RickRoll Opened event count > 0 as a fun outlier metric.",
+		"persona": "methodical",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "#adminSignIn",
+				"textFallback": "Sign In",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[type=email]", "text": "iam.admin@hooli.com" },
+			{ "action": "type", "selector": "input[type=password]", "text": "Z3roTrust2026" },
+			{ "action": "click", "selector": "button[type=submit]", "textFallback": "Sign In" },
+			{ "action": "wait", "ms": 2500 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "a[href*='/access']", "textFallback": "Access" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Pending Requests" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Approve" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Approve" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Reject" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Approve" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Provisioned Services" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Bulk Provision" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Teams & Groups" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "#nonexistent-cta", "textFallback": "Manage Team" },
+			{ "action": "wait", "tier": "think" }
+		]
+	}
+}

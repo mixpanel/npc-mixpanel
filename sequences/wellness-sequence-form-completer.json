@@ -1,0 +1,36 @@
+{
+	"form-completer": {
+		"description": "Happy-path wellness symptom poster: lands on ourHeart, clicks Post Symptoms CTA, fills the strict-validation form with canonical valid values (username starts with letter + has digit + 8+ chars, age 18-100, duration matches '<n> days|hours|weeks' regex, symptoms 50-500 chars with sentence-ending punctuation), submits cleanly. Story: clean form completion that bypasses the over-strict validation friction. Dashboard: wellness submit funnel landing -> Post Symptoms click -> Form Submitted, Form Validation Failed=0 cohort.",
+		"persona": "formFiller",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "tier": "read" },
+			{ "action": "scroll", "amount": "half" },
+			{
+				"action": "click",
+				"selector": "a[href*='/wellness/submit']",
+				"textFallback": "Post Symptoms",
+				"expectsNavigation": true,
+				"navigationTimeout": 8000
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "type", "selector": "input[placeholder*='SneezMaster']", "text": "WellUser123" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='32']", "text": "32" },
+			{ "action": "wait", "tier": "micro" },
+			{ "action": "type", "selector": "input[placeholder*='3 days']", "text": "5 days" },
+			{ "action": "wait", "tier": "micro" },
+			{
+				"action": "type",
+				"selector": "textarea[placeholder*='detailed']",
+				"text": "My head hurts and I feel dizzy when I stand up. Help."
+			},
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "form button[type=submit]", "textFallback": "Submit" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" }
+		]
+	}
+}

@@ -1,0 +1,30 @@
+{
+	"wheel-spinner": {
+		"description": "Flag-driven engagement: lands on ourHeart, waits for the bottom-left Symptom Wheel button to render (~1s after load), opens the modal, spins the wheel three times across whatever variant of the our-heart-wheel-of-symptoms feature flag the user is bucketed into (A=1.5s / B=6s / C=3s spin animation). Story: tests wheel engagement per variant. Dashboard: Symptom Wheel Spun event count > 2, breakdown by our-heart-wheel-of-symptoms variant.",
+		"persona": "contentReader",
+		"temperature": 10,
+		"chaos-range": [10, 10],
+		"circuitBreaker": { "maxFailures": 5, "resetOnSuccess": true, "mode": "skip" },
+		"actions": [
+			{ "action": "wait", "ms": 1500 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "hover", "selector": "button.fixed.bottom-6.left-6" },
+			{ "action": "click", "selector": "button.fixed.bottom-6.left-6", "textFallback": "Symptom" },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "click", "selector": "button.w-full.bg-teal-600", "textFallback": "Spin" },
+			{ "action": "wait", "ms": 7000 },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.w-full.bg-teal-600", "textFallback": "Spin" },
+			{ "action": "wait", "ms": 7000 },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "click", "selector": "button.w-full.bg-teal-600", "textFallback": "Spin" },
+			{ "action": "wait", "ms": 7000 },
+			{ "action": "wait", "tier": "think" },
+			{ "action": "scroll", "amount": "half" },
+			{ "action": "wait", "tier": "read" },
+			{ "action": "navigate" }
+		]
+	}
+}
