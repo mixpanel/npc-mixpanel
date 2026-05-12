@@ -78,8 +78,8 @@ export default async function main(PARAMS = {}, logFunction = null) {
 	} = PARAMS;
 
 	if (url === 'fixpanel') url = `https://mixpanel.github.io/fixpanel/`;
-	if (users > 25) users = 25;
-	if (concurrency > 10) concurrency = 10;
+	if (users > 100) users = 100;
+	if (concurrency > 20) concurrency = 20;
 	const limit = pLimit(concurrency);
 	if (token) MIXPANEL_TOKEN = token;
 	if (NODE_ENV === 'production') headless = true; // Always headless in production

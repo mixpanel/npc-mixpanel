@@ -211,8 +211,8 @@
 						>
 					</p>
 
-					<label for="users">Number of Meeples (1-15):</label>
-					<input type="range" id="users" name="users" min="1" max="10" value="5" />
+					<label for="users">Number of Meeples (1-100):</label>
+					<input type="range" id="users" name="users" min="1" max="100" value="5" />
 					<output for="users" id="usersOutput">5 meeples</output>
 
 					<div style="display: flex; align-items: center; gap: 20px">
@@ -229,6 +229,58 @@
 					<label> <input type="checkbox" id="headless" name="headless" checked /> Run in Headless Mode </label>
 
 					<label> <input type="checkbox" id="past" name="past" /> Simulate time in past </label>
+
+					<div
+						id="behavior-section"
+						style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1)"
+					>
+						<p style="margin: 4px 0; font-size: 0.85em; color: #888"><b>Behavior (1.1.0)</b></p>
+						<label style="font-size: 0.9em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+							Persona:
+							<select
+								id="persona"
+								name="persona"
+								style="
+									margin-left: 4px;
+									padding: 2px 4px;
+									background: #1a1a2e;
+									color: #fff;
+									border: 1px solid #333;
+									border-radius: 4px;
+								"
+							>
+								<!-- Options populated by app.js from PERSONA_NAMES (mirrors meeple/entities.js) -->
+							</select>
+						</label>
+						<details id="persona-mix-advanced" style="margin-top: 6px">
+							<summary style="cursor: pointer; font-size: 0.85em; color: #aaa; user-select: none">
+								Advanced: persona mix
+							</summary>
+							<div style="margin-top: 8px; padding: 8px; background: rgba(255, 255, 255, 0.03); border-radius: 4px">
+								<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px">
+									<small style="color: #888">Custom frequency weights (0-100). Ignored if a persona is selected.</small>
+									<button
+										type="button"
+										id="persona-mix-die"
+										style="
+											padding: 2px 8px;
+											font-size: 0.85em;
+											background: #2a2a3e;
+											color: #fff;
+											border: 1px solid #444;
+											border-radius: 4px;
+											cursor: pointer;
+										"
+									>
+										🎲 Randomize
+									</button>
+								</div>
+								<div id="persona-mix-grid" class="persona-mix-grid">
+									<!-- Sliders populated by app.js -->
+								</div>
+							</div>
+						</details>
+					</div>
 
 					<div
 						id="friction-section"

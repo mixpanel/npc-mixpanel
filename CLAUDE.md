@@ -112,11 +112,15 @@ Required in `.env`:
 
 ## Limits
 
-- Max 25 users/simulation, max 10 concurrent
+- Max 100 users/simulation, max 20 concurrent (raised from 25/10 in 1.1.0)
 - 10-min timeout per session, 1-min page load timeout
 - Cloud Run: 8Gi memory, 4 CPU, 3600s timeout, 0-10 instances
+- Wall-clock math: 100 users ÷ 20 concurrent × 10 min/session ≈ 50 min, fits the 60-min Cloud Run timeout
+- Per-job memory: 20 browsers × ~100 MB ≈ 2 GB. Multi-tenant `--concurrency` (currently 10) may need to drop to 2 if OOM observed
+- Sessions targeted past 10 min (researcher / contentReader / methodical can target up to 12) get cut off at the per-session timeout
 
 ## Known Issues
 
-- **Typecheck fails** — 6 TS errors in `forms.js` (ElementHandle<Node> vs ElementHandle<Element>) and 1 unused var in `interactions.js`. Pre-existing, not blocking lint or tests.
+(none — pre-existing typecheck errors cleared in 1.1.0)
+
 - `meeple/sequences.js` uses `@ts-nocheck` to suppress DOM/type complexity

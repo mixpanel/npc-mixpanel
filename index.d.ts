@@ -104,9 +104,9 @@ declare global {
 export interface MeepleParams {
 	/** Target URL to simulate user behavior on */
 	url?: string;
-	/** Number of concurrent users to simulate (max 25) */
+	/** Number of concurrent users to simulate (max 100, raised from 25 in 1.1.0) */
 	users?: number;
-	/** Concurrency limit for simultaneous executions (max 10) */
+	/** Concurrency limit for simultaneous executions (max 20, raised from 10 in 1.1.0) */
 	concurrency?: number;
 	/** Run browser in headless mode */
 	headless?: boolean;

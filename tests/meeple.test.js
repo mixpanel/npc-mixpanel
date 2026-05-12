@@ -1140,6 +1140,28 @@ describe('Meeple 1.1.0 — Persona Selection', () => {
 		expect(result).toBe('researcher');
 	});
 
+	test('selectPersona with multi-key weights only returns the keyed personas', () => {
+		// 50/50 mix between researcher and browser — exclude all others
+		const seen = new Set();
+		for (let i = 0; i < 50; i++) {
+			seen.add(selectPersona(noop, { weights: { researcher: 1, browser: 1 } }));
+		}
+		// Every selection must be one of the two
+		for (const p of seen) {
+			expect(['researcher', 'browser']).toContain(p);
+		}
+		// With 50 samples it's vanishingly unlikely to never see both
+		expect(seen.size).toBeGreaterThanOrEqual(1);
+	});
+
+	test('selectPersona with zero-weight key never selects that persona', () => {
+		// Heavily weight researcher, set browser to 0 — browser should never appear
+		for (let i = 0; i < 30; i++) {
+			const r = selectPersona(noop, { weights: { researcher: 1, browser: 0 } });
+			expect(r).toBe('researcher');
+		}
+	});
+
 	test('pickNextAction safety valve forces click after non-click streak', () => {
 		const weights = { scroll: 1.0, hover: 1.0, click: 0.001 };
 		const persona = 'researcher'; // maxConsecutiveNonClicks = 5

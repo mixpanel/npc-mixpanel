@@ -383,14 +383,14 @@ app.get('/help', (_req, res) => {
 					users: {
 						type: 'number',
 						default: 10,
-						max: 25,
+						max: 100,
 						description: 'Number of meeples (simulated users) to spawn'
 					},
 					concurrency: {
 						type: 'number',
 						default: 10,
-						max: 10,
-						description: 'Maximum concurrent meeples running at once'
+						max: 20,
+						description: 'Maximum concurrent meeples running at once (raised from 10 in 1.1.0)'
 					},
 					headless: {
 						type: 'boolean',
@@ -521,8 +521,8 @@ app.get('/help', (_req, res) => {
 				auth: true,
 				description: 'Run meeple simulations on the Mixtape music streaming demo with 5 persona types',
 				parameters: {
-					users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
-					concurrency: { type: 'number', default: 5, max: 10 },
+					users: { type: 'number', default: 10, max: 100, description: 'Number of meeples to spawn' },
+					concurrency: { type: 'number', default: 5, max: 20 },
 					headless: { type: 'boolean', default: true },
 					past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
 					bugRate: {
@@ -860,8 +860,8 @@ app.get('/mixtape', (_req, res) => {
 			safe_word: { required: true, description: 'Authentication password' }
 		},
 		parameters: {
-			users: { type: 'number', default: 10, max: 25, description: 'Number of meeples to spawn' },
-			concurrency: { type: 'number', default: 5, max: 10, description: 'Max concurrent meeples' },
+			users: { type: 'number', default: 10, max: 100, description: 'Number of meeples to spawn' },
+			concurrency: { type: 'number', default: 5, max: 20, description: 'Max concurrent meeples' },
 			headless: { type: 'boolean', default: true, description: 'Run in headless mode' },
 			past: { type: 'boolean', default: true, description: 'Simulate past timestamps' },
 			bugRate: {
