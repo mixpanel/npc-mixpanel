@@ -119,3 +119,26 @@ export function shuffle(array) {
 	}
 	return arr;
 }
+
+/**
+ * Compare a URL's hostname against an origin domain, allowing subdomains and www variants.
+ * Used by the domain-boundary recovery logic to keep meeples on-site.
+ *
+ * @param {string} currentUrl
+ * @param {string} originDomain - bare hostname (e.g. "example.com" — not a URL)
+ * @returns {boolean}
+ */
+export function isDomainMatch(currentUrl, originDomain) {
+	if (!currentUrl || !originDomain) return false;
+	try {
+		const host = new URL(currentUrl).hostname;
+		if (host === originDomain) return true;
+		if (host === 'www.' + originDomain) return true;
+		if (originDomain === 'www.' + host) return true;
+		if (host.endsWith('.' + originDomain)) return true;
+		if (originDomain.endsWith('.' + host)) return true;
+		return false;
+	} catch {
+		return false;
+	}
+}

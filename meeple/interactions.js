@@ -1435,6 +1435,140 @@ export async function deadClick(page, hotZones = [], log = console.log, mouseSta
 }
 
 /**
+ * Navigate to a new page on the same domain by finding and clicking a link.
+ * Supports both real-href navigation and SPA patterns (href="#", javascript:void, router-links).
+ *
+ * @param {Page} page
+ * @param {Object|null} mouseState
+ * @param {string} originDomain - hostname of session genesis URL (for filtering candidates)
+ * @param {Function} log
+ * @returns {Promise<{navigated: boolean, fromUrl: string, toUrl: string|null, target: string|null}>}
+ */
+export async function navigateToNewPage(page, mouseState, originDomain, log = console.log) {
+	const fromUrl = page.url();
+	try {
+		const linksData = await page.evaluate(domain => {
+			function isSameDomain(targetHost, origin) {
+				if (!targetHost) return false;
+				if (targetHost === origin) return true;
+				if (targetHost === 'www.' + origin) return true;
+				if (origin === 'www.' + targetHost) return true;
+				if (targetHost.endsWith('.' + origin)) return true;
+				if (origin.endsWith('.' + targetHost)) return true;
+				return false;
+			}
+			const els = Array.from(document.querySelectorAll('a, [role="link"], [data-href], [routerlink]'));
+			const out = [];
+			for (const el of els) {
+				const r = el.getBoundingClientRect();
+				if (r.width <= 0 || r.height <= 0) continue;
+				if (r.top > window.innerHeight + 200 || r.bottom < -200) continue;
+				const cs = window.getComputedStyle(el);
+				if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+
+				const rawHref = el.getAttribute('href') || el.getAttribute('data-href') || el.getAttribute('routerlink') || '';
+				let isSpa = false;
+				let resolvedHref = '';
+				let sameDomain = false;
+
+				if (!rawHref || rawHref === '#' || rawHref.startsWith('javascript:')) {
+					isSpa = true;
+					sameDomain = true;
+				} else if (rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+					sameDomain = false;
+				} else {
+					try {
+						const u = new URL(rawHref, window.location.href);
+						if (!u.protocol.startsWith('http')) continue;
+						resolvedHref = u.href;
+						sameDomain = isSameDomain(u.hostname, domain);
+					} catch {
+						sameDomain = false;
+					}
+				}
+
+				if (!sameDomain) continue;
+
+				const inViewport = r.top >= 0 && r.bottom <= window.innerHeight;
+				const inHeader = !!el.closest('header, nav, [role="banner"], [role="navigation"]');
+				const text = (el.textContent || '').trim().substring(0, 60);
+
+				out.push({
+					x: r.x + r.width / 2,
+					y: r.y + r.height / 2,
+					width: r.width,
+					height: r.height,
+					href: resolvedHref,
+					isSpa,
+					inViewport,
+					inHeader,
+					text
+				});
+			}
+			return {
+				links: out,
+				nodeCount: document.querySelectorAll('*').length
+			};
+		}, originDomain);
+
+		if (!linksData.links || linksData.links.length === 0) {
+			log(`    └─ 🧭 <span style="color: #888;">No same-domain links found, skipping navigate</span>`);
+			return { navigated: false, fromUrl, toUrl: null, target: null };
+		}
+
+		// Weight: prefer in-viewport (×3), in-header (×2), real-href slightly over SPA
+		const pool = [];
+		for (const l of linksData.links) {
+			let w = 1;
+			if (l.inViewport) w += 2;
+			if (l.inHeader) w += 1;
+			if (!l.isSpa) w += 1;
+			for (let i = 0; i < w; i++) pool.push(l);
+		}
+		const target = pool[Math.floor(Math.random() * pool.length)];
+
+		// Move mouse to target naturally then click via coords (no element handle survives evaluate)
+		const start = getStartPos(page, mouseState);
+		await moveMouse(page, start.x, start.y, target.x, target.y, target.width, target.height, log);
+		await new Promise(resolve => setTimeout(resolve, randomBetween(80, 250)));
+		await page.mouse.click(target.x, target.y, { delay: randomBetween(25, 75) });
+		updateMouseState(mouseState, target.x, target.y);
+
+		log(
+			`    ├─ 🧭 <span style="color: #BCF0F0;">Navigate click</span> on ${target.isSpa ? 'SPA link' : 'href'}: ` +
+				`"<span style="color: #FEDE9B;">${target.text || '(no text)'}</span>"`
+		);
+
+		// Wait for nav to settle, then check URL or DOM mutation
+		await new Promise(resolve => setTimeout(resolve, 2500));
+
+		const after = await page.evaluate(() => ({
+			url: window.location.href,
+			nodeCount: document.querySelectorAll('*').length
+		}));
+
+		const urlChanged = after.url !== fromUrl;
+		const nodeDelta = Math.abs(after.nodeCount - linksData.nodeCount);
+		const domDiff = nodeDelta / Math.max(1, linksData.nodeCount);
+		const navigated = urlChanged || domDiff > 0.3;
+
+		if (navigated) {
+			log(
+				`    └─ ✅ <span style="color: #07B096;">Navigated</span> to ${after.url} ` +
+					`<span style="color: #888;">(urlChange: ${urlChanged}, domDiff: ${(domDiff * 100).toFixed(0)}%)</span>`
+			);
+		} else {
+			log(`    └─ 🤷 <span style="color: #888;">Click registered but no navigation detected</span>`);
+		}
+
+		return { navigated, fromUrl, toUrl: navigated ? after.url : null, target: target.text };
+	} catch (error) {
+		log(`    └─ ⚠️ Navigate action failed: ${error.message}`);
+		return { navigated: false, fromUrl, toUrl: null, target: null };
+	}
+}
+
+/**
  * Simulate confused user behavior: rapid jittery mouse movements and frantic scrolling.
  * Triggered when a meeple encounters friction (failed action, timeout, etc.)
  * @param {Page} page - Puppeteer page object

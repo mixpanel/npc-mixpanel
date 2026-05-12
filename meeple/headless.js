@@ -21,6 +21,7 @@ import {
 	intelligentScroll,
 	naturalMouseMovement,
 	hoverOverElements,
+	navigateToNewPage,
 	deadClick,
 	confusedBehavior
 } from './interactions.js';
@@ -40,7 +41,7 @@ import { executeSequence } from './sequences.js';
 import { forceSpoofTimeInBrowser } from './analytics.js';
 import { personas } from './entities.js';
 import { generatePhaseSchedule, getPhaseForProgress, applyPhaseModifiers } from './phases.js';
-import { randomBetween, sleep } from './utils.js';
+import { randomBetween, sleep, isDomainMatch } from './utils.js';
 
 const { NODE_ENV = '' } = process.env;
 let { MIXPANEL_TOKEN = '' } = process.env;
@@ -474,6 +475,19 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 	const hardCeiling = opts.maxActions || null;
 	const mouseState = createMouseState(page.viewport());
 
+	// Domain boundary recovery — page.url() is post-navigation, use it as genesis
+	const genesisUrl = page.url();
+	let genesisDomain = '';
+	try {
+		genesisDomain = new URL(genesisUrl).hostname;
+	} catch {
+		// genesisUrl might be about:blank — leave empty, isDomainMatch handles it
+	}
+
+	// Login-trap recovery: per-URL-path consecutive form-fill failure counter
+	const formFailures = new Map();
+	const FORM_FAILURE_THRESHOLD = 3;
+
 	log(
 		`⏱️ <span style="color: #7856FF;">Target session duration:</span> ${(targetDurationMs / 1000).toFixed(0)}s ` +
 			`(persona: ${persona}, range: ${minMin}-${maxMin}min)`
@@ -557,13 +571,23 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 			log(`🎯 Updated: ${hotZones.length} hot zones identified`);
 		}
 
-		const funcToPerform = resolveActionHandler(action, page, hotZones, persona, hoverHistory, mouseState, opts, log);
+		const funcToPerform = resolveActionHandler(
+			action,
+			page,
+			hotZones,
+			persona,
+			hoverHistory,
+			mouseState,
+			genesisDomain,
+			opts,
+			log
+		);
 
 		try {
 			await ensurePageSetup(page, usersHandle, opts.inject !== false, opts, log);
 
 			const actionTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Action timeout')), 30000));
-			await Promise.race([funcToPerform(), actionTimeout]);
+			const actionResult = await Promise.race([funcToPerform(), actionTimeout]);
 
 			actionResults.push(action);
 			consecutiveFailures = 0;
@@ -571,6 +595,23 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 
 			if (action === 'click') consecutiveNonClicks = 0;
 			else consecutiveNonClicks++;
+
+			// Login-trap recovery: track form failures by URL path
+			if (action === 'form') {
+				const path = pageUrlPath(page);
+				if (actionResult === false) {
+					const count = (formFailures.get(path) || 0) + 1;
+					formFailures.set(path, count);
+					log(`    ├─ 📝 Form failure ${count}/${FORM_FAILURE_THRESHOLD} on ${path}`);
+					if (count >= FORM_FAILURE_THRESHOLD && genesisUrl && page.url() !== genesisUrl) {
+						log(`    └─ 🪤 <span style="color: #CC332B;">Login trap detected</span> on ${path} — escaping to genesis`);
+						await escapeToGenesis(page, genesisUrl, log);
+						formFailures.clear();
+					}
+				} else if (actionResult === true) {
+					formFailures.delete(path);
+				}
+			}
 		} catch (actionError) {
 			consecutiveFailures++;
 			log(`    ├─ ⚠️ <span style="color: #F8BC3B;">Action failed:</span> ${actionError.message}`);
@@ -583,6 +624,13 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 					`    └─ 🚨 <span style="color: #CC332B;">Too many consecutive failures (${consecutiveFailures}), terminating session</span>`
 				);
 				break;
+			}
+		}
+
+		// Domain boundary check after any action that could navigate (click/navigate/exploratory/back/forward)
+		if (genesisDomain && /^(click|exploratoryClick|navigate|back|forward|deadClick)$/.test(action)) {
+			if (!isDomainMatch(page.url(), genesisDomain)) {
+				await enforceDomainBoundary(page, genesisUrl, genesisDomain, log);
 			}
 		}
 
@@ -604,7 +652,7 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 /**
  * Resolve an action name to a callable handler. Unknown actions fall back to wait().
  */
-function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mouseState, opts, log) {
+function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mouseState, genesisDomain, opts, log) {
 	switch (action) {
 		case 'click':
 			return () => clickStuff(page, hotZones, log, mouseState);
@@ -623,6 +671,8 @@ function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mou
 			return () => hoverOverElements(page, hotZones, persona, hoverHistory, log, mouseState);
 		case 'form':
 			return () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
+		case 'navigate':
+			return () => navigateToNewPage(page, mouseState, genesisDomain, log);
 		case 'deadClick':
 			return () => deadClick(page, hotZones, log, mouseState);
 		case 'confusedBehavior':
@@ -634,7 +684,59 @@ function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mou
 		case 'wait':
 			return () => wait();
 		default:
-			// 'navigate' lands here until Phase 4 wires the handler.
 			return () => wait();
+	}
+}
+
+/**
+ * Get the path component of the current page URL for keying form-failure counters.
+ * Falls back to "/" on parse errors.
+ */
+function pageUrlPath(page) {
+	try {
+		return new URL(page.url()).pathname || '/';
+	} catch {
+		return '/';
+	}
+}
+
+/**
+ * If the meeple has wandered off the genesis domain, try to recover via goBack
+ * up to 2 times. If still off-domain, navigate directly to the genesis URL.
+ */
+async function enforceDomainBoundary(page, genesisUrl, genesisDomain, log) {
+	const offUrl = page.url();
+	log(`🛡️ <span style="color: #F8BC3B;">Off-domain:</span> ${offUrl} (genesis: ${genesisDomain}) — recovering...`);
+	for (let i = 0; i < 2; i++) {
+		try {
+			await page.goBack({ waitUntil: 'domcontentloaded', timeout: 5000 });
+			await sleep(400);
+			if (isDomainMatch(page.url(), genesisDomain)) {
+				log(`    └─ ↩️ <span style="color: #07B096;">Back-nav recovered:</span> ${page.url()}`);
+				return true;
+			}
+		} catch {
+			break;
+		}
+	}
+	log(`    └─ 🏠 <span style="color: #80E1D9;">Returning to genesis URL:</span> ${genesisUrl}`);
+	try {
+		await page.goto(genesisUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+		return true;
+	} catch (e) {
+		log(`    └─ ⚠️ Genesis recovery failed: ${e.message}`);
+		return false;
+	}
+}
+
+/**
+ * Navigate directly to the genesis URL. Used by login-trap recovery.
+ */
+async function escapeToGenesis(page, genesisUrl, log) {
+	try {
+		await page.goto(genesisUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+		log(`    └─ 🏠 <span style="color: #80E1D9;">Escaped to genesis:</span> ${genesisUrl}`);
+	} catch (e) {
+		log(`    └─ ⚠️ Escape to genesis failed: ${e.message}`);
 	}
 }
