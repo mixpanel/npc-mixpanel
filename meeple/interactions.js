@@ -626,46 +626,129 @@ export async function trackMouseMovement(page, target, log = null) {
 }
 
 /**
- * Simulate reading movements during hover
- * @param {Page} page - Puppeteer page object
- * @param {Object} target - Target element information
- * @param {number} hoverDuration - Duration of hover in milliseconds
- * @param {string} persona - User persona affecting reading behavior
- * @param {Function} _log - Logging function
+ * Simulate reading-trace mouse movements during hover.
+ *
+ * Pattern depends on target type:
+ *   - text content (paragraph/heading with substantial text): horizontal sweeps with vertical drift,
+ *     mimicking eye/cursor following lines of text
+ *   - image: slow diagonal scan with focal-point lingers
+ *   - default (interactive element): minimal jitter, brief settle
+ *
+ * @param {Page} page
+ * @param {Object} target - {x, y, width, height, text, tag}
+ * @param {number} hoverDuration
+ * @param {string} persona
+ * @param {Function} _log
+ * @param {Object|null} mouseState - persistent cursor (updated after final movement)
  */
-export async function simulateReadingMovements(page, target, hoverDuration, persona, _log) {
-	// Determine reading behavior based on persona
-	let readingIntensity = 1.0; // Default intensity
+export async function simulateReadingMovements(page, target, hoverDuration, persona, _log, mouseState = null) {
+	const cfg = personas[persona] || {};
+	const intensityByPersona = {
+		researcher: 1.5,
+		contentReader: 1.5,
+		methodical: 1.4,
+		firstTimer: 1.3,
+		browser: 1.0,
+		shopper: 1.0,
+		explorer: 1.0,
+		skimmer: 0.7,
+		speedRunner: 0.5,
+		taskFocused: 0.5,
+		impulsive: 0.4
+	};
+	const readingIntensity = intensityByPersona[persona] || 1.0;
 
-	if (persona === 'researcher' || persona === 'powerUser') {
-		readingIntensity = 1.5; // More thorough reading
-	} else if (persona === 'quickBrowser' || persona === 'impulse') {
-		readingIntensity = 0.7; // Faster, less thorough
-	}
+	// Pick trace pattern by target characteristics
+	const isImage = target.tag === 'img' || target.tag === 'video' || target.tag === 'svg';
+	const isLongText = !isImage && target.text && target.text.length > 50;
 
-	const movements = Math.floor((hoverDuration / 1000) * readingIntensity * 3); // 3 movements per second base
+	let lastX = target.x;
+	let lastY = target.y;
 
-	for (let i = 0; i < movements; i++) {
-		const progress = i / movements;
-
-		// Simulate reading pattern - left to right, top to bottom
-		const readingX = target.x + target.width * 0.1 + target.width * 0.8 * (progress % 1);
-		const readingY = target.y + target.height * 0.2 + (target.height * 0.6 * Math.floor(progress * 3)) / 3;
-
-		// Add natural micro-movements
-		const jitterX = (Math.random() - 0.5) * 8;
-		const jitterY = (Math.random() - 0.5) * 4;
-
-		const finalX = readingX + jitterX;
-		const finalY = readingY + jitterY;
-
-		try {
-			await page.mouse.move(finalX, finalY);
+	if (isLongText) {
+		// Horizontal sweeps following text lines — left→right with downward drift
+		const lineCount = Math.max(2, Math.floor(target.height / 24));
+		const sweepsPerLine = Math.max(1, Math.round(readingIntensity));
+		const totalMoves = lineCount * sweepsPerLine;
+		const perMoveTime = hoverDuration / totalMoves;
+		for (let line = 0; line < lineCount; line++) {
+			const lineY = target.y - target.height * 0.4 + ((line + 0.5) / lineCount) * target.height * 0.8;
+			for (let s = 0; s < sweepsPerLine; s++) {
+				const startX = target.x - target.width * 0.4;
+				const endX = target.x + target.width * 0.4;
+				const steps = 6;
+				for (let i = 0; i <= steps; i++) {
+					const t = i / steps;
+					const x = startX + (endX - startX) * t + (Math.random() - 0.5) * 6;
+					const y = lineY + (Math.random() - 0.5) * 4;
+					try {
+						await page.mouse.move(x, y);
+					} catch {
+						/* continue */
+					}
+					await new Promise(resolve => setTimeout(resolve, perMoveTime / steps));
+					lastX = x;
+					lastY = y;
+				}
+			}
+		}
+	} else if (isImage) {
+		// Diagonal scan with focal-point lingers
+		const passes = Math.max(1, Math.round(2 * readingIntensity));
+		const perPass = hoverDuration / passes;
+		for (let p = 0; p < passes; p++) {
+			const corners = [
+				{ x: target.x - target.width * 0.4, y: target.y - target.height * 0.4 },
+				{ x: target.x + target.width * 0.4, y: target.y + target.height * 0.4 },
+				{ x: target.x + target.width * 0.4, y: target.y - target.height * 0.4 },
+				{ x: target.x - target.width * 0.4, y: target.y + target.height * 0.4 }
+			];
+			const start = corners[p % 2];
+			const end = corners[(p % 2) + 2];
+			const steps = 8;
+			for (let i = 0; i <= steps; i++) {
+				const t = i / steps;
+				const x = start.x + (end.x - start.x) * t + (Math.random() - 0.5) * 8;
+				const y = start.y + (end.y - start.y) * t + (Math.random() - 0.5) * 8;
+				try {
+					await page.mouse.move(x, y);
+				} catch {
+					/* continue */
+				}
+				await new Promise(resolve => setTimeout(resolve, perPass / steps));
+				lastX = x;
+				lastY = y;
+			}
+			// Focal-point linger at center
+			try {
+				await page.mouse.move(target.x, target.y);
+			} catch {
+				/* continue */
+			}
+			await new Promise(resolve => setTimeout(resolve, randomBetween(150, 400)));
+			lastX = target.x;
+			lastY = target.y;
+		}
+	} else {
+		// Default: small jitter inside the bounding box
+		const movements = Math.max(1, Math.floor((hoverDuration / 1000) * readingIntensity * 2));
+		for (let i = 0; i < movements; i++) {
+			const x = target.x + (Math.random() - 0.5) * (target.width || 50) * 0.4;
+			const y = target.y + (Math.random() - 0.5) * (target.height || 30) * 0.4;
+			try {
+				await page.mouse.move(x, y);
+			} catch {
+				/* continue */
+			}
 			await new Promise(resolve => setTimeout(resolve, hoverDuration / movements));
-		} catch (error) {
-			// Continue with remaining movements even if one fails
+			lastX = x;
+			lastY = y;
 		}
 	}
+
+	updateMouseState(mouseState, lastX, lastY);
+	// Reference cfg to silence unused warning in older lint configs
+	void cfg;
 }
 
 /**
@@ -1154,28 +1237,37 @@ export async function hoverOverElements(
 			}
 		}
 
-		// Fallback: find regular hover targets
+		// Fallback: find regular hover targets (plus content elements for engagement-heavy personas)
 		if (!target) {
-			const hoverTargets = await page.evaluate(selectors => {
-				const elements = document.querySelectorAll(selectors.join(', '));
-				const targets = [];
+			const highEngagement = ['researcher', 'contentReader', 'firstTimer', 'methodical', 'browser'].includes(persona);
+			const hoverTargets = await page.evaluate(
+				(selectors, includeContent) => {
+					const baseSelector = selectors.join(', ');
+					const sel = includeContent
+						? baseSelector + ', p, h1, h2, h3, h4, h5, h6, img, [class*="price"], [class*="feature"], li'
+						: baseSelector;
+					const elements = document.querySelectorAll(sel);
+					const targets = [];
 
-				elements.forEach(el => {
-					const rect = el.getBoundingClientRect();
-					if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
-						targets.push({
-							x: rect.x + rect.width / 2,
-							y: rect.y + rect.height / 2,
-							width: rect.width,
-							height: rect.height,
-							text: el.textContent?.trim().substring(0, 30) || '',
-							tag: el.tagName.toLowerCase()
-						});
-					}
-				});
+					elements.forEach(el => {
+						const rect = el.getBoundingClientRect();
+						if (rect.width > 50 && rect.height > 20 && rect.top < window.innerHeight && rect.top > 0) {
+							targets.push({
+								x: rect.x + rect.width / 2,
+								y: rect.y + rect.height / 2,
+								width: rect.width,
+								height: rect.height,
+								text: el.textContent?.trim().substring(0, 200) || '',
+								tag: el.tagName.toLowerCase()
+							});
+						}
+					});
 
-				return targets.slice(0, 20); // Limit to first 20 for performance
-			}, interactiveSelectors);
+					return targets.slice(0, 25);
+				},
+				interactiveSelectors,
+				highEngagement
+			);
 
 			if (hoverTargets.length === 0) return false;
 			target = hoverTargets[Math.floor(Math.random() * hoverTargets.length)];
@@ -1210,7 +1302,7 @@ export async function hoverOverElements(
 		);
 
 		// Simulate reading-pattern micro-movements during hover (interleaved with the hover duration)
-		await simulateReadingMovements(page, target, hoverDuration, persona, log);
+		await simulateReadingMovements(page, target, hoverDuration, persona, log, mouseState);
 
 		// Track explicit hover dwell event with Mixpanel
 		await trackHoverDwellEvent(page, target, hoverDuration, persona, log);
@@ -1300,31 +1392,28 @@ function calculateHoverDuration(target, persona) {
 	// Get base duration range
 	const baseDuration = contentTypeDurations[contentType];
 
-	// Persona-based modifiers
+	// Persona-based modifiers (1.1.0 personas)
 	const personaModifiers = {
-		// High engagement personas - longer hover times
+		// High engagement
 		researcher: 1.5,
-		ruleSlawyer: 1.4,
-		discoverer: 1.3,
-		comparison: 1.2,
-		rolePlayer: 1.2,
+		contentReader: 1.5,
+		methodical: 1.4,
+		firstTimer: 1.3,
 
-		// Medium engagement personas
+		// Medium engagement
 		shopper: 1.1,
 		explorer: 1.0,
-		methodical: 1.1,
-		reader: 1.3,
+		browser: 1.0,
+		formFiller: 1.0,
+		returnVisitor: 0.9,
 
-		// Low engagement personas - shorter hover times
-		powerUser: 0.7,
-		taskFocused: 0.6,
-		decisive: 0.5,
-		mobileHabits: 0.4,
-		murderHobo: 0.3,
-
-		// Variable engagement
-		skimmer: 0.8,
-		minMaxer: 0.9
+		// Low engagement / fast-pace
+		skimmer: 0.7,
+		mobileUser: 0.6,
+		taskFocused: 0.5,
+		speedRunner: 0.4,
+		impulsive: 0.4,
+		frustrated: 0.5
 	};
 
 	// Apply persona modifier

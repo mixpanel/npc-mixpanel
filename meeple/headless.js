@@ -670,7 +670,7 @@ function resolveActionHandler(action, page, hotZones, persona, hoverHistory, mou
 		case 'hover':
 			return () => hoverOverElements(page, hotZones, persona, hoverHistory, log, mouseState);
 		case 'form':
-			return () => interactWithForms(page, log, { formMistakes: opts.formMistakes });
+			return () => interactWithForms(page, log, { formMistakes: opts.formMistakes, persona });
 		case 'navigate':
 			return () => navigateToNewPage(page, mouseState, genesisDomain, log);
 		case 'deadClick':

@@ -1,7 +1,101 @@
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
-import { formTestData } from './entities.js';
+import { formTestData, personas } from './entities.js';
+
+/** Per-persona char-delay ranges for typing. Falls back to medium. */
+const TYPING_RANGES = {
+	fast: { perChar: [15, 40], wordPause: [50, 200] },
+	medium: { perChar: [25, 75], wordPause: [100, 400] },
+	slow: { perChar: [40, 120], wordPause: [200, 700] }
+};
+
+function getTypingProfile(persona) {
+	const speed = personas[persona]?.typingSpeed || 'medium';
+	return TYPING_RANGES[speed] || TYPING_RANGES.medium;
+}
+
+/** Type a single word with realistic per-char timing and a small chance of a delayed typo. */
+async function typeWordWithMaybeTypo(page, word, profile) {
+	const willTypo = Math.random() < 0.05 && word.length >= 4;
+
+	if (!willTypo) {
+		for (const ch of word) {
+			await page.keyboard.type(ch);
+			await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+		}
+		return;
+	}
+
+	// Pick typo position (not very first char). Keep noticeAfter within remaining word.
+	const typoPos = randomBetween(1, Math.max(1, word.length - 2));
+	const remaining = word.length - typoPos;
+	const noticeAfter = randomBetween(2, Math.min(4, Math.max(2, remaining)));
+
+	const keyboardChars = 'qwertyuiopasdfghjklzxcvbnm';
+	const wrongChar = keyboardChars[Math.floor(Math.random() * keyboardChars.length)];
+
+	// Type up to typo
+	for (let i = 0; i < typoPos; i++) {
+		await page.keyboard.type(word[i]);
+		await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+	}
+	// Wrong char
+	await page.keyboard.type(wrongChar);
+	await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+	// Continue typing past the typo (delayed detection)
+	const continued = Math.min(noticeAfter, remaining);
+	for (let i = 0; i < continued; i++) {
+		await page.keyboard.type(word[typoPos + i]);
+		await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+	}
+	// "Wait, that's wrong" pause
+	await sleep(randomBetween(150, 400));
+	// Backspace the wrong char + everything typed after it
+	const backspaces = continued + 1;
+	for (let i = 0; i < backspaces; i++) {
+		await page.keyboard.press('Backspace');
+		await sleep(randomBetween(40, 90));
+	}
+	// Retype correctly from the typo position
+	for (let i = typoPos; i < word.length; i++) {
+		await page.keyboard.type(word[i]);
+		await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+	}
+}
+
+/** Type text in word-burst style: per-word burst + inter-word pause. Persona modulates speed. */
+async function typeWithBursts(page, text, persona) {
+	const profile = getTypingProfile(persona);
+	const words = text.split(/(\s+)/); // keep separators so spaces are preserved
+	for (const segment of words) {
+		if (segment.length === 0) continue;
+		if (/\s/.test(segment)) {
+			// Whitespace: type as-is then add a word-boundary pause
+			for (const ch of segment) {
+				await page.keyboard.type(ch);
+				await sleep(randomBetween(profile.perChar[0], profile.perChar[1]));
+			}
+			await sleep(randomBetween(profile.wordPause[0], profile.wordPause[1]));
+		} else {
+			await typeWordWithMaybeTypo(page, segment, profile);
+		}
+	}
+}
+
+/** Paste text by setting element value directly + dispatching input/change events. */
+async function pasteText(page, element, text) {
+	await page.evaluate(
+		(el, val) => {
+			el.focus();
+			el.value = val;
+			el.dispatchEvent(new Event('input', { bubbles: true }));
+			el.dispatchEvent(new Event('change', { bubbles: true }));
+		},
+		element,
+		text
+	);
+}
 
 // Click fuzziness configuration for form interactions
 export const CLICK_FUZZINESS = {
@@ -17,20 +111,25 @@ const randomBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) 
  */
 
 /**
- * Fill a text input or textarea with realistic typing
- * @param {Page} page - Puppeteer page object
- * @param {ElementHandle} element - The input/textarea element
- * @param {string} text - Text to type (optional, will use test data if not provided)
- * @param {Function} log - Logging function
- * @returns {Promise<boolean>} Success status
+ * Fill a text input or textarea with realistic typing.
+ *
+ * 1.1.0:
+ *   - Word-burst typing (per-char delay + inter-word pause), modulated by persona typingSpeed
+ *   - Delayed typo detection: type 2-4 chars past the typo before noticing and backspacing
+ *   - Paste behavior for structured fields (email/url/tel) ~25% of the time
+ *
+ * @param {Page} page
+ * @param {ElementHandle} element
+ * @param {string|null} text - Text to type (will pick from test data if null)
+ * @param {Function} log
+ * @param {string|null} persona - For typing-speed selection
+ * @returns {Promise<boolean>}
  */
-export async function fillTextInput(page, element, text = null, log = console.log) {
+export async function fillTextInput(page, element, text = null, log = console.log, persona = null) {
 	try {
-		// Scroll element into view
 		await element.scrollIntoViewIfNeeded();
 		await sleep(randomBetween(100, 300));
 
-		// Get element info for test data selection
 		const elementInfo = await page.evaluate(
 			el => ({
 				type: el.type || 'text',
@@ -40,7 +139,6 @@ export async function fillTextInput(page, element, text = null, log = console.lo
 			element
 		);
 
-		// Use provided text or select from test data
 		let textToType = text;
 		if (!textToType) {
 			const termType = ['email', 'search', 'password', 'url', 'tel', 'number'].includes(elementInfo.type)
@@ -50,24 +148,21 @@ export async function fillTextInput(page, element, text = null, log = console.lo
 			textToType = availableTerms[Math.floor(Math.random() * availableTerms.length)];
 		}
 
-		// Click into the field
-		await element.click({ clickCount: 3 }); // Triple-click to select all
+		// Paste-shortcut for structured fields ~25% of the time (real users autofill / paste)
+		const isStructuredField = ['email', 'url', 'tel'].includes(elementInfo.type);
+		if (isStructuredField && Math.random() < 0.25) {
+			await element.click();
+			await sleep(randomBetween(80, 200));
+			await pasteText(page, element, textToType);
+			await sleep(randomBetween(100, 300));
+			log(`    └─ 📋 <span style="color: #80E1D9;">Pasted</span> into ${elementInfo.type} field`);
+			return true;
+		}
+
+		await element.click({ clickCount: 3 }); // select-all to clear
 		await sleep(randomBetween(50, 150));
 
-		// Type with realistic speed and occasional typos
-		for (const char of textToType) {
-			// Occasionally make a typo and correct it (5% chance)
-			if (Math.random() < 0.05) {
-				const wrongChar = String.fromCharCode(97 + Math.floor(Math.random() * 26));
-				await page.keyboard.type(wrongChar);
-				await sleep(randomBetween(50, 100));
-				await page.keyboard.press('Backspace');
-				await sleep(randomBetween(25, 75));
-			}
-
-			await page.keyboard.type(char);
-			await sleep(randomBetween(25, 75));
-		}
+		await typeWithBursts(page, textToType, persona);
 
 		await sleep(randomBetween(100, 300));
 		return true;
@@ -220,7 +315,7 @@ export async function fillRadioGroup(page, radioGroupElement, clicksCount = 2, l
  * @param {Function} log - Logging function
  * @returns {Promise<boolean>} Success status
  */
-export async function fillTextInputWithMistake(page, element, text = null, log = console.log) {
+export async function fillTextInputWithMistake(page, element, text = null, log = console.log, persona = null) {
 	try {
 		await element.scrollIntoViewIfNeeded();
 		await sleep(randomBetween(100, 300));
@@ -279,10 +374,7 @@ export async function fillTextInputWithMistake(page, element, text = null, log =
 		// Type the wrong text
 		await element.click({ clickCount: 3 });
 		await sleep(randomBetween(50, 100));
-		for (const char of wrongText) {
-			await page.keyboard.type(char);
-			await sleep(randomBetween(25, 75));
-		}
+		await typeWithBursts(page, wrongText, persona);
 
 		// Try to submit to trigger validation error
 		await page.keyboard.press('Enter');
@@ -297,10 +389,7 @@ export async function fillTextInputWithMistake(page, element, text = null, log =
 		// Fix it — select all and retype correctly
 		await element.click({ clickCount: 3 });
 		await sleep(randomBetween(100, 200));
-		for (const char of correctText) {
-			await page.keyboard.type(char);
-			await sleep(randomBetween(25, 75));
-		}
+		await typeWithBursts(page, correctText, persona);
 
 		await sleep(randomBetween(200, 500));
 		log(`    └─ ✅ <span style="color: #07B096;">Corrected input</span>`);
@@ -329,6 +418,8 @@ export async function fillFormElement(page, element, options = {}, log = console
 			return { tagName, type, role };
 		}, element);
 
+		const persona = options.persona || null;
+
 		// Route to appropriate handler
 		if (elementInfo.role === 'radiogroup') {
 			return await fillRadioGroup(page, element, options.clicksPerGroup || 2, log);
@@ -337,11 +428,10 @@ export async function fillFormElement(page, element, options = {}, log = console
 		} else if (elementInfo.tagName === 'select') {
 			return await fillSelectDropdown(page, element, options.value, log);
 		} else if (elementInfo.tagName === 'textarea' || elementInfo.tagName === 'input') {
-			// When formMistakes is enabled, 30% chance to make an intentional mistake
 			if (options.formMistakes && Math.random() < 0.3) {
-				return await fillTextInputWithMistake(page, element, options.text, log);
+				return await fillTextInputWithMistake(page, element, options.text, log, persona);
 			}
-			return await fillTextInput(page, element, options.text, log);
+			return await fillTextInput(page, element, options.text, log, persona);
 		}
 
 		return false;
@@ -481,6 +571,7 @@ export async function interactWithForms(page, log = console.log, opts = {}) {
 		// Use shared utilities to fill the form element based on type
 		let success = false;
 		let action = '';
+		const persona = opts.persona || null;
 
 		if (target.role === 'radiogroup') {
 			success = await fillRadioGroup(page, elementHandle, 2, log);
@@ -494,9 +585,9 @@ export async function interactWithForms(page, log = console.log, opts = {}) {
 		} else {
 			// Text input, textarea, or other input types
 			if (opts.formMistakes && Math.random() < 0.3) {
-				success = await fillTextInputWithMistake(page, elementHandle, null, log);
+				success = await fillTextInputWithMistake(page, elementHandle, null, log, persona);
 			} else {
-				success = await fillTextInput(page, elementHandle, null, log);
+				success = await fillTextInput(page, elementHandle, null, log, persona);
 			}
 
 			// Sometimes submit (30%), sometimes just leave it
