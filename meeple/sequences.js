@@ -2,7 +2,7 @@
 /** @typedef {import('puppeteer').Page} Page */
 /** @typedef {import('puppeteer').ElementHandle} ElementHandle */
 
-import { wait, naturalMouseMovement, intelligentScroll, exploratoryClick } from './interactions.js';
+import { wait, naturalMouseMovement, intelligentScroll, exploratoryClick, createMouseState } from './interactions.js';
 import { interactWithForms, fillRadioGroup, toggleCheckbox, fillSelectDropdown, fillTextInput } from './forms.js';
 import { randomBetween, sleep } from './utils.js';
 
@@ -53,6 +53,9 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 	const maxConsecutiveFailures = maxFailures;
 	let circuitBreakerTriggered = false;
 
+	// 1.1.0: per-session cursor persistence so mouse doesn't teleport between sequence steps
+	const mouseState = createMouseState(page.viewport());
+
 	for (const [index, action] of actions.entries()) {
 		try {
 			// Check if we should follow the sequence or go random based on temperature
@@ -89,7 +92,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 			} else {
 				log(`🎲 <span style="color: #9B59B6;">Temperature bypass - random action instead</span>`);
 				// Execute a random action instead
-				const randomResult = await executeRandomAction(page, hotZones, persona, log);
+				const randomResult = await executeRandomAction(page, hotZones, persona, log, mouseState);
 				actionResults.push(randomResult);
 			}
 
@@ -109,7 +112,7 @@ export async function executeSequence(page, sequenceSpec, hotZones, persona, use
 			}
 
 			// Add realistic delays and non-state-changing actions between sequence actions
-			await addHumanBehavior(page, hotZones, persona, log);
+			await addHumanBehavior(page, hotZones, persona, log, mouseState);
 		} catch (error) {
 			log(`🚨 <span style="color: #E74C3C;">Sequence action error:</span> ${error.message}`);
 			let currentUrl = 'unknown';
@@ -622,12 +625,12 @@ async function executeFillOutForm(page, selector, clicksPerGroup = 2, log) {
  * @param {Function} log - Logging function
  * @returns {Promise<Object>} Action result
  */
-async function executeRandomAction(page, hotZones, persona, log) {
+async function executeRandomAction(page, hotZones, persona, log, mouseState = null) {
 	const randomActions = [
-		() => exploratoryClick(page, log),
-		() => naturalMouseMovement(page, hotZones, log),
-		() => intelligentScroll(page, hotZones, log),
-		() => interactWithForms(page, log)
+		() => exploratoryClick(page, log, mouseState),
+		() => naturalMouseMovement(page, hotZones, log, mouseState),
+		() => intelligentScroll(page, hotZones, log, mouseState),
+		() => interactWithForms(page, log, { persona })
 	];
 
 	const randomAction = randomActions[Math.floor(Math.random() * randomActions.length)];
@@ -656,7 +659,7 @@ async function executeRandomAction(page, hotZones, persona, log) {
  * @param {string} persona - Selected persona
  * @param {Function} log - Logging function
  */
-async function addHumanBehavior(page, hotZones, persona, log) {
+async function addHumanBehavior(page, hotZones, persona, log, mouseState = null) {
 	// Random delay between actions (500ms to 2000ms)
 	const baseDelay = randomBetween(500, 2000);
 	await sleep(baseDelay);
@@ -664,8 +667,8 @@ async function addHumanBehavior(page, hotZones, persona, log) {
 	// Occasionally add non-state-changing actions (30% chance)
 	if (Math.random() < 0.3) {
 		const behaviorActions = [
-			() => naturalMouseMovement(page, hotZones, log),
-			() => intelligentScroll(page, hotZones, log),
+			() => naturalMouseMovement(page, hotZones, log, mouseState),
+			() => intelligentScroll(page, hotZones, log, mouseState),
 			() => wait()
 		];
 

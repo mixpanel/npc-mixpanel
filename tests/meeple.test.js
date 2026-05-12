@@ -34,6 +34,13 @@ import { randomBetween, clamp, distance, shuffle } from '../meeple/utils.js';
 import { ensureCSPRelaxed, ensurePageSetup } from '../meeple/security.js';
 import { executeSequence, validateSequence, validateSequences } from '../meeple/sequences.js';
 
+// 1.1.0 imports for the new pure-function describe blocks at the bottom of this file
+import { generatePhaseSchedule, getPhaseForProgress, applyPhaseModifiers, PHASE_NAMES } from '../meeple/phases.js';
+import { pickNextAction } from '../meeple/personas.js';
+import { isDomainMatch } from '../meeple/utils.js';
+import { createMouseState, getStartPos, updateMouseState } from '../meeple/interactions.js';
+import { personas, personaNames } from '../meeple/entities.js';
+
 // Set test environment
 process.env.NODE_ENV = 'test';
 process.env.MIXPANEL_TOKEN = 'test-token-for-testing';
@@ -1069,5 +1076,142 @@ describe('Meeple Modules - Unit Tests', () => {
 				console.warn('Sequences directory not found or empty:', error.message);
 			}
 		}, 10000);
+	});
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Meeple 1.1.0 — pure-function unit tests (no browser, no network)
+// (imports for these blocks live at the top of the file)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Meeple 1.1.0 — Phase System', () => {
+	test('generatePhaseSchedule returns 4 phases ending at 1.0 with monotonic boundaries', () => {
+		for (let i = 0; i < 50; i++) {
+			const sched = generatePhaseSchedule();
+			expect(sched).toHaveLength(4);
+			expect(sched[3].endRatio).toBe(1.0);
+			expect(sched.map(p => p.name)).toEqual(PHASE_NAMES);
+			for (let j = 1; j < sched.length; j++) {
+				expect(sched[j].endRatio).toBeGreaterThan(sched[j - 1].endRatio);
+			}
+			// Arrival within plan-spec range (10-15% ±5% = ~5-20%)
+			expect(sched[0].endRatio).toBeGreaterThanOrEqual(0.05);
+			expect(sched[0].endRatio).toBeLessThanOrEqual(0.2);
+		}
+	});
+
+	test('getPhaseForProgress maps progress to phase', () => {
+		const sched = [
+			{ name: 'arrival', endRatio: 0.1 },
+			{ name: 'exploration', endRatio: 0.4 },
+			{ name: 'engagement', endRatio: 0.8 },
+			{ name: 'windDown', endRatio: 1.0 }
+		];
+		expect(getPhaseForProgress(0.05, sched)).toBe('arrival');
+		expect(getPhaseForProgress(0.25, sched)).toBe('exploration');
+		expect(getPhaseForProgress(0.6, sched)).toBe('engagement');
+		expect(getPhaseForProgress(0.9, sched)).toBe('windDown');
+		expect(getPhaseForProgress(1.0, sched)).toBe('windDown'); // edge: at-or-past end
+	});
+
+	test('applyPhaseModifiers multiplies base weights', () => {
+		const base = { click: 0.5, scroll: 0.5 };
+		const mods = applyPhaseModifiers(base, 'engagement');
+		expect(mods.click).toBeCloseTo(0.5 * 1.5); // engagement default click multiplier
+		// Unchanged actions keep their weight
+		const arrivalMods = applyPhaseModifiers({ deadClick: 0.1 }, 'arrival');
+		expect(arrivalMods.deadClick).toBe(0.1);
+	});
+});
+
+describe('Meeple 1.1.0 — Persona Selection', () => {
+	const noop = () => {};
+
+	test('selectPersona honors override', () => {
+		expect(selectPersona(noop, { override: 'researcher' })).toBe('researcher');
+	});
+
+	test('selectPersona rejects unknown override', () => {
+		expect(() => selectPersona(noop, { override: 'nonExistentPersona' })).toThrow(/Unknown persona/);
+	});
+
+	test('selectPersona uses custom weights', () => {
+		const result = selectPersona(noop, { weights: { researcher: 1.0 } });
+		expect(result).toBe('researcher');
+	});
+
+	test('pickNextAction safety valve forces click after non-click streak', () => {
+		const weights = { scroll: 1.0, hover: 1.0, click: 0.001 };
+		const persona = 'researcher'; // maxConsecutiveNonClicks = 5
+		const history = ['scroll', 'scroll', 'scroll', 'scroll', 'scroll'];
+		const action = pickNextAction(weights, persona, history, 5);
+		expect(action).toBe('click');
+	});
+
+	test('all 1.1.0 personas have valid sessionDuration in [1,12] minutes', () => {
+		expect(personaNames.length).toBe(15);
+		for (const name of personaNames) {
+			const p = personas[name];
+			expect(Array.isArray(p.sessionDuration)).toBe(true);
+			expect(p.sessionDuration[0]).toBeLessThanOrEqual(p.sessionDuration[1]);
+			expect(p.sessionDuration[0]).toBeGreaterThanOrEqual(1);
+			expect(p.sessionDuration[1]).toBeLessThanOrEqual(12);
+			expect(typeof p.frequency).toBe('number');
+			expect(p.frequency).toBeGreaterThan(0);
+			expect(p.actionWeights).toBeDefined();
+			expect(p.actionWeights.click).toBeDefined();
+		}
+	});
+
+	test('persona frequencies sum to a positive total', () => {
+		const total = personaNames.reduce((s, n) => s + personas[n].frequency, 0);
+		expect(total).toBeGreaterThan(0.5);
+		expect(total).toBeLessThan(2.0);
+	});
+});
+
+describe('Meeple 1.1.0 — Domain Matching', () => {
+	test('exact match', () => {
+		expect(isDomainMatch('https://example.com/path', 'example.com')).toBe(true);
+	});
+	test('www variant', () => {
+		expect(isDomainMatch('https://www.example.com/', 'example.com')).toBe(true);
+		expect(isDomainMatch('https://example.com/', 'www.example.com')).toBe(true);
+	});
+	test('subdomain', () => {
+		expect(isDomainMatch('https://blog.example.com/', 'example.com')).toBe(true);
+	});
+	test('different domain', () => {
+		expect(isDomainMatch('https://other.com/', 'example.com')).toBe(false);
+	});
+	test('invalid input', () => {
+		expect(isDomainMatch('not a url', 'example.com')).toBe(false);
+		expect(isDomainMatch('', 'example.com')).toBe(false);
+		expect(isDomainMatch('https://x.com', '')).toBe(false);
+	});
+});
+
+describe('Meeple 1.1.0 — Mouse State', () => {
+	test('createMouseState defaults to viewport center/upper-third', () => {
+		const st = createMouseState({ width: 1280, height: 800 });
+		expect(st.x).toBe(640);
+		expect(st.y).toBeCloseTo(800 / 3, 1);
+		expect(typeof st.lastMoveTimestamp).toBe('number');
+	});
+
+	test('getStartPos prefers mouseState over fallback', () => {
+		const fakePage = { viewport: () => ({ width: 1000, height: 800 }) };
+		expect(getStartPos(fakePage, { x: 100, y: 200 })).toEqual({ x: 100, y: 200 });
+		expect(getStartPos(fakePage, null)).toEqual({ x: 500, y: 400 });
+	});
+
+	test('updateMouseState mutates and is null-safe', () => {
+		const st = { x: 0, y: 0, lastMoveTimestamp: 0 };
+		updateMouseState(st, 50, 75);
+		expect(st.x).toBe(50);
+		expect(st.y).toBe(75);
+		expect(st.lastMoveTimestamp).toBeGreaterThan(0);
+		// Null is a no-op
+		expect(() => updateMouseState(null, 1, 2)).not.toThrow();
 	});
 });
