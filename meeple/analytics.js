@@ -13,12 +13,23 @@ dayjs.extend(utc);
  * @returns {number} - Unix timestamp in milliseconds
  */
 export function getRandomTimestampWithinLast5Days(log = console.log) {
+	return getRandomTimestampWithinHours(120, log);
+}
+
+/**
+ * Generate a random timestamp within the last N hours (clamped to [1, 120]).
+ * @param {number} hours - lookback window in hours
+ * @param {Function} log
+ * @returns {number} - Unix timestamp in milliseconds
+ */
+export function getRandomTimestampWithinHours(hours, log = console.log) {
+	const clamped = Math.max(1, Math.min(120, hours));
 	const now = Date.now();
-	const fiveDaysAgo = now - 5 * 24 * 60 * 60 * 1000;
-	const randomTime = fiveDaysAgo + Math.random() * (now - fiveDaysAgo);
+	const windowStart = now - clamped * 60 * 60 * 1000;
+	const randomTime = windowStart + Math.random() * (now - windowStart);
 
 	const formattedTime = dayjs(randomTime).utc().format('YYYY-MM-DD HH:mm:ss UTC');
-	log(`⏰ Simulating past time: ${formattedTime}`);
+	log(`⏰ Simulating past time: ${formattedTime} (within last ${clamped}h)`);
 
 	return randomTime;
 }
@@ -75,12 +86,13 @@ export function extractTopLevelDomain(hostname) {
 }
 
 /**
- * Force spoof time in browser by injecting time manipulation code
+ * Force spoof time in browser by injecting time manipulation code.
  * @param {Page} page - Puppeteer page object
  * @param {Function} log - Logging function
+ * @param {number} [hours=120] - lookback window for the spoofed timestamp (1-120, default 120 = 5 days)
  */
-export async function forceSpoofTimeInBrowser(page, log = console.log) {
-	const spoofedTimestamp = getRandomTimestampWithinLast5Days(log);
+export async function forceSpoofTimeInBrowser(page, log = console.log, hours = 120) {
+	const spoofedTimestamp = getRandomTimestampWithinHours(hours, log);
 	const spoofTimeFunctionString = spoofTime.toString();
 	log(`	├─ 🕰️ Spoofing time to: ${dayjs(spoofedTimestamp).toISOString()}`);
 

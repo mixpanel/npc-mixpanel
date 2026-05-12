@@ -317,8 +317,10 @@ export async function simulateUser(
 
 			// Spoof Date.now() in browser BEFORE navigation so site's Mixpanel SDK
 			// uses past timestamps. Must run before navigateToUrl.
-			if (past) {
-				await forceSpoofTimeInBrowser(page, log);
+			// past=true → 120h (5d). past=N → clamped to [1, 120] hours.
+			const pastHours = resolvePastHours(past);
+			if (pastHours > 0) {
+				await forceSpoofTimeInBrowser(page, log, pastHours);
 			}
 
 			// Apply friction behaviors if configured
@@ -719,6 +721,25 @@ async function simulateUserSession(page, hotZones, persona, usersHandle, opts, l
 	);
 
 	return actionResults;
+}
+
+/**
+ * Resolve the `past` API param to a lookback window in hours.
+ *   - false / 0 / null / undefined → 0 (no spoofing)
+ *   - true                         → 120 (5 days, the legacy default)
+ *   - number 1-120                 → clamped to [1, 120]
+ *   - any other value              → 0 (silently no-op)
+ *
+ * @param {boolean | number | null | undefined} past
+ * @returns {number} hours, 0 means "do not spoof"
+ */
+function resolvePastHours(past) {
+	if (past === true) return 120;
+	if (past === false || past == null) return 0;
+	if (typeof past === 'number' && Number.isFinite(past) && past > 0) {
+		return Math.max(1, Math.min(120, Math.floor(past)));
+	}
+	return 0;
 }
 
 /**

@@ -403,9 +403,10 @@ app.get('/help', (_req, res) => {
 						description: 'Inject Mixpanel analytics tracking into the page'
 					},
 					past: {
-						type: 'boolean',
+						type: 'boolean | number',
 						default: false,
-						description: 'Simulate past timestamps for analytics events'
+						description:
+							'Simulate past timestamps. false = no spoof. true = random within last 120h (5d). number N = random within last N hours, clamped to [1, 120].'
 					},
 					token: {
 						type: 'string',
