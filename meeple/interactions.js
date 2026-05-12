@@ -1625,10 +1625,19 @@ export async function navigateToNewPage(page, mouseState, originDomain, log = co
 		}
 		const target = pool[Math.floor(Math.random() * pool.length)];
 
-		// Move mouse to target naturally then click via coords (no element handle survives evaluate)
+		// Move mouse to target naturally
 		const start = getStartPos(page, mouseState);
 		await moveMouse(page, start.x, start.y, target.x, target.y, target.width, target.height, log);
 		await new Promise(resolve => setTimeout(resolve, randomBetween(80, 250)));
+
+		// Register the navigation listener BEFORE clicking. Real-href clicks fire the
+		// nav event before/during the click, so attaching after would miss it and force
+		// every click to wait the full SPA window.
+		const navPromise = page
+			.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' })
+			.then(() => 'navigation')
+			.catch(() => null);
+
 		await page.mouse.click(target.x, target.y, { delay: randomBetween(25, 75) });
 		updateMouseState(mouseState, target.x, target.y);
 
@@ -1637,13 +1646,8 @@ export async function navigateToNewPage(page, mouseState, originDomain, log = co
 				`"<span style="color: #FEDE9B;">${target.text || '(no text)'}</span>"`
 		);
 
-		// Race real navigation against the SPA detection window. Real hrefs resolve as soon
-		// as the load event fires; SPAs (no Puppeteer nav event) fall through to the DOM-diff
-		// check after ~2.5s.
-		const navPromise = page
-			.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' })
-			.then(() => 'navigation')
-			.catch(() => null);
+		// Real hrefs resolve as soon as the load event fires (navPromise wins); SPAs
+		// (no Puppeteer nav event) fall through to the DOM-diff check after ~2.5s.
 		const spaPromise = new Promise(resolve => setTimeout(() => resolve('spa-window'), 2500));
 		await Promise.race([navPromise, spaPromise]);
 
