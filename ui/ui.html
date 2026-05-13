@@ -216,9 +216,17 @@
 					<output for="users" id="usersOutput">5 meeples</output>
 
 					<div style="display: flex; align-items: center; gap: 20px">
-						<label> <input type="checkbox" id="inject" name="inject" checked /> Inject Mixpanel in Site </label>
+						<label
+							class="has-tooltip"
+							data-tooltip="Loads the Mixpanel SDK on the target site so meeple actions fire as Mixpanel events. Disable for sites that already have Mixpanel installed."
+						>
+							<input type="checkbox" id="inject" name="inject" checked /> Inject Mixpanel in Site
+						</label>
 						<div id="masking-container">
-							<label>
+							<label
+								class="has-tooltip"
+								data-tooltip="Toggles session-replay PII masking on text inputs and content. Off = capture everything; On = mask sensitive fields."
+							>
 								<span>masking</span>
 								<input type="checkbox" id="masking" name="masking" disabled />
 								<span id="masking-label">no masking</span>
@@ -226,29 +234,39 @@
 						</div>
 					</div>
 
-					<label> <input type="checkbox" id="headless" name="headless" checked /> Run in Headless Mode </label>
+					<label
+						class="has-tooltip"
+						data-tooltip="Run Chromium without a visible browser window. Faster and cheaper. Uncheck to watch meeples interact with the page in real-time."
+					>
+						<input type="checkbox" id="headless" name="headless" checked /> Run in Headless Mode
+					</label>
 
-					<label> <input type="checkbox" id="past" name="past" /> Simulate time in past </label>
+					<label
+						class="has-tooltip"
+						data-tooltip="Backdate event timestamps so the meeple session looks like it happened in the past N hours. Useful for backfilling demo or workshop data."
+					>
+						<input type="checkbox" id="past" name="past" /> Simulate time in past
+					</label>
+					<div id="past-hours-container" class="past-hours-row" hidden>
+						<span>up to:</span>
+						<input type="number" id="past-hours" name="past-hours" min="1" max="120" value="120" />
+						<span>hours ago</span>
+						<span id="past-hours-readable">~5 days</span>
+					</div>
 
 					<div
 						id="behavior-section"
 						style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1)"
 					>
-						<p style="margin: 4px 0; font-size: 0.85em; color: #888"><b>Behavior (1.1.0)</b></p>
-						<label style="font-size: 0.9em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+						<p style="margin: 4px 0; font-size: 0.85em; color: #888"><b>Cohorts</b></p>
+						<label
+							class="has-tooltip"
+							data-tooltip="Pick one of 15 user archetypes that controls pacing, typing speed, click patterns, and dwell time. Auto uses each persona's natural frequency to produce a realistic global mix."
+							style="font-size: 0.9em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap"
+						>
 							Persona:
-							<select
-								id="persona"
-								name="persona"
-								style="
-									margin-left: 4px;
-									padding: 2px 4px;
-									background: #1a1a2e;
-									color: #fff;
-									border: 1px solid #333;
-									border-radius: 4px;
-								"
-							>
+							<div id="persona-dropdown-anchor"></div>
+							<select id="persona" name="persona" hidden>
 								<!-- Options populated by app.js from PERSONA_NAMES (mirrors meeple/entities.js) -->
 							</select>
 						</label>
@@ -288,30 +306,32 @@
 					>
 						<p style="margin: 4px 0; font-size: 0.85em; color: #888"><b>Friction Behaviors</b></p>
 						<div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap">
-							<label style="font-size: 0.9em">
+							<label
+								class="has-tooltip"
+								data-tooltip="Throttle network speed to simulate real-world conditions. Affects all requests the meeple's browser makes."
+								style="font-size: 0.9em; display: flex; align-items: center; gap: 8px"
+							>
 								Network:
-								<select
-									id="networkProfile"
-									name="networkProfile"
-									style="
-										margin-left: 4px;
-										padding: 2px 4px;
-										background: #1a1a2e;
-										color: #fff;
-										border: 1px solid #333;
-										border-radius: 4px;
-									"
-								>
+								<div id="network-dropdown-anchor"></div>
+								<select id="networkProfile" name="networkProfile" hidden>
 									<option value="fast">Fast (default)</option>
 									<option value="moderate">Moderate (2 Mbps)</option>
 									<option value="slow4g">Slow 4G</option>
 									<option value="slow3g">Slow 3G</option>
 								</select>
 							</label>
-							<label style="font-size: 0.9em">
+							<label
+								class="has-tooltip"
+								data-tooltip="Randomly fail 15% of POST/PUT/PATCH requests to simulate flaky backends. Mixpanel requests are excluded. Great for testing error tracking."
+								style="font-size: 0.9em"
+							>
 								<input type="checkbox" id="chaosMode" name="chaosMode" /> Chaos Mode
 							</label>
-							<label style="font-size: 0.9em">
+							<label
+								class="has-tooltip"
+								data-tooltip="Meeples make occasional typos in form inputs and self-correct mid-typing. Produces more realistic input event traces."
+								style="font-size: 0.9em"
+							>
 								<input type="checkbox" id="formMistakes" name="formMistakes" /> Form Mistakes
 							</label>
 						</div>
