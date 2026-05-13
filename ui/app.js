@@ -322,6 +322,154 @@ async function fetchPersonaCatalog() {
 	}
 }
 
+// 1.1.0 — display-friendly metadata for the styled dropdowns. Hidden <select>
+// elements remain the source of truth for form state; these maps only feed
+// the visual options (title + 1-line description).
+const PERSONA_DISPLAY = {
+	'': { label: 'Auto (frequency-weighted)', desc: "Realistic global mix — uses each persona's natural frequency" },
+	speedRunner: { label: 'Speed Runner', desc: 'Goal-driven, fast clicks, minimal dwell (1-3 min)' },
+	browser: { label: 'Browser', desc: 'Casual mix — moderate clicks, some hovers (3-7 min)' },
+	researcher: { label: 'Researcher', desc: 'Slow + thorough, heavy hovers and reads (5-12 min)' },
+	shopper: { label: 'Shopper', desc: 'High navigation, comparison-style browsing (3-8 min)' },
+	taskFocused: { label: 'Task Focused', desc: 'Form-dominant, completes objectives quickly (1-4 min)' },
+	explorer: { label: 'Explorer', desc: 'Curious wanderer, high navigation + exploratory clicks (4-10 min)' },
+	skimmer: { label: 'Skimmer', desc: 'Heavy scroll, light clicks, fast scan (2-5 min)' },
+	firstTimer: { label: 'First-Timer', desc: 'Cautious, lots of hovering and waiting (3-8 min)' },
+	mobileUser: { label: 'Mobile User', desc: 'Scroll-heavy, low hover, tap patterns (2-6 min)' },
+	frustrated: { label: 'Frustrated', desc: 'Rage clicks, back-button heavy (1-4 min)' },
+	formFiller: { label: 'Form Filler', desc: 'Locked into forms, minimal exploration (2-5 min)' },
+	returnVisitor: { label: 'Return Visitor', desc: 'Knows the site, fast and direct (2-6 min)' },
+	contentReader: { label: 'Content Reader', desc: 'Deep reads, scroll + dwell dominant (5-12 min)' },
+	impulsive: { label: 'Impulsive', desc: 'Fast and reactive, frequent rage clicks (1-3 min)' },
+	methodical: { label: 'Methodical', desc: 'Slow and complete, balanced + form-heavy (6-12 min)' }
+};
+
+const NETWORK_DISPLAY = {
+	fast: { label: 'Fast', desc: 'No throttling — default' },
+	moderate: { label: 'Moderate', desc: '2 Mbps — light degradation' },
+	slow4g: { label: 'Slow 4G', desc: 'Mobile-grade latency' },
+	slow3g: { label: 'Slow 3G', desc: 'Worst-case mobile' }
+};
+
+/**
+ * Build a styled dropdown that mirrors a hidden <select>. The hidden select
+ * stays the source of truth — selecting an option sets select.value and
+ * dispatches a 'change' event so existing form-state code keeps working.
+ *
+ * @param {HTMLElement} anchor - placeholder element where the dropdown mounts
+ * @param {HTMLSelectElement} select - hidden source-of-truth select
+ * @param {Object<string, {label: string, desc: string}>} displayMap
+ */
+function createStyledDropdown(anchor, select, displayMap) {
+	const dropdown = document.createElement('div');
+	dropdown.className = 'styled-dropdown';
+	dropdown.dataset.open = 'false';
+
+	const trigger = document.createElement('button');
+	trigger.type = 'button';
+	trigger.className = 'styled-dropdown__trigger';
+	trigger.setAttribute('aria-haspopup', 'listbox');
+	trigger.setAttribute('aria-expanded', 'false');
+
+	const triggerLabel = document.createElement('span');
+	triggerLabel.className = 'styled-dropdown__trigger-label';
+
+	const chevron = document.createElement('span');
+	chevron.className = 'styled-dropdown__chevron';
+	chevron.textContent = '▾';
+
+	trigger.appendChild(triggerLabel);
+	trigger.appendChild(chevron);
+
+	const menu = document.createElement('ul');
+	menu.className = 'styled-dropdown__menu';
+	menu.setAttribute('role', 'listbox');
+
+	function render() {
+		menu.innerHTML = '';
+		Array.from(select.options).forEach(opt => {
+			const meta = displayMap[opt.value] || { label: opt.textContent || opt.value, desc: '' };
+			const li = document.createElement('li');
+			li.className = 'styled-dropdown__option';
+			li.setAttribute('role', 'option');
+			li.dataset.value = opt.value;
+			if (opt.value === select.value) li.dataset.active = 'true';
+
+			const labelEl = document.createElement('span');
+			labelEl.className = 'styled-dropdown__option-label';
+			labelEl.textContent = meta.label;
+			li.appendChild(labelEl);
+
+			if (meta.desc) {
+				const descEl = document.createElement('span');
+				descEl.className = 'styled-dropdown__option-desc';
+				descEl.textContent = meta.desc;
+				li.appendChild(descEl);
+			}
+
+			li.addEventListener('click', () => {
+				select.value = opt.value;
+				select.dispatchEvent(new Event('change', { bubbles: true }));
+				close();
+				updateTriggerLabel();
+				render();
+			});
+
+			menu.appendChild(li);
+		});
+	}
+
+	function updateTriggerLabel() {
+		const meta = displayMap[select.value] || {
+			label: select.options[select.selectedIndex]?.textContent || select.value
+		};
+		triggerLabel.textContent = meta.label;
+	}
+
+	function open() {
+		dropdown.dataset.open = 'true';
+		trigger.setAttribute('aria-expanded', 'true');
+	}
+
+	function close() {
+		dropdown.dataset.open = 'false';
+		trigger.setAttribute('aria-expanded', 'false');
+	}
+
+	trigger.addEventListener('click', e => {
+		e.stopPropagation();
+		if (dropdown.dataset.open === 'true') close();
+		else open();
+	});
+
+	trigger.addEventListener('keydown', e => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			if (dropdown.dataset.open === 'true') close();
+			else open();
+		} else if (e.key === 'Escape') {
+			close();
+		}
+	});
+
+	document.addEventListener('click', e => {
+		if (!dropdown.contains(/** @type {Node} */ (e.target))) close();
+	});
+
+	dropdown.appendChild(trigger);
+	dropdown.appendChild(menu);
+	anchor.replaceWith(dropdown);
+
+	updateTriggerLabel();
+	render();
+
+	// External code may set select.value programmatically — keep label in sync
+	select.addEventListener('change', () => {
+		updateTriggerLabel();
+		render();
+	});
+}
+
 (async function initPersonaControls() {
 	const personaSelect = /** @type {HTMLSelectElement} */ (document.getElementById('persona'));
 	const grid = document.getElementById('persona-mix-grid');
@@ -330,24 +478,28 @@ async function fetchPersonaCatalog() {
 
 	const { names, frequencies } = await fetchPersonaCatalog();
 
-	// Populate dropdown
+	// Populate hidden select (source of truth for form state)
 	const autoOpt = document.createElement('option');
 	autoOpt.value = '';
-	autoOpt.textContent = 'auto (frequency-weighted)';
+	autoOpt.textContent = 'Auto (frequency-weighted)';
 	personaSelect.appendChild(autoOpt);
 	for (const name of names) {
 		const opt = document.createElement('option');
 		opt.value = name;
-		opt.textContent = name;
+		opt.textContent = PERSONA_DISPLAY[name]?.label || name;
 		personaSelect.appendChild(opt);
 	}
+
+	// Mount the styled dropdown
+	const personaAnchor = document.getElementById('persona-dropdown-anchor');
+	if (personaAnchor) createStyledDropdown(personaAnchor, personaSelect, PERSONA_DISPLAY);
 
 	// Populate mix grid
 	for (const name of names) {
 		const defaultPct = Math.round((frequencies[name] || 0.05) * 100);
 		const labelEl = document.createElement('span');
 		labelEl.className = 'persona-name';
-		labelEl.textContent = name;
+		labelEl.textContent = PERSONA_DISPLAY[name]?.label || name;
 		const slider = document.createElement('input');
 		slider.type = 'range';
 		slider.min = '0';
@@ -376,6 +528,43 @@ async function fetchPersonaCatalog() {
 			sl.dispatchEvent(new Event('input'));
 		});
 	});
+})();
+
+// Mount the network styled dropdown (hidden select already has its options)
+(function initNetworkDropdown() {
+	const networkSelect = /** @type {HTMLSelectElement} */ (document.getElementById('networkProfile'));
+	const networkAnchor = document.getElementById('network-dropdown-anchor');
+	if (!networkSelect || !networkAnchor) return;
+	createStyledDropdown(networkAnchor, networkSelect, NETWORK_DISPLAY);
+})();
+
+// Past-hours toggle + readable display
+(function initPastHoursControls() {
+	const pastCheckbox = /** @type {HTMLInputElement} */ (document.getElementById('past'));
+	const container = document.getElementById('past-hours-container');
+	const hoursInput = /** @type {HTMLInputElement} */ (document.getElementById('past-hours'));
+	const readable = document.getElementById('past-hours-readable');
+	if (!pastCheckbox || !container || !hoursInput || !readable) return;
+
+	function updateReadable() {
+		const h = parseInt(hoursInput.value, 10) || 0;
+		if (h <= 0) readable.textContent = '';
+		else if (h < 24) readable.textContent = h === 1 ? '~1 hour' : `~${h} hours`;
+		else {
+			const days = Math.round(h / 24);
+			readable.textContent = days === 1 ? '~1 day' : `~${days} days`;
+		}
+	}
+
+	function syncVisibility() {
+		container.hidden = !pastCheckbox.checked;
+	}
+
+	pastCheckbox.addEventListener('change', syncVisibility);
+	hoursInput.addEventListener('input', updateReadable);
+
+	syncVisibility();
+	updateReadable();
 })();
 
 // Update token field styling based on inject checkbox
@@ -667,8 +856,18 @@ form.addEventListener('submit', async e => {
 	// Ensure checkbox values are included in the data
 	data.inject = /** @type {HTMLInputElement} */ (form.querySelector('#inject')).checked;
 	data.headless = /** @type {HTMLInputElement} */ (form.querySelector('#headless')).checked;
-	data.past = /** @type {HTMLInputElement} */ (form.querySelector('#past')).checked;
 	data.masking = /** @type {HTMLInputElement} */ (form.querySelector('#masking')).checked;
+
+	// 1.1.0: past = integer hours (1-120) when checkbox is checked, else false
+	const pastChecked = /** @type {HTMLInputElement} */ (form.querySelector('#past')).checked;
+	if (pastChecked) {
+		const rawHours = parseInt(/** @type {HTMLInputElement} */ (form.querySelector('#past-hours')).value, 10);
+		const clamped = Math.max(1, Math.min(120, Number.isFinite(rawHours) ? rawHours : 120));
+		data.past = clamped;
+	} else {
+		data.past = false;
+	}
+	delete data['past-hours'];
 
 	// Friction behaviors
 	data.networkProfile = /** @type {HTMLSelectElement} */ (form.querySelector('#networkProfile')).value;
@@ -816,7 +1015,7 @@ form.addEventListener('submit', async e => {
 
 	formLine3.innerHTML = `<div class="config-row">
 		<span class="config-label">${data.users} meeple${data.users > 1 ? 's' : ''}</span>
-		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${data.past ? '✓' : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}${frictionStr}</span>
+		<span class="config-flags">inject: ${data.inject ? '✓' : '✗'} | headless: ${data.headless ? '✓' : '✗'} | past: ${typeof data.past === 'number' ? `${data.past}h` : '✗'}${data.inject && data.masking ? ' | masking: ✓' : ''}${frictionStr}</span>
 		${data.inject && data.token === '7127e52d6d61ee30a4d7fb4555277f87' ? `<a href="https://mixpanel.com/project/3769788/view/4266856/app/events" target="_blank" class="default-project-link">→ view project</a>` : ''}
 	</div>`;
 

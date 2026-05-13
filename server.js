@@ -685,6 +685,19 @@ app.post('/simulate', async (req, res) => {
 			});
 		}
 
+		// 1.1.0: validate past parameter (boolean, or integer hours 1-120)
+		if (mergedParams.past != null && typeof mergedParams.past !== 'boolean') {
+			const n = Number(mergedParams.past);
+			if (!Number.isFinite(n) || n < 1 || n > 120) {
+				logger.error(`/SIMULATE past validation error`, { past: mergedParams.past, user, clientId });
+				return res.status(400).json({
+					error: 'Invalid past parameter',
+					details: ['past must be boolean or integer hours in range [1, 120]']
+				});
+			}
+			mergedParams.past = Math.floor(n);
+		}
+
 		const startTime = Date.now();
 
 		// Server-side analytics: Track API job start
